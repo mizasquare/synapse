@@ -20,3 +20,6 @@ gcamp6s-venv/
 # 옛 버전 · 대용량 (의도적 제외)
 under_vsersion1/
 archived/
+
+# 페달보드 프리셋 — 첫 커밋(09c5308)에 백업으로 박제됨, 이후 추적 안 함
+pedal/
