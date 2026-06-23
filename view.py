@@ -549,9 +549,18 @@ class SynapseGUI(RelativeLayout):
 
     def update_parameter_display(self, instance_name, param_symbol, value):
         # Locate the correct widget and update it instead of redrawing everything
+        # isinstance 를 먼저 검사해야 port_symbol 없는 위젯(PatchFileWidget 등)에서 안전.
         for widget in self.port_control_area.grid_layout.children:
             if isinstance(widget, ParameterSliderWidget) and widget.port_symbol == param_symbol:
                 widget.set_value_external(value)  # thumb + 라벨 갱신(host 되쏨 없음)
+                return
+            if isinstance(widget, ParameterToggleWidget) and widget.port_symbol == param_symbol:
+                # 토글: port_value 설정 → update_toggle_button 으로 버튼 상태만 바뀜.
+                # on_port_value_change 디스패치는 버튼 '직접 누름'에서만 발생하므로 host 되쏨 없음.
+                widget.port_value = 1 if value >= 0.5 else 0
+                return
+            if isinstance(widget, BypassToggleWidget) and widget.port_symbol == param_symbol:
+                widget.port_value = value >= 0.5  # 포트영역 Bypass 스위치 갱신(디스패치 없음)
                 return
 
     def update_patch_display(self, instance_name, patch_uri, patch_file):

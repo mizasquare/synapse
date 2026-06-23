@@ -145,8 +145,9 @@ class Presenter:
         if not effect:
             return
         if symbol == ":bypass":
-            effect.bypassed = bool(value)
-            self.view_update_effect()
+            effect.bypassed = value >= 0.5
+            self.view_update_effect()                                    # 리스트 O 표시 갱신
+            self.view.update_parameter_display(instance, symbol, value)  # 포트영역 Bypass 스위치 갱신
             return
         port = effect.ports.get(symbol)
         if port is not None:
