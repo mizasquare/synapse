@@ -2210,6 +2210,9 @@ class Host(object):
 
         # TODO: restore HMI and CC addressings if crashed
 
+        # Gap D: send the current pedalboard name to a freshly-connected client
+        # too, so its title bar is correct on (re)connect (mirrors the broadcast).
+        websocket.write_message("pedalboard_name %s" % self.pedalboard_name)
         websocket.write_message("loading_end %d" % self.current_pedalboard_snapshot_id)
 
     # -----------------------------------------------------------------------------------------------------------------
@@ -3669,6 +3672,11 @@ class Host(object):
 
         self.addressings.registerMappings(self.msg_callback, rinstances)
 
+        # Gap D: broadcast the pedalboard name so every connected web-UI client
+        # refreshes its title bar on any load (app/REST/MIDI/HMI), not only when
+        # the client itself initiated the load. Must precede loading_end so the
+        # client's loading_end handler redraws with the fresh desktop.title.
+        self.msg_callback("pedalboard_name %s" % pb['title'])
         self.msg_callback("loading_end %d" % self.current_pedalboard_snapshot_id)
 
         if isDefault:

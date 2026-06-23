@@ -23,6 +23,8 @@ SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST_DIR="/usr/lib/python3/dist-packages/mod"
 SERVICE="modep-mod-ui"
 FILES=(host.py session.py webserver.py)
+# 비-파이썬 자산(웹 프론트 등): "소스파일::대상경로" 쌍. py_compile 없이 통째 cp.
+ASSETS=("host.js::/usr/share/mod/html/js/host.js")
 
 CHECK_ONLY=0
 DRY_RUN=0
@@ -54,6 +56,17 @@ if [[ "$CHECK_ONLY" == 1 ]]; then
       echo "  [다름]   $f"; differ=1
     fi
   done
+  for pair in "${ASSETS[@]}"; do
+    src="${pair%%::*}"; dst="${pair##*::}"
+    if [[ ! -f "$dst" ]]; then
+      echo "  [없음]   $src (라이브에 없음: $dst)"; differ=1; continue
+    fi
+    if diff -q "$SRC_DIR/$src" "$dst" >/dev/null; then
+      echo "  [동일]   $src"
+    else
+      echo "  [다름]   $src"; differ=1
+    fi
+  done
   exit $differ
 fi
 
@@ -69,6 +82,15 @@ for f in "${FILES[@]}"; do
   [[ -f "$SRC_DIR/$f" ]] || { echo "오류: 소스 없음 $SRC_DIR/$f" >&2; exit 1; }
   python3 -m py_compile "$SRC_DIR/$f" || { echo "오류: $f 컴파일 실패 — 배포 중단" >&2; exit 1; }
 done
+# 자산(.js) best-effort 문법검사: node 가 설치돼 있을 때만.
+if command -v node >/dev/null 2>&1; then
+  for pair in "${ASSETS[@]}"; do
+    case "${pair%%::*}" in
+      *.js) node --check "$SRC_DIR/${pair%%::*}" \
+              || { echo "오류: ${pair%%::*} JS 문법 오류 — 배포 중단" >&2; exit 1; } ;;
+    esac
+  done
+fi
 echo "  OK"
 echo
 
@@ -97,6 +119,33 @@ for f in "${FILES[@]}"; do
     echo "  [배포]   $f ✓"
   else
     echo "오류: $f 배포 후 검증 실패" >&2; exit 1
+  fi
+done
+
+# 자산(.js 등) 배포: py_compile 없이, .py 와 동일한 백업/cp/검증.
+for pair in "${ASSETS[@]}"; do
+  name="${pair%%::*}"; src="$SRC_DIR/$name"; dst="${pair##*::}"
+  [[ -f "$src" ]] || { echo "오류: 소스 없음 $src" >&2; exit 1; }
+  if [[ -f "$dst" ]] && diff -q "$src" "$dst" >/dev/null; then
+    echo "  [건너뜀] $name (이미 최신)"
+    continue
+  fi
+  changed=1
+  if [[ "$DRY_RUN" == 1 ]]; then
+    echo "  [dry-run] $name → 백업 후 cp 예정"
+    continue
+  fi
+  if [[ -f "$dst" ]]; then
+    cp -p "$dst" "$dst.bak-$TS"
+    echo "  [백업]   $name → $(basename "$dst").bak-$TS"
+  fi
+  cp "$src" "$dst"
+  chown root:root "$dst"
+  chmod 644 "$dst"
+  if diff -q "$src" "$dst" >/dev/null; then
+    echo "  [배포]   $name ✓"
+  else
+    echo "오류: $name 배포 후 검증 실패" >&2; exit 1
   fi
 done
 
