@@ -192,6 +192,9 @@ class Session(object):
             self.host.bypass(instance, bvalue, callback)
         else:
             self.host.param_set(port, value, callback)
+        # 트랙1-②: 앱(syn_set)에서 바꾼 값을 모든 웹UI에 broadcast (정상 경로 ws_parameter_set와 동일).
+        # HTTP 출처라 제외할 ws 없음 → ws2=None 으로 전체 전송. desync 제거.
+        self.msg_callback_broadcast("param_set %s %s %f" % (instance, portsymbol, value), None)
 
 
     # Connect 2 ports
