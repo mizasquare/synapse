@@ -3,6 +3,7 @@
 from hardwares.Adafruit_I2C import Adafruit_I2C
 import time
 import math
+import threading
 
 MCP23017_IODIRA = 0x00
 MCP23017_IODIRB = 0x01
@@ -54,6 +55,10 @@ class MCP23017(object):
         self.i2c = Adafruit_I2C(address=address, busnum=busnum)
         self.address = address
         self.num_gpios = num_gpios
+        # Serialises every runtime I2C access (input/output/currentVal/read_bank_a)
+        # so the background footswitch-poll thread and the Kivy main thread (LED
+        # writes) can never interleave transactions on the shared bus.
+        self._lock = threading.Lock()
 
         # set defaults
         self.i2c.write8(MCP23017_IODIRA, 0xFF)  # all inputs on port A
@@ -146,13 +151,14 @@ class MCP23017(object):
         assert pin >= 0 and pin < self.num_gpios, "Pin number %s is invalid, only 0-%s are valid" % (
         pin, self.num_gpios)
         assert self.direction & (1 << pin) == 0, "Pin %s not set to output" % pin
-        # if the pin is < 8, use register from first bank
-        if (pin < 8):
-            self.outputvalue = self._readAndChangePin(MCP23017_GPIOA, pin, value, self.i2c.readU8(MCP23017_OLATA))
-        else:
-            # otherwise use register from second bank
-            # readAndChangePin accepts pin relative to register though, so subtract
-            self.outputvalue = self._readAndChangePin(MCP23017_GPIOB, pin - 8, value, self.i2c.readU8(MCP23017_OLATB))
+        with self._lock:
+            # if the pin is < 8, use register from first bank
+            if (pin < 8):
+                self.outputvalue = self._readAndChangePin(MCP23017_GPIOA, pin, value, self.i2c.readU8(MCP23017_OLATA))
+            else:
+                # otherwise use register from second bank
+                # readAndChangePin accepts pin relative to register though, so subtract
+                self.outputvalue = self._readAndChangePin(MCP23017_GPIOB, pin - 8, value, self.i2c.readU8(MCP23017_OLATB))
         return self.outputvalue
 
     # read the value of a pin
@@ -163,14 +169,22 @@ class MCP23017(object):
         assert self.direction & (1 << pin) != 0, "Pin %s not set to input" % pin
         value = 0
         # reads the whole register then compares the value of the specific pin
-        if (pin < 8):
-            regValue = self.i2c.readU8(MCP23017_GPIOA)
-            if regValue & (1 << pin) != 0: value = 1
-        else:
-            regValue = self.i2c.readU8(MCP23017_GPIOB)
-            if regValue & (1 << pin - 8) != 0: value = 1
+        with self._lock:
+            if (pin < 8):
+                regValue = self.i2c.readU8(MCP23017_GPIOA)
+                if regValue & (1 << pin) != 0: value = 1
+            else:
+                regValue = self.i2c.readU8(MCP23017_GPIOB)
+                if regValue & (1 << pin - 8) != 0: value = 1
         # 1 or 0
         return value
+
+    # Read all eight port-A pins in ONE I2C transaction and return the raw byte.
+    # Footswitches live on port A (pins 0-3); the caller masks the bits it needs.
+    # This replaces four separate input() calls (one per switch) with a single read.
+    def read_bank_a(self):
+        with self._lock:
+            return self.i2c.readU8(MCP23017_GPIOA)
         # Return current value when output mode
 
     def currentVal(self, pin):
@@ -178,12 +192,13 @@ class MCP23017(object):
         pin, self.num_gpios)
         value = 0
         # reads the whole register then compares the value of the specific pin
-        if (pin < 8):
-            regValue = self.i2c.readU8(MCP23017_GPIOA)
-            if regValue & (1 << pin) != 0: value = 1
-        else:
-            regValue = self.i2c.readU8(MCP23017_GPIOB)
-            if regValue & (1 << pin - 8) != 0: value = 1
+        with self._lock:
+            if (pin < 8):
+                regValue = self.i2c.readU8(MCP23017_GPIOA)
+                if regValue & (1 << pin) != 0: value = 1
+            else:
+                regValue = self.i2c.readU8(MCP23017_GPIOB)
+                if regValue & (1 << pin - 8) != 0: value = 1
         # 1 or 0
         return value
 

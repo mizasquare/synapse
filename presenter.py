@@ -6,6 +6,8 @@ import utils
 from hardwares import fsledctrl
 from modepctrl import ModepController, initialize_modep_pedalboard
 import subprocess
+import threading
+import time
 
 import json
 import os
@@ -21,8 +23,9 @@ class Presenter:
         self.footswitch_assigns = {0: None, 1: None, 2: None, 3: None}
         self.footswitch_combo_assigns = {}
         self.footswitch_input_que = [0] * 4
-        self.polling_event = None
-        self.start_footswitch_polling(20)  # Start at 20Hz
+        self._poll_thread = None
+        self._poll_stop = None
+        self.start_footswitch_polling(100)  # background thread @100Hz
 
         # Load pedalboard model
         self.pedalboard = initialize_modep_pedalboard()
@@ -235,20 +238,61 @@ class Presenter:
         else:
             print(f"Failed to load PB {pb_path}: {error}")
 
-    def start_footswitch_polling(self, rate_hz):
-        if self.polling_event:
-            self.polling_event.cancel()
-        self.polling_event = Clock.schedule_interval(self.poll_footswitches, 1 / rate_hz)
+    # Consecutive identical samples required before a switch state change is
+    # accepted (software debounce). At 100 Hz, 3 samples == ~30 ms: longer than
+    # mechanical bounce (<10 ms) yet imperceptible to the player.
+    FOOTSWITCH_POLL_HZ = 100
+    DEBOUNCE_SAMPLES = 3
 
-    def poll_footswitches(self, dt):
-        current_status = [self.hwi.footswitch[i] for i in range(4)]
-        for i in range(4):
-            if current_status[i] == 1:
-                self.footswitch_input_que[i] = 1
+    def start_footswitch_polling(self, rate_hz=None):
+        """Run the footswitch poll loop on a dedicated daemon thread.
 
-        if current_status == [0, 0, 0, 0] and self.footswitch_input_que != [0, 0, 0, 0]:
-            self.handle_footswitch_event(self.footswitch_input_que)
-            self.footswitch_input_que = [0, 0, 0, 0]
+        Blocking I2C reads happen off the Kivy main thread so they never stall
+        the UI; detected events are marshalled back to the main thread via
+        Clock.schedule_once, so LED blinks and ModepController calls still run
+        on the main thread exactly as before.
+        """
+        if rate_hz:
+            self.FOOTSWITCH_POLL_HZ = rate_hz
+        if self._poll_thread and self._poll_thread.is_alive():
+            return  # already running
+        self._poll_stop = threading.Event()
+        self._poll_thread = threading.Thread(
+            target=self._footswitch_poll_loop, daemon=True, name='footswitch-poll')
+        self._poll_thread.start()
+
+    def stop_footswitch_polling(self):
+        if self._poll_stop:
+            self._poll_stop.set()
+
+    def _footswitch_poll_loop(self):
+        interval = 1.0 / self.FOOTSWITCH_POLL_HZ
+        n = self.DEBOUNCE_SAMPLES
+        stable = [0, 0, 0, 0]   # debounced switch states
+        counts = [0, 0, 0, 0]   # consecutive samples disagreeing with `stable`
+        while not self._poll_stop.is_set():
+            raw = self.hwi.read_footswitches()  # one I2C transaction -> [0/1]*4
+            for i in range(4):
+                if raw[i] == stable[i]:
+                    counts[i] = 0
+                else:
+                    counts[i] += 1
+                    if counts[i] >= n:
+                        stable[i] = raw[i]
+                        counts[i] = 0
+                # Latch any switch that is (debounced) pressed during this cycle,
+                # so combos are captured even if released slightly out of sync.
+                if stable[i] == 1:
+                    self.footswitch_input_que[i] = 1
+
+            # Fire only once every switch is released again — release-edge firing
+            # is required to disambiguate single presses from combos (chords).
+            if stable == [0, 0, 0, 0] and self.footswitch_input_que != [0, 0, 0, 0]:
+                status = list(self.footswitch_input_que)
+                self.footswitch_input_que = [0, 0, 0, 0]
+                Clock.schedule_once(lambda dt, s=status: self.handle_footswitch_event(s))
+
+            time.sleep(interval)
 
     def handle_footswitch_event(self, status):
         print(f'Footswitch event: {status}')
