@@ -551,7 +551,7 @@ class SynapseGUI(RelativeLayout):
         # Locate the correct widget and update it instead of redrawing everything
         for widget in self.port_control_area.grid_layout.children:
             if isinstance(widget, ParameterSliderWidget) and widget.port_symbol == param_symbol:
-                widget.port_value = value  # Directly update the displayed value
+                widget.set_value_external(value)  # thumb + 라벨 갱신(host 되쏨 없음)
                 return
 
     def update_patch_display(self, instance_name, patch_uri, patch_file):

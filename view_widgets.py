@@ -111,6 +111,7 @@ class ParameterSliderWidget(RelativeLayout):
 
     def __init__(self, port_data=[], **kwargs):
         super().__init__(**kwargs)
+        self._suppress_dispatch = False  # 외부값 주입 시 host 되쏨 방지
         self.register_event_type('on_port_value_change')  # Register custom event
         self.size_hint_y = None
         self.height = 32 * SCALE_FACTOR
@@ -170,8 +171,21 @@ class ParameterSliderWidget(RelativeLayout):
     def on_slider_value_change(self, instance, value):
         # Update the property, which will automatically update the label
         self.port_value = value
+        # 외부(역방향 채널)에서 주입된 값이면 host로 되쏘지 않는다
+        if self._suppress_dispatch:
+            return
         # Dispatch event with the necessary information
         self.dispatch('on_port_value_change', self.effect_instance, self.port_symbol, value)
+
+    def set_value_external(self, value):
+        """역방향 채널 등 외부에서 온 값으로 슬라이더 thumb + 라벨을 갱신.
+        on_port_value_change를 디스패치하지 않아 host로 되쏘지 않는다."""
+        self._suppress_dispatch = True
+        try:
+            self.slider.value = value  # thumb 이동
+        finally:
+            self._suppress_dispatch = False
+        self.port_value = value  # 라벨 갱신 보장(값이 동일해 콜백 미발동인 경우 대비)
 
     def on_port_value_change(self, effect_instance, port_symbol, value):
         pass  # Placeholder for event handling
