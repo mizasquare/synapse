@@ -1,0 +1,120 @@
+{
+    "current": 0,
+    "snapshots": [
+        {
+            "name": "Default",
+            "data": {
+                "rt_neural_generic": {
+                    "bypassed": false,
+                    "parameters": {
+                        "http://aidadsp.cc/plugins/aidadsp-bundle/rt-neural-generic#json": [
+                            "/var/modep/user-files/Aida DSP Models/AMP Orange Clean.aidax",
+                            "p"
+                        ]
+                    },
+                    "ports": {
+                        "ANTIALIASING": 66.21600341796875,
+                        "PREGAIN": 0.0,
+                        "NETBYPASS": 0.0,
+                        "PARAM1": 0.0,
+                        "PARAM2": 0.0,
+                        "EQBYPASS": 0.0,
+                        "EQPOS": 0.0,
+                        "BASS": 0.0,
+                        "BFREQ": 305.0,
+                        "MID": 0.0,
+                        "MFREQ": 750.0,
+                        "MIDQ": 0.7070000171661377,
+                        "MTYPE": 0.0,
+                        "TREBLE": 0.0,
+                        "TFREQ": 2000.0,
+                        "DEPTH": 0.0,
+                        "PRESENCE": 0.0,
+                        "MASTER": 0.0,
+                        "enabled": 1.0
+                    },
+                    "preset": ""
+                },
+                "CfgStereo": {
+                    "bypassed": false,
+                    "parameters": {
+                        "http://gareus.org/oss/lv2/zeroconvolv#ir": [
+                            "/var/modep/user-files/Reverb IRs/RCA_77DX_1.wav",
+                            "p"
+                        ]
+                    },
+                    "ports": {
+                        "dry": -60.0,
+                        "wet": -30.0,
+                        "enable": 1.0
+                    },
+                    "preset": ""
+                },
+                "_slowgear_": {
+                    "bypassed": false,
+                    "parameters": {},
+                    "ports": {
+                        "DOWNTIME": 5.0,
+                        "TRESHOLD": 1.0,
+                        "UPTIME": 100.0
+                    },
+                    "preset": ""
+                },
+                "CabinetLoader": {
+                    "bypassed": false,
+                    "parameters": {
+                        "https://mod.audio/plugins/CabinetLoader#irfile": [
+                            "/var/modep/user-files/Speaker Cabinets IRs/08 - 2x12 Twin Combo.WAV",
+                            "p"
+                        ]
+                    },
+                    "ports": {
+                        "level": -12.0,
+                        "lv2_enabled": 1.0
+                    },
+                    "preset": ""
+                },
+                "modmeter": {
+                    "bypassed": false,
+                    "parameters": {},
+                    "ports": {
+                        "reset": 0.0
+                    },
+                    "preset": ""
+                },
+                "Noisegate": {
+                    "bypassed": false,
+                    "parameters": {},
+                    "ports": {
+                        "open": -35.02231979370117,
+                        "attack": 0.0,
+                        "close": -44.86607142857143,
+                        "mains": 60.0
+                    },
+                    "preset": "file:///var/modep/lv2-presets/Noisegate-Home.lv2/Home.ttl"
+                },
+                "_3BandEQ": {
+                    "bypassed": false,
+                    "parameters": {},
+                    "ports": {
+                        "low": 0.0,
+                        "mid": 0.0,
+                        "high": 0.0,
+                        "master": 0.0,
+                        "low_mid": 220.0,
+                        "mid_high": 2000.0
+                    },
+                    "preset": ""
+                },
+                "modmeter_1": {
+                    "bypassed": false,
+                    "parameters": {},
+                    "ports": {
+                        "reset": 1.0
+                    },
+                    "preset": ""
+                }
+            }
+        }
+    ]
+}

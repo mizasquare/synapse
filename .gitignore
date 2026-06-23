@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS / IDE
+.DS_Store
+.idea/
+
+# Claude Code 세션 데이터
+.claude/
+
+# 런타임 소켓 / 파이프
+*.sock
+.lgd-nfy0
+
+# 외부 venv (참조만, REFERENCES.md 참고)
+gcamp6s-venv/
+
+# 옛 버전 · 대용량 (의도적 제외)
+under_vsersion1/
+archived/

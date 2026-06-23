@@ -1,0 +1,112 @@
+{
+    "current": 0,
+    "snapshots": [
+        {
+            "name": "Default",
+            "data": {
+                "audiofile": {
+                    "bypassed": false,
+                    "parameters": {
+                        "http://kxstudio.sf.net/carla/file/audio": [
+                            "/var/modep/user-files/Audio Recordings/lv2record/mod_session002.wav",
+                            "p"
+                        ]
+                    },
+                    "ports": {
+                        "lv2_freewheel": 0.0,
+                        "loop_mode": 1.0,
+                        "host_sync": 0.0,
+                        "volume": 100.0,
+                        "enabled": 1.0
+                    },
+                    "preset": ""
+                },
+                "_3BandEQ": {
+                    "bypassed": false,
+                    "parameters": {},
+                    "ports": {
+                        "low": -2.3571428571428683,
+                        "mid": 1.9821428571428648,
+                        "high": -0.455357142857153,
+                        "master": -1.1785714285714306,
+                        "low_mid": 293.5267857142857,
+                        "mid_high": 5633.370535714293
+                    },
+                    "preset": ""
+                },
+                "modmeter": {
+                    "bypassed": false,
+                    "parameters": {},
+                    "ports": {
+                        "reset": 1.0
+                    },
+                    "preset": ""
+                },
+                "Advanced_Compressor": {
+                    "bypassed": true,
+                    "parameters": {},
+                    "ports": {
+                        "THRES": -26.796875000000007,
+                        "KNEE": 18.705357142857146,
+                        "ATTACK": 7.016183037152845,
+                        "RELEASE": 111.38058035714282,
+                        "RATIO": 1.5521853366229403,
+                        "MAKEUP": 2.9363839285714306
+                    },
+                    "preset": ""
+                },
+                "Gain": {
+                    "bypassed": false,
+                    "parameters": {},
+                    "ports": {
+                        "Gain": -24.82142857142856
+                    },
+                    "preset": ""
+                },
+                "neural_amp_modeler_lv2": {
+                    "bypassed": false,
+                    "parameters": {
+                        "http://github.com/mikeoliphant/neural-amp-modeler-lv2#model": [
+                            "/var/modep/user-files/NAM Models/Marshall JCM2000/Tim R JCM2000 Clean.nam",
+                            "p"
+                        ]
+                    },
+                    "ports": {
+                        "input_level": 0.9342403628117815,
+                        "output_level": 12.725623582766488,
+                        "buffered": 0.0
+                    },
+                    "preset": "file:///var/modep/lv2-presets/neural_amp_modeler_lv2-Clean_tone.lv2/Clean_tone.ttl"
+                },
+                "CabinetLoader": {
+                    "bypassed": false,
+                    "parameters": {
+                        "https://mod.audio/plugins/CabinetLoader#irfile": [
+                            "/var/modep/user-files/Speaker Cabinets IRs/05 - 1x12 BlackFace.WAV",
+                            "p"
+                        ]
+                    },
+                    "ports": {
+                        "level": 0.0,
+                        "lv2_enabled": 1.0
+                    },
+                    "preset": ""
+                },
+                "early": {
+                    "bypassed": false,
+                    "parameters": {},
+                    "ports": {
+                        "dry_level": 90.90401785714289,
+                        "early_level": 10.212053571428571,
+                        "program": 2.0,
+                        "size": 20.0,
+                        "width": 100.0,
+                        "low_cut": 61.04910714285714,
+                        "high_cut": 9847.65625
+                    },
+                    "preset": ""
+                }
+            }
+        }
+    ]
+}
