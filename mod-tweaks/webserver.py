@@ -1387,6 +1387,9 @@ class ServerWebSocket(websocket.WebSocketHandler):
             vtype = data[2]
             value = data[3]
             SESSION.ws_patch_set(inst, uri, vtype, value, self)
+            # 역방향 채널: 웹UI/HMI에서 일어난 패치파일 변경을 앱에 알림(Gap C).
+            # value=파일경로(공백/콤마 가능)는 맨 뒤에 둬서 앱이 통째로 파싱.
+            notify_synapsin(message="EffectPatchSet %s %s %s" % (inst, uri, value))
 
         elif cmd == "plugin_pos":
             data = data[1].split(" ",3)

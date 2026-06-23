@@ -130,6 +130,13 @@ class Presenter:
                 instance_path, _, symbol = port_part.strip().rpartition("/")
                 instance = instance_path.split("/graph/", 1)[-1].lstrip("/")
                 self.apply_external_parameter(instance, symbol, float(value_str.strip()))
+            elif cmd == "EffectPatchSet":
+                # 포맷: "EffectPatchSet <instance> <patch_uri> <file_path>"
+                # file_path는 공백/콤마 포함 가능 → 앞 2개만 분리, 뒤는 통째로.
+                instance_path, _, rest2 = rest.partition(" ")
+                patch_uri, _, patch_file = rest2.partition(" ")
+                instance = instance_path.split("/graph/", 1)[-1].lstrip("/")
+                self.apply_external_patch(instance, patch_uri, patch_file)
             elif cmd in ("EffectAdd", "EffectRemove", "PedalboardLoadBundle",
                          "SnapshotLoad", "SnapshotName", "SnapshotRemove", "BankLoad"):
                 # 구조 변경 → 안전하게 전체 재동기화
@@ -153,6 +160,16 @@ class Presenter:
         if port is not None:
             port.value = value  # 캐시만 갱신
             self.view.update_parameter_display(instance, symbol, value)
+
+    def apply_external_patch(self, instance, patch_uri, patch_file):
+        """외부에서 바뀐 패치파일(IR/NAM/cabsim 등)을 모델 캐시 + 화면에 반영(host 되쏨 없음)."""
+        effect = self.pedalboard.get_effect_by_instance(instance)
+        if not effect:
+            return
+        patch = effect.patches.get(patch_uri)
+        if patch is not None:
+            patch.value = patch_file  # 캐시만 갱신 (set_patch는 host로 쓰므로 호출 안 함)
+        self.view.update_patch_display(instance, patch_uri, patch_file)
 
     def prev_pedalboard(self):
         ModepController.set_prev_pedalboard()

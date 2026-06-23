@@ -23,6 +23,7 @@ class PatchFileWidget(RelativeLayout):
         self.register_event_type('on_patch_change')
 
         super().__init__(**kwargs)
+        self._suppress_dispatch = False  # 외부값(역방향 채널) 주입 시 host 되쏨 방지
         self.size_hint_y = None
         self.height = 49 * SCALE_FACTOR
         self.patch_data = patch_data or {}
@@ -88,8 +89,25 @@ class PatchFileWidget(RelativeLayout):
             self.popup.dismiss()
 
     def on_patch_value(self, instance, value):
+        # 외부(역방향 채널)에서 주입된 값이면 host로 되쏘지 않는다
+        if self._suppress_dispatch:
+            return
         # Dispatch the custom event when patch_value changes.
         self.dispatch('on_patch_change', self.effect_instance, self.patch_uri, value)
+
+    def set_patch_external(self, patch_file):
+        """역방향 채널 등 외부에서 온 값으로 패치 표시를 갱신.
+        on_patch_change를 디스패치하지 않아 host로 되쏘지 않는다."""
+        self._suppress_dispatch = True
+        try:
+            self.patch_value = patch_file
+        finally:
+            self._suppress_dispatch = False
+        self.patch_name = (
+            patch_file.split('/')[-1].rsplit('.', 1)[0]
+            if patch_file.strip() else 'Empty Patch'
+        )
+        self.patch_file_disp.text = optimize_for_newline("  " + self.patch_name, 12)
 
     def on_patch_change(self, effect_instance, patch_uri, patch_file):
         # This event can be handled by binding to it externally.

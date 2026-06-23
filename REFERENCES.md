@@ -12,11 +12,24 @@
 | 앱 venv | `/home/miza/gcamp6s-venv/` | repo 밖 |
 | 앱 실행 스크립트(원본) | `/home/miza/run_synapsepy.sh` | repo의 `run_synapsepy.sh`는 그 사본 |
 
-## 패치 적용 상태 (2026-06-23 확인)
+## 패치 적용 상태
 
-`mod-tweaks/{host,session,webserver}.py` 와 `/usr/lib/python3/dist-packages/mod/` 설치본은
-**byte-identical (diff 0줄)** → 내 패치가 현재 라이브에 적용돼 있음.
+`mod-tweaks/{host,session,webserver}.py` 가 패치 적용된 **완본**이며, 라이브
+`/usr/lib/python3/dist-packages/mod/` 와 byte-identical 로 유지된다.
 `mod-tweaks/org/` 는 upstream 원본 + `.diff`.
+
+## mod 코드 배포 (mod-tweaks/deploy.sh)
+
+mod 코드(host/session/webserver) 수정 시 **파일 통째 cp** 전략을 쓴다(diff-patch 아님 —
+컨텍스트 어긋남으로 인한 부분 적용 실패가 라이브 악기에서 더 위험하므로).
+
+절차:
+1. `mod-tweaks/` 안의 해당 `.py` 를 직접 수정(= 다음 배포의 소스).
+2. 라이브 반영: Pi 실제 터미널에서 `cd ~/synapse/mod-tweaks && sudo ./deploy.sh`
+   - 배포 전 py_compile 검사 → 덮어쓰기 전 `<file>.bak-<타임스탬프>` 백업 → cp → diff 검증 → `modep-mod-ui` 재시작.
+   - `./deploy.sh --check` : 라이브 vs 소스 차이만 확인(sudo 불필요).
+   - `./deploy.sh --dry-run` / `--no-restart` 옵션 있음.
+   - ★sudo 는 비대화형 셸 불가 → 반드시 사용자가 Pi 터미널에서 직접 실행.
 
 ## 자동 실행 체인
 

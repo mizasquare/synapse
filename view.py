@@ -566,8 +566,7 @@ class SynapseGUI(RelativeLayout):
     def update_patch_display(self, instance_name, patch_uri, patch_file):
         for widget in self.port_control_area.grid_layout.children:
             if isinstance(widget, PatchFileWidget) and widget.patch_uri == patch_uri:
-                widget.patch_value = patch_file
-                widget.patch_file_disp.text = optimize_for_newline("  " + patch_file.split("/")[-1], 12)
+                widget.set_patch_external(patch_file)  # 디스패치 억제 → host 되쏨 없음
                 return
 
     def set_abcd_availability(self, available):
