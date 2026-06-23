@@ -29,6 +29,8 @@ class Presenter:
 
         # Load pedalboard model
         self.pedalboard = initialize_modep_pedalboard()
+        # pb별 마지막 활성 스냅샷 기억 (세션 한정 인메모리). key=current_pb_path, value=snapshot idx
+        self.pb_snapshot_memory = {}
         # Load stored assignments from disk
         # self.fs_mode2_assigns = load_footswitch_assignments()
 
@@ -66,6 +68,35 @@ class Presenter:
     def refresh_pedalboard(self):
         self.pedalboard = initialize_modep_pedalboard()
         self.view_update_effect()
+
+    # ── pb별 마지막 스냅샷 기억/복원 (세션 한정, 풋스위치 PB전환에서만 복원) ──
+    def _remember_current_snapshot(self):
+        """떠나는 페달보드의 '지금' 스냅샷을 host 기준으로 직접 읽어 기억한다.
+        self.pedalboard.current_snapshot_idx 는 마지막 refresh 시점 값이라
+        HMI/웹 변경이 아직 안 들어와 있을 수 있으므로 host에 직접 물어본다."""
+        pb = self.pedalboard.current_pb_path
+        idx = ModepController.snapshot_current_idx()   # host = ground truth, 못 맞추면 -1
+        if pb and idx is not None and idx >= 0:
+            self.pb_snapshot_memory[pb] = idx
+
+    def _restore_snapshot_for_current_pb(self):
+        """방금 로드된 페달보드에 대해 기억해 둔 스냅샷이 있으면 복원한다.
+        번들이 이미 그 스냅샷을 띄웠으면(=같은 idx) 아무것도 안 함 → 불필요한
+        load_snapshot/에코/refresh 방지. list_of_snapshots 는 {"0":name,...} dict
+        (HTTP실패 시 [])이므로 멤버십(str(idx) in ...)으로 유효성 확인 — 삭제로 인한
+        sparse 인덱스에도 안전."""
+        pb = self.pedalboard.current_pb_path
+        if not pb:
+            return
+        idx = self.pb_snapshot_memory.get(pb)
+        if idx is None:
+            return
+        if str(idx) not in self.pedalboard.list_of_snapshots:
+            return
+        if idx == self.pedalboard.current_snapshot_idx:
+            return
+        ModepController.load_snapshot(idx)
+        self.refresh_pedalboard()   # current_snapshot_idx 를 host 기준으로 재확정
 
     def view_update_effect(self, clear_ports=False):
         if clear_ports:
@@ -140,9 +171,25 @@ class Presenter:
                 patch_uri, _, patch_file = rest2.partition(" ")
                 instance = instance_path.split("/graph/", 1)[-1].lstrip("/")
                 self.apply_external_patch(instance, patch_uri, patch_file)
+            elif cmd == "SnapshotLoad":
+                # 모든 /snapshot/load 가 여기로 에코됨(앱 FS2/FS3, 웹UI, save_as).
+                # pb별 마지막 스냅샷을 연속 기록 → 나중에 그 pb로 풋스위치 복귀 시 복원.
+                pb_before = self.pedalboard.current_pb_path
+                self.refresh_pedalboard()                      # 기존 동작 유지(전체 재동기화)
+                # 에코가 PB 전환 경계를 넘어왔으면(현재 pb != 에코 당시 pb) 기록 안 함
+                # → A보드 스냅샷이 B보드 키로 잘못 기록되는 비동기 레이스 방지.
+                if self.pedalboard.current_pb_path == pb_before:
+                    try:
+                        idx = int(rest.strip())
+                    except (TypeError, ValueError):
+                        idx = self.pedalboard.current_snapshot_idx
+                    pb = self.pedalboard.current_pb_path
+                    if pb and str(idx) in self.pedalboard.list_of_snapshots:
+                        self.pb_snapshot_memory[pb] = idx
             elif cmd in ("EffectAdd", "EffectRemove", "PedalboardLoadBundle",
-                         "SnapshotLoad", "SnapshotName", "SnapshotRemove", "BankLoad"):
+                         "SnapshotName", "SnapshotRemove", "BankLoad"):
                 # 구조 변경 → 안전하게 전체 재동기화
+                # (웹발 PedalboardLoadBundle 은 복원 안 함: mod-ui 번들 저장 스냅샷 기본동작 유지)
                 self.refresh_pedalboard()
             else:
                 print(f"[reverse] unhandled: {message}")
@@ -175,12 +222,16 @@ class Presenter:
         self.view.update_patch_display(instance, patch_uri, patch_file)
 
     def prev_pedalboard(self):
+        self._remember_current_snapshot()   # /reset 으로 날아가기 전에 떠나는 보드 기록
         ModepController.set_prev_pedalboard()
         self.refresh_pedalboard()
+        self._restore_snapshot_for_current_pb()
 
     def next_pedalboard(self):
+        self._remember_current_snapshot()
         ModepController.set_next_pedalboard()
         self.refresh_pedalboard()
+        self._restore_snapshot_for_current_pb()
 
     def prev_snapshot(self):
         if self.pedalboard.current_snapshot_idx > 0:
