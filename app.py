@@ -52,13 +52,17 @@ class GCaMP6sApp(App):
                 data, _ = self.sock.recvfrom(1024)
                 message = data.decode('utf-8')
                 print(message)
-                Clock.schedule_once(lambda dt: self.notify_presenter(message))
+                Clock.schedule_once(lambda dt, m=message: self.notify_presenter(m))
             except Exception as e:
                 logger.error(f"Error receiving message: {e}")
                 break
 
     def notify_presenter(self, message):
-        pass
+        # mod-ui 역방향 채널 메시지를 Presenter로 전달 (웹UI/HMI 변화 → 앱 동기화).
+        # Clock.schedule_once로 메인스레드에서 호출되므로 UI 갱신 안전.
+        root = self.root
+        if root is not None and hasattr(root, "presenter"):
+            root.presenter.handle_reverse_event(message)
 
     def on_stop(self):
         if hasattr(self, 'sock'):

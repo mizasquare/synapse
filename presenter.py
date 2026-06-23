@@ -118,6 +118,41 @@ class Presenter:
             else:
                 print(error_msg)
 
+    # ── 역방향 채널 (mod-ui notify_synapsin → /tmp/synapsin.sock → app.py → 여기) ──
+    # 웹UI/HMI 등 앱 바깥에서 일어난 변화를 desync 없이 앱 화면에 반영한다.
+    # 수신 전용: host로 절대 되쏘지 않는다(피드백 루프 방지).
+    def handle_reverse_event(self, message):
+        try:
+            cmd, _, rest = message.partition(" ")
+            if cmd == "EffectParameterSet":
+                # 포맷: "EffectParameterSet /graph/<instance>/<symbol>, <value>"
+                port_part, _, value_str = rest.rpartition(",")
+                instance_path, _, symbol = port_part.strip().rpartition("/")
+                instance = instance_path.split("/graph/", 1)[-1].lstrip("/")
+                self.apply_external_parameter(instance, symbol, float(value_str.strip()))
+            elif cmd in ("EffectAdd", "EffectRemove", "PedalboardLoadBundle",
+                         "SnapshotLoad", "SnapshotName", "SnapshotRemove", "BankLoad"):
+                # 구조 변경 → 안전하게 전체 재동기화
+                self.refresh_pedalboard()
+            else:
+                print(f"[reverse] unhandled: {message}")
+        except Exception as e:
+            print(f"[reverse] parse error on {message!r}: {e}")
+
+    def apply_external_parameter(self, instance, symbol, value):
+        """외부에서 바뀐 파라미터를 모델 캐시 + 화면에 반영(네트워크 호출 없음)."""
+        effect = self.pedalboard.get_effect_by_instance(instance)
+        if not effect:
+            return
+        if symbol == ":bypass":
+            effect.bypassed = bool(value)
+            self.view_update_effect()
+            return
+        port = effect.ports.get(symbol)
+        if port is not None:
+            port.value = value  # 캐시만 갱신
+            self.view.update_parameter_display(instance, symbol, value)
+
     def prev_pedalboard(self):
         ModepController.set_prev_pedalboard()
         self.refresh_pedalboard()
