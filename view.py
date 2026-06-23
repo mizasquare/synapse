@@ -357,7 +357,7 @@ class PedalboardDisplay(RelativeLayout):
 
         self.snapshot_label = Label(
             font_name=FONTS[2],
-            text=f"{str(self.current_snapshot[0])}-{self.current_snapshot[1][str(self.current_snapshot[0])]}",
+            text=f"{self.current_snapshot[0]}-{self.current_snapshot[1].get(str(self.current_snapshot[0]), '')}",
             font_size=16 * SCALE_FACTOR,
             color=(0.90, 0.88, 0.90, 0.7),
             size_hint=(None, None),
@@ -394,13 +394,13 @@ class PedalboardDisplay(RelativeLayout):
 
     def on_current_snapshot(self, instance, value):
         try:
-            self.snapshot_label.text = f"{value[0]}-{value[1][str(value[0])]}"
-        except KeyError:
+            idx, names = value[0], value[1]
+            name = names.get(str(idx)) if isinstance(names, dict) else None
+            self.snapshot_label.text = f"{idx}-{name}" if name is not None else f"{idx}-"
+        except Exception:
             pass
 
         self.populate_plugin_list()
-
-        pass
 
 
     def on_current_plugins(self, instance, value):

@@ -139,14 +139,14 @@ class ModepController:
 
 	@staticmethod
 	def snapshot_current_idx():
-		snapshotlist = ModepController.get_snapshot_list()
+		snapshotlist = ModepController.get_snapshot_list()   # {"0":"Default", ...} (dict)
 		if not snapshotlist:
 			return -1
 		try:
-			current = ModepController.get_current_snapshot()
-			idx = snapshotlist.index(current)
-			if idx >= 0:
-				return idx
+			current = ModepController.get_current_snapshot()  # 현재 스냅샷 '이름'
+			for k, v in snapshotlist.items():
+				if v == current:
+					return int(k)
 		except Exception as e:
 			logging.error(f"An error occurred: {e}")
 		return -1
@@ -188,7 +188,7 @@ class ModepController:
 	@staticmethod
 	def load_prev_snapshot():
 		currentidx = ModepController.snapshot_current_idx()
-		snapshots = list_snapshot()
+		snapshots = ModepController.get_snapshot_list()
 		if len(snapshots) == 1:
 			print("No another snapshot!")
 			return currentidx
@@ -248,7 +248,7 @@ class ModepController:
 		try:
 			r = ModepController._request("get", "snapshot/saveas", params={'title': new_name})
 			if r.status_code == 200:
-				newindex = len(list_snapshot()) - 1
+				newindex = len(ModepController.get_snapshot_list()) - 1
 				ModepController.load_snapshot(newindex) #Nessessary?
 				if save_pb_also:
 					ModepController.save_current_pedalboard()
