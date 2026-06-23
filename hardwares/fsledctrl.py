@@ -1,4 +1,3 @@
-import gpiod
 from hardwares.MCP23017 import MCP23017
 from kivy.clock import Clock
 
@@ -139,55 +138,28 @@ class LEDContainer:
 
 
 class Controller:
-    def __init__(self, address=0x27, num_gpios=16, chip_name='gpiochip4'):
+    def __init__(self, address=0x27, num_gpios=16):
         self.mcp = MCP23017(address=address, num_gpios=num_gpios)
 
-        # Initialize footswitches
+        # Initialize footswitches (each Footswitch configures its pin as input + pull-up)
         footswitches = [Footswitch(self.mcp, pin) for pin in range(4)]
         self.footswitch = FootswitchContainer(footswitches)
+        # Pin numbers for the batched single-transaction read below.
+        # All four footswitches are on port A (pins 0-3).
+        self._fs_pins = [fs.pin for fs in footswitches]
 
         # Initialize LEDs as pairs (red and blue together)
         leds = [LED(self.mcp, red_pin, blue_pin) for red_pin, blue_pin in zip(range(15, 7, -2), range(14, 6, -2))]
         self.LED = LEDContainer(leds)
 
-        # Configure system interrupt on MCP23017
-        self.mcp.configSystemInterrupt(self.mcp.INTMIRRORON, self.mcp.INTPOLACTIVEHIGH)
-        for fs in footswitches:
-            self.mcp.configPinInterrupt(fs.pin, self.mcp.INTERRUPTON, self.mcp.INTERRUPTCOMPAREPREVIOUS)
+    def read_footswitches(self):
+        """Read all four footswitches in a single I2C transaction.
 
-        # Set up interrupt pin with gpiod
-        self.chip = gpiod.Chip(chip_name)
-        self.line = self.chip.get_line(5)  # GPIO pin 5
-        self.line.request(consumer="my-interrupt-handler", type=gpiod.LINE_REQ_EV_FALLING_EDGE)
-
-        # Store the last interrupt result
-        self.last_interrupt = None
-
-        # External interrupt handler function
-        self.external_interrupt_handler = None
-
-
-    def handle_interrupt(self):
-        event = self.line.event_read()  # Blocking until the interrupt occurs
-        if event:
-            pin, value = self.mcp.readInterrupt()
-            self.last_interrupt = (pin, value)
-            if self.external_interrupt_handler:
-                self.external_interrupt_handler(pin, value)
-            self.mcp.clearInterrupts()
-
-    def set_interrupt_handler(self, handler=None):
-        """Sets an external interrupt handler function."""
-        if handler:
-            self.external_interrupt_handler = handler
-
-    def get_last_interrupt(self):
-        interrupt = self.last_interrupt
-        self.last_interrupt = None  # Clear the interrupt after reading
-        return interrupt
+        Switches are wired active-low (pressed -> pin reads 0), so the bit is
+        inverted: returns [fs0, fs1, fs2, fs3] where 1 == pressed.
+        """
+        reg = self.mcp.read_bank_a()
+        return [0 if (reg >> pin) & 1 else 1 for pin in self._fs_pins]
 
     def cleanup(self):
-        self.mcp.clearInterrupts()
         self.mcp.cleanup()
-        self.line.release()  # Release the GPIO line
-        self.chip.close()    # Close the GPIO chip
