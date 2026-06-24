@@ -33,6 +33,11 @@ def main():
     if "--shot" in argv:
         i = argv.index("--shot")
         shot = os.path.abspath(argv[i + 1]) if i + 1 < len(argv) else os.path.join(BASE, "shot.png")
+    focus_inst = None
+    if "--focus" in argv:
+        j = argv.index("--focus")
+        if j + 1 < len(argv):
+            focus_inst = argv[j + 1]  # dev: open FOCUS on this effect for a screenshot
 
     app = QGuiApplication(argv)
 
@@ -54,6 +59,8 @@ def main():
     # Populate the view from the presenter before loading QML, so first paint is
     # already correct (the change signal then keeps it live for Stage 2+).
     presenter.initiate_view()
+    if focus_inst:
+        presenter.view_render_parameters(focus_inst)
 
     engine = QQmlApplicationEngine()
     ctx = engine.rootContext()

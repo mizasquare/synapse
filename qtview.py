@@ -1,21 +1,25 @@
 """QML <-> presenter bridge (the Qt "view").
 
 A single QObject exposed to QML as the ``view`` context property. It implements
-the same method surface the presenter calls on its view (so the presenter logic
-is unchanged), translating those calls into QML-readable properties + a change
-signal. Read-only for Stage 1 (OVERVIEW): board name, snapshot, BPM, the routing
-graph (nodes + cables) and the footswitch status strip, all derived from the
-presenter's live ``pedalboard`` model (fixtures via the fake backend).
+the same method surface the presenter calls on its view (so presenter logic is
+unchanged), translating those calls into QML-readable properties + a change
+signal, and exposes Slots for QML->presenter events.
 
-Stage 2+ adds the FOCUS screen (populate_port_area) and QML->presenter slots
-(node tap, knob drag, footswitch). Visual tokens (colors/fonts) live in QML;
-this bridge passes data + semantic flags only.
+Stage 1 (OVERVIEW): board/snapshot/BPM/mode, the routing graph (nodes + cables)
+and the footswitch status strip, all derived from the live presenter.pedalboard.
+Stage 2 (FOCUS): node tap -> per-effect knobs (vertical-drag = local parameter
+change), bypass toggle, IN/OUT routing. Knob drags update silently (no rebuild)
+so the QML knob owns its visual during interaction without flicker.
+
+Visual tokens (colors/fonts) live in QML; this bridge passes data + flags only.
 """
 
-from PySide6.QtCore import QObject, Property, Signal
+import os
+
+from PySide6.QtCore import QObject, Property, Signal, Slot
 
 # Graph canvas coordinate space. MUST match the QML graph Item size
-# (qml/main.qml `graph` is 776x176) — cable paths are precomputed here in this
+# (qml/main.qml `graph` is 776x176) -- cable paths are precomputed here in this
 # pixel space, so changing one side without the other misaligns cables vs nodes.
 _GW, _GH = 776.0, 176.0
 _LED_BLUE, _LED_GREEN, _LED_RED, _LED_OFF = "#3b6fe0", "#5fd0a0", "#e6402e", "#2a3140"
@@ -34,6 +38,8 @@ class QtView(QObject):
         self._nodes = []
         self._cables = []
         self._foot = []
+        self._screen = "overview"   # "overview" | "focus"
+        self._focus = {}            # FOCUS payload for QML
 
     def set_presenter(self, presenter):
         self.presenter = presenter
@@ -55,6 +61,14 @@ class QtView(QObject):
     def modeLabel(self):
         return self._mode
 
+    @Property(str, notify=dataChanged)
+    def screen(self):
+        return self._screen
+
+    @Property("QVariantMap", notify=dataChanged)
+    def focus(self):
+        return self._focus
+
     @Property("QVariantList", notify=dataChanged)
     def nodes(self):
         return self._nodes
@@ -67,10 +81,58 @@ class QtView(QObject):
     def footswitches(self):
         return self._foot
 
+    # ------------------------------------------ QML -> presenter (slots)
+    @Slot(str)
+    def selectNode(self, instance):
+        """A graph node was tapped -> presenter builds its FOCUS payload."""
+        if self.presenter and instance not in ("IN", "OUT"):
+            self.presenter.view_render_parameters(instance)
+
+    @Slot()
+    def goOverview(self):
+        self._screen = "overview"
+        self.dataChanged.emit()
+
+    @Slot(str, str, float)
+    def setParameter(self, instance, symbol, value):
+        """Knob drag -> presenter applies it (fake backend = local state)."""
+        if self.presenter:
+            self.presenter.parameter_changed(instance, symbol, value)
+
+    @Slot(str, bool)
+    def toggleBypass(self, instance, on):
+        # presenter.parameter_changed(:bypass) refreshes the overview (node dim)
+        # but does NOT touch _focus, so sync the FOCUS card's toggle here — else
+        # it wouldn't flip until the effect is re-focused.
+        if self._focus.get("instance") == instance:
+            self._focus["bypassed"] = bool(on)
+        if self.presenter:
+            self.presenter.parameter_changed(instance, ":bypass", on)
+
+    @Slot()
+    def focusPrev(self):
+        self._focus_step(-1)
+
+    @Slot()
+    def focusNext(self):
+        self._focus_step(1)
+
+    def _focus_step(self, d):
+        pb = getattr(self.presenter, "pedalboard", None) if self.presenter else None
+        cur = self._focus.get("instance")
+        if pb is None or not cur:
+            return
+        fx = list(pb.effects)
+        ids = [e.instance for e in fx]
+        if cur not in ids:
+            return
+        nxt = fx[(ids.index(cur) + d) % len(fx)]
+        self.presenter.view_render_parameters(nxt.instance)
+
     # ----------------------------------------- presenter view-method surface
     def refresh_plugin_display(self, pb_title=None, plugins=None, snapshot=None):
         # NOTE: `plugins` (presenter's pre-built (instance,name,cat,[status]) tuples)
-        # is intentionally ignored — QtView renders the graph/strip from the live
+        # is intentionally ignored -- QtView renders the graph/strip from the live
         # presenter.pedalboard model instead. Keep bypass/assignment a single source
         # of truth (the model); don't start consuming `plugins` without retiring that.
         self._board = pb_title or ""
@@ -86,13 +148,31 @@ class QtView(QObject):
         self.dataChanged.emit()
 
     def populate_port_area(self, effectData=None):
-        pass  # FOCUS screen — Stage 2
+        # presenter.view_render_parameters -> here with effectData; build the
+        # FOCUS payload and switch screens. (None == clear, not used in phase 1.)
+        if effectData is None:
+            self._focus = {}
+        else:
+            self._focus = self._build_focus(effectData)
+            self._screen = "focus"
+        self.dataChanged.emit()
 
     def update_parameter_display(self, instance, symbol, value):
-        pass  # Stage 2
+        # Silent model sync (NO emit): a live knob drag must not trigger a full
+        # focus rebuild/flicker. QML owns the knob visual during the drag; this
+        # just keeps _focus consistent for the next full rebuild.
+        if self._focus.get("instance") != instance:
+            return
+        for k in self._focus.get("knobs", []):
+            if k["symbol"] == symbol:
+                mn, mx = k["min"], k["max"]
+                k["value"] = value
+                k["norm"] = 0.0 if mx == mn else max(0.0, min(1.0, (value - mn) / (mx - mn)))
+                k["display"] = ("%g %s" % (value, k.get("unit", ""))).strip()
+                break
 
     def update_patch_display(self, instance, uri, file_path):
-        pass  # Stage 2
+        pass  # IR/NAM file picker -- deferred (phase-1 비목표)
 
     def update_bpm_display(self, bpm):
         self._bpm = ("%g" % bpm) if isinstance(bpm, (int, float)) else str(bpm)
@@ -116,7 +196,70 @@ class QtView(QObject):
     def enable_webui_button(self):
         pass
 
+    # --------------------------------------------------------- FOCUS builder
+    def _build_focus(self, d):
+        inst = d.get("effect_instance", "")
+        knobs = []
+        for p in d.get("effect_ports", []):
+            rng = p.get("port_range", {}) or {}
+            mn = rng.get("min", 0.0)
+            mx = rng.get("max", 1.0)
+            v = p.get("port_value")
+            if v is None:
+                v = mn
+            unit = p.get("port_unit") or ""
+            norm = 0.0 if mx == mn else max(0.0, min(1.0, (v - mn) / (mx - mn)))
+            knobs.append({"symbol": p["port_symbol"], "name": p["port_name"],
+                          "value": v, "norm": norm, "min": mn, "max": mx, "unit": unit,
+                          "display": ("%g %s" % (v, unit)).strip()})
+        cat = d.get("effect_category")
+        cat = cat[0] if isinstance(cat, (list, tuple)) and cat else (cat or "")
+        ins, outs = self._routing_for(inst)
+        patches = [{"label": pt.get("patch_label", ""), "value": self._patch_str(pt.get("patch_value"))}
+                   for pt in d.get("patches", [])]
+        return {"instance": inst, "name": d.get("effect_name", inst), "category": cat,
+                "bypassed": bool(d.get("effect_bypassed")), "knobs": knobs,
+                "inputs": ins, "outputs": outs, "patches": patches}
+
+    @staticmethod
+    def _patch_str(value):
+        if isinstance(value, (list, tuple)) and value:
+            return os.path.basename(str(value[0]))
+        return os.path.basename(str(value)) if value else ""
+
+    def _routing_for(self, instance):
+        pb = getattr(self.presenter, "pedalboard", None) if self.presenter else None
+        ins, outs = [], []
+        if pb is None:
+            return ["—"], ["—"]
+
+        def label(nid):
+            if nid in ("IN", "OUT"):
+                return nid
+            e = pb.get_effect_by_instance(nid)
+            return e.name if e else nid
+
+        seen_in, seen_out = set(), set()
+        for conn in pb.connections:
+            s, t = self._norm_ep(conn.source), self._norm_ep(conn.target)
+            if t == instance and s != instance and s not in seen_in:
+                seen_in.add(s)
+                ins.append(label(s))
+            if s == instance and t != instance and t not in seen_out:
+                seen_out.add(t)
+                outs.append(label(t))
+        return (ins or ["—"]), (outs or ["—"])
+
     # --------------------------------------------------------- graph builder
+    @staticmethod
+    def _norm_ep(endpoint):
+        base = endpoint.split("/")[0]
+        if base.startswith("capture"):
+            return "IN"
+        if base.startswith("playback"):
+            return "OUT"
+        return base
+
     def _rebuild_graph(self):
         pb = getattr(self.presenter, "pedalboard", None) if self.presenter else None
         if pb is None:
@@ -144,21 +287,13 @@ class QtView(QObject):
             add(e.instance, e.name, cat, False, not e.bypassed, center_x(i + 1), fx_w, fx_h)
         add("OUT", "OUT", "STEREO", True, True, center_x(cols - 1), io_w, io_h)
 
-        def norm(endpoint):
-            base = endpoint.split("/")[0]
-            if base.startswith("capture"):
-                return "IN"
-            if base.startswith("playback"):
-                return "OUT"
-            return base
-
         # One cable per (source-effect, target-effect) pair: stereo L/R links
         # collapse to a single schematic line, and connections whose endpoint
         # isn't a built node (e.g. a plugin skipped during the build) are dropped.
         # Intentional for the phase-1 read-only schematic; revisit for Step F.
         cables, seen = [], set()
         for conn in pb.connections:
-            a, b = norm(conn.source), norm(conn.target)
+            a, b = self._norm_ep(conn.source), self._norm_ep(conn.target)
             if a == b or a not in idmap or b not in idmap or (a, b) in seen:
                 continue
             seen.add((a, b))
@@ -181,9 +316,9 @@ class QtView(QObject):
         # STOMP placeholder: shows the first four effects. The presenter actually
         # assigns toggles to a CATEGORY-FILTERED set ([0],[1],[-2],[-1] of effects
         # excluding simulator/amp/cab/utility; none if <4). Stage 3 (footswitch
-        # input) must mirror presenter.assign_footswitches' selection here — ideally
-        # by having the presenter expose the 4 chosen effects — so captions match
-        # what a press toggles. Not exercised in Stage 1 (boots in NAVIGATE mode).
+        # input) must mirror presenter.assign_footswitches' selection here -- ideally
+        # by having the presenter expose the 4 chosen effects -- so captions match
+        # what a press toggles. Not exercised in Stage 1/2 (boots in NAVIGATE mode).
         if mode == 1 and pb is not None:  # STOMP: first four effects as toggles
             fx = list(pb.effects)
             cells = []
