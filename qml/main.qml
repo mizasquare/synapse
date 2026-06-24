@@ -115,7 +115,6 @@ Window {
                 model: view.cables
                 Shape {
                     anchors.fill: parent
-                    preferredRendererType: Shape.CurveRenderer
                     ShapePath {
                         strokeColor: modelData.color
                         strokeWidth: 2.5
@@ -350,7 +349,6 @@ Window {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 Shape {
                                     anchors.fill: parent
-                                    preferredRendererType: Shape.CurveRenderer
                                     ShapePath {
                                         strokeColor: cBorder; strokeWidth: 9; fillColor: "transparent"
                                         PathAngleArc { centerX: 48; centerY: 48; radiusX: 40; radiusY: 40; startAngle: -90; sweepAngle: 360 }

@@ -7,7 +7,7 @@ loop) -- it marshals the work onto the GUI thread via a queued signal, mirroring
 KivyScheduler's thread-safety.
 """
 
-from PySide6.QtCore import QObject, QTimer, Signal, Qt, QCoreApplication, QThread
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal as Signal, Qt, QCoreApplication, QThread
 
 from scheduler import Scheduler
 

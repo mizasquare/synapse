@@ -16,7 +16,7 @@ Visual tokens (colors/fonts) live in QML; this bridge passes data + flags only.
 
 import os
 
-from PySide6.QtCore import QObject, Property, Signal, Slot
+from PyQt6.QtCore import QObject, pyqtProperty as Property, pyqtSignal as Signal, pyqtSlot as Slot
 
 # Graph canvas coordinate space. MUST match the QML graph Item size
 # (qml/main.qml `graph` is 776x176) -- cable paths are precomputed here in this

@@ -12,10 +12,10 @@ Run:
 import os
 import sys
 
-from PySide6.QtCore import QTimer, QUrl
-from PySide6.QtGui import QGuiApplication, QFontDatabase
-from PySide6.QtQml import QQmlApplicationEngine
-from PySide6.QtQuick import QQuickWindow  # registers QQuickWindow so the QML root casts correctly
+from PyQt6.QtCore import QTimer, QUrl
+from PyQt6.QtGui import QGuiApplication, QFontDatabase
+from PyQt6.QtQml import QQmlApplicationEngine
+from PyQt6.QtQuick import QQuickWindow  # registers QQuickWindow so the QML root casts correctly
 
 import modepctrl
 from fakemodep import FakeModepController
