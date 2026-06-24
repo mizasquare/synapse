@@ -1,5 +1,4 @@
 from hardwares.MCP23017 import MCP23017
-from kivy.clock import Clock
 
 class Footswitch:
     def __init__(self, mcp, pin):
@@ -26,10 +25,11 @@ class FootswitchContainer:
 
 
 class LED:
-    def __init__(self, mcp, red_pin, blue_pin):
+    def __init__(self, mcp, red_pin, blue_pin, scheduler):
         self.mcp = mcp
         self.red_pin = red_pin
         self.blue_pin = blue_pin
+        self.scheduler = scheduler  # event-loop timer (see scheduler.Scheduler)
         self.mcp.pinMode(self.red_pin, self.mcp.OUTPUT)
         self.mcp.pinMode(self.blue_pin, self.mcp.OUTPUT)
         self.turnOff()
@@ -62,15 +62,19 @@ class LED:
         else:
             self.turnOffRed()
 
+    def stop_blink(self):
+        """Cancel an in-progress blink, if any."""
+        if self._blink_event:
+            self.scheduler.unschedule(self._blink_event)
+            self._blink_event = None
+
     def blink(self, color='red', times=3, interval=0.2):
         """
         Blink the LED in the specified color a given number of times.
         Supports 'red', 'blue', and 'purple' (both red and blue).
         """
         # Cancel any existing blink event for this LED
-        if self._blink_event:
-            Clock.unschedule(self._blink_event)
-            self._blink_event = None
+        self.stop_blink()
 
         blink_state = [0]  # Mutable counter
 
@@ -104,11 +108,11 @@ class LED:
                 elif color == 'purple':
                     self.turnOffRed()
                     self.turnOffBlue()
-                Clock.unschedule(self._blink_event)
+                self.scheduler.unschedule(self._blink_event)
                 self._blink_event = None
 
         # Schedule the blinking using the event handle
-        self._blink_event = Clock.schedule_interval(toggle, interval)
+        self._blink_event = self.scheduler.schedule_interval(toggle, interval)
 
 
 class LEDContainer:
@@ -131,14 +135,12 @@ class LEDContainer:
 
     def stop_all_blinking(self):
         for led in self.leds:
-            if led._blink_event:
-                Clock.unschedule(led._blink_event)
-                led._blink_event = None
+            led.stop_blink()
             led.turnOff()
 
 
 class Controller:
-    def __init__(self, address=0x27, num_gpios=16):
+    def __init__(self, scheduler, address=0x27, num_gpios=16):
         self.mcp = MCP23017(address=address, num_gpios=num_gpios)
 
         # Initialize footswitches (each Footswitch configures its pin as input + pull-up)
@@ -148,8 +150,9 @@ class Controller:
         # All four footswitches are on port A (pins 0-3).
         self._fs_pins = [fs.pin for fs in footswitches]
 
-        # Initialize LEDs as pairs (red and blue together)
-        leds = [LED(self.mcp, red_pin, blue_pin) for red_pin, blue_pin in zip(range(15, 7, -2), range(14, 6, -2))]
+        # Initialize LEDs as pairs (red and blue together). The scheduler drives
+        # non-blocking blink timing (see scheduler.Scheduler).
+        leds = [LED(self.mcp, red_pin, blue_pin, scheduler) for red_pin, blue_pin in zip(range(15, 7, -2), range(14, 6, -2))]
         self.LED = LEDContainer(leds)
 
     def read_footswitches(self):

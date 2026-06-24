@@ -1,6 +1,3 @@
-from kivy.clock import Clock
-from kivy.core.window import Window
-
 from collections import defaultdict
 import utils
 from hardwares import fsledctrl
@@ -14,9 +11,12 @@ import os
 from configs import LOCAL_STORAGE
 
 class Presenter:
-    def __init__(self, view):
+    def __init__(self, view, scheduler):
         self.view = view
-        self.hwi = fsledctrl.Controller()
+        # scheduler: event-loop timer abstraction (see scheduler.Scheduler).
+        # Keeps the presenter and hardware layer free of any GUI-framework import.
+        self.scheduler = scheduler
+        self.hwi = fsledctrl.Controller(scheduler)
 
         # 0: pedalboard nav, 1: parameter assign, 2: pb snapshot assign
         self.footswitch_mode = 0
@@ -298,10 +298,10 @@ class Presenter:
     def start_footswitch_polling(self, rate_hz=None):
         """Run the footswitch poll loop on a dedicated daemon thread.
 
-        Blocking I2C reads happen off the Kivy main thread so they never stall
-        the UI; detected events are marshalled back to the main thread via
-        Clock.schedule_once, so LED blinks and ModepController calls still run
-        on the main thread exactly as before.
+        Blocking I2C reads happen off the main thread so they never stall the
+        UI; detected events are marshalled back to the main thread via
+        self.scheduler.schedule_once, so LED blinks and ModepController calls
+        still run on the main thread exactly as before.
         """
         if rate_hz:
             self.FOOTSWITCH_POLL_HZ = rate_hz
@@ -341,7 +341,7 @@ class Presenter:
             if stable == [0, 0, 0, 0] and self.footswitch_input_que != [0, 0, 0, 0]:
                 status = list(self.footswitch_input_que)
                 self.footswitch_input_que = [0, 0, 0, 0]
-                Clock.schedule_once(lambda dt, s=status: self.handle_footswitch_event(s))
+                self.scheduler.schedule_once(lambda dt, s=status: self.handle_footswitch_event(s))
 
             time.sleep(interval)
 
@@ -452,8 +452,8 @@ class Presenter:
         else:
             # Start Chromium in full-screen mode
             self.chromium_process = subprocess.Popen(['chromium-browser', '--start-fullscreen', 'http://localhost/'])
-            # Minimize Kivy window
-            Window.minimize()
+            # Minimize the app window (view owns window control)
+            self.view.minimize()
             # Set footswitch mode to 3 and reassign footswitches
             self.footswitch_mode = 3
             self.assign_footswitches()
@@ -479,7 +479,7 @@ class Presenter:
 
         self.assign_footswitches()
 
-        Window.restore()
+        self.view.restore()
         os.system("xdotool search --name 'GCaMP6s' windowactivate")
 
         self.refresh_pedalboard()
@@ -500,7 +500,7 @@ class Presenter:
 
     def boot_lightshow(self, i=None):
         # for i in range(4):
-        #     Clock.schedule_once(lambda dt, i=i: self.hwi.LED.get_led(i).blink(color='red', times=2, interval=0.1),
+        #     self.scheduler.schedule_once(lambda dt, i=i: self.hwi.LED.get_led(i).blink(color='red', times=2, interval=0.1),
         #                         i * 0.3)
         pass
 
