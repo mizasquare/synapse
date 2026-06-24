@@ -1,6 +1,5 @@
 from collections import defaultdict
 import utils
-from hardwares import fsledctrl
 from modepctrl import initialize_modep_pedalboard, get_backend
 import subprocess
 import threading
@@ -11,7 +10,7 @@ import os
 from configs import LOCAL_STORAGE
 
 class Presenter:
-    def __init__(self, view, scheduler, backend=None):
+    def __init__(self, view, scheduler, backend=None, hardware=None):
         self.view = view
         # scheduler: event-loop timer abstraction (see scheduler.Scheduler).
         # Keeps the presenter and hardware layer free of any GUI-framework import.
@@ -19,7 +18,10 @@ class Presenter:
         # backend: MODEP host seam (see modepctrl.get_backend). Defaults to the
         # real ModepController; an off-device entry point injects a fake.
         self.backend = backend if backend is not None else get_backend()
-        self.hwi = fsledctrl.Controller(scheduler)
+        # hardware: footswitch/LED seam (see hardware.HardwareController).
+        # Defaults to the real I2C controller, built lazily so an off-device
+        # entry point can inject a fake without importing the Pi-only I2C stack.
+        self.hwi = hardware if hardware is not None else self._build_default_hardware(scheduler)
 
         # 0: pedalboard nav, 1: parameter assign, 2: pb snapshot assign
         self.footswitch_mode = 0
@@ -49,6 +51,18 @@ class Presenter:
 
         self.assign_footswitches()
         self.boot_lightshow()
+
+    @staticmethod
+    def _build_default_hardware(scheduler):
+        """Construct the real I2C footswitch/LED controller.
+
+        Imported lazily (not at module load) so off-device entry points that
+        inject a fake never import the Pi-only I2C stack (hardwares.* -> smbus2,
+        which needs fcntl + a real /dev/i2c). On the Pi this still fails loud if
+        the hardware is absent/faulty -- selection is explicit, never silent.
+        """
+        from hardwares import fsledctrl
+        return fsledctrl.Controller(scheduler)
 
     def initiate_view(self):
         self.view_update_effect()
