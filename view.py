@@ -1,4 +1,5 @@
 from kivy.clock import Clock
+from kivy.core.window import Window
 from kivy.graphics import Rectangle, Color
 from kivy.properties import StringProperty, ListProperty
 from kivy.uix.boxlayout import BoxLayout
@@ -15,6 +16,7 @@ from mywidget.buttons import CustomButton, ABCDbutton, PluginButton
 from mywidget.labels import BGLabel
 from mywidget.utils import DebouncedTextInput
 from presenter import Presenter
+from scheduler import KivyScheduler
 from utils import optimize_for_newline
 from view_widgets import PatchFileWidget, ParameterSliderWidget, ParameterToggleWidget, BypassToggleWidget
 from mywidget.snapshot_saveas_popup import SaveAsPopup
@@ -479,8 +481,13 @@ class SynapseGUI(RelativeLayout):
     def __init__(self, **kwargs):
         super(SynapseGUI, self).__init__(**kwargs)
 
+        # The view owns the Kivy-specific scheduler and hands it to the presenter,
+        # which forwards it to the hardware layer. This keeps presenter.py and
+        # hardwares/ free of any kivy import (see scheduler.py).
+        self.scheduler = KivyScheduler()
+
         # Create the presenter instance
-        self.presenter = Presenter(self)
+        self.presenter = Presenter(self, self.scheduler)
 
         # Initialize the canvas and background
         with self.canvas.before:
@@ -546,6 +553,14 @@ class SynapseGUI(RelativeLayout):
 
     def enable_webui_button(self):
         self.bezel.webui_button.disabled = False
+
+    # Window control lives in the view; the presenter calls these instead of
+    # touching kivy.core.window.Window directly.
+    def minimize(self):
+        Window.minimize()
+
+    def restore(self):
+        Window.restore()
 
     def update_parameter_display(self, instance_name, param_symbol, value):
         # Locate the correct widget and update it instead of redrawing everything
