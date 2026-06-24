@@ -1,7 +1,7 @@
 from collections import defaultdict
 import utils
 from hardwares import fsledctrl
-from modepctrl import ModepController, initialize_modep_pedalboard
+from modepctrl import initialize_modep_pedalboard, get_backend
 import subprocess
 import threading
 import time
@@ -11,11 +11,14 @@ import os
 from configs import LOCAL_STORAGE
 
 class Presenter:
-    def __init__(self, view, scheduler):
+    def __init__(self, view, scheduler, backend=None):
         self.view = view
         # scheduler: event-loop timer abstraction (see scheduler.Scheduler).
         # Keeps the presenter and hardware layer free of any GUI-framework import.
         self.scheduler = scheduler
+        # backend: MODEP host seam (see modepctrl.get_backend). Defaults to the
+        # real ModepController; an off-device entry point injects a fake.
+        self.backend = backend if backend is not None else get_backend()
         self.hwi = fsledctrl.Controller(scheduler)
 
         # 0: pedalboard nav, 1: parameter assign, 2: pb snapshot assign
@@ -53,13 +56,13 @@ class Presenter:
 
     def set_beat(self, bpb=None, bpm=None):
         if bpb:
-            error_msg = ModepController.set_bpb(bpb)
+            error_msg = self.backend.set_bpb(bpb)
             if error_msg is None:
                 self.pedalboard.bpb = bpb
             else:
                 print(error_msg)
         if bpm:
-            error_msg = ModepController.set_bpm(bpm)
+            error_msg = self.backend.set_bpm(bpm)
             if error_msg is None:
                 self.pedalboard.bpm = bpm
             else:
@@ -75,7 +78,7 @@ class Presenter:
         self.pedalboard.current_snapshot_idx 는 마지막 refresh 시점 값이라
         HMI/웹 변경이 아직 안 들어와 있을 수 있으므로 host에 직접 물어본다."""
         pb = self.pedalboard.current_pb_path
-        idx = ModepController.snapshot_current_idx()   # host = ground truth, 못 맞추면 -1
+        idx = self.backend.snapshot_current_idx()   # host = ground truth, 못 맞추면 -1
         if pb and idx is not None and idx >= 0:
             self.pb_snapshot_memory[pb] = idx
 
@@ -95,7 +98,7 @@ class Presenter:
             return
         if idx == self.pedalboard.current_snapshot_idx:
             return
-        ModepController.load_snapshot(idx)
+        self.backend.load_snapshot(idx)
         self.refresh_pedalboard()   # current_snapshot_idx 를 host 기준으로 재확정
 
     def view_update_effect(self, clear_ports=False):
@@ -128,7 +131,7 @@ class Presenter:
 
     def parameter_changed(self, effect_instance, port_symbol, port_value):
         if port_symbol == ":bypass":
-            error_msg = ModepController.bypass_effect(effect_instance, port_value)
+            error_msg = self.backend.bypass_effect(effect_instance, port_value)
             if error_msg is None:
                 self.pedalboard.get_effect_by_instance(effect_instance).bypassed = port_value
                 self.view_update_effect()
@@ -223,26 +226,26 @@ class Presenter:
 
     def prev_pedalboard(self):
         self._remember_current_snapshot()   # /reset 으로 날아가기 전에 떠나는 보드 기록
-        ModepController.set_prev_pedalboard()
+        self.backend.set_prev_pedalboard()
         self.refresh_pedalboard()
         self._restore_snapshot_for_current_pb()
 
     def next_pedalboard(self):
         self._remember_current_snapshot()
-        ModepController.set_next_pedalboard()
+        self.backend.set_next_pedalboard()
         self.refresh_pedalboard()
         self._restore_snapshot_for_current_pb()
 
     def prev_snapshot(self):
         if self.pedalboard.current_snapshot_idx > 0:
             self.pedalboard.current_snapshot_idx -= 1
-            ModepController.load_snapshot(self.pedalboard.current_snapshot_idx)
+            self.backend.load_snapshot(self.pedalboard.current_snapshot_idx)
             self.refresh_pedalboard()
 
     def next_snapshot(self):
         if self.pedalboard.current_snapshot_idx < len(self.pedalboard.list_of_snapshots) - 1:
             self.pedalboard.current_snapshot_idx += 1
-            ModepController.load_snapshot(self.pedalboard.current_snapshot_idx)
+            self.backend.load_snapshot(self.pedalboard.current_snapshot_idx)
             self.refresh_pedalboard()
 
     def assign_pb_ss_to_footswitch(self, fs_idx_to_assign):
@@ -277,13 +280,13 @@ class Presenter:
 
         # Implementation detail: you might have a function that sets pedalboard by ID
         # or you have a different approach for indexing
-        error = ModepController.set_pedalboard(pb_path)
+        error = self.backend.set_pedalboard(pb_path)
         if error is None:
             # Re-initialize your pedalboard object
             self.refresh_pedalboard()
             # Then set the snapshot
             self.pedalboard.current_snapshot_idx = ss_idx
-            ModepController.set_snapshot(ss_idx)
+            self.backend.set_snapshot(ss_idx)
             self.view_update_effect()
             print(f"Recalled PB {pb_path}, snapshot {ss_idx}.")
         else:
@@ -505,10 +508,10 @@ class Presenter:
         pass
 
     def save_snapshot(self):
-        ModepController.snapshot_save()
+        self.backend.snapshot_save()
         self.refresh_pedalboard()
     def  save_snapshot_as(self, name):
-        ModepController.snapshot_save_as(new_name=name)
+        self.backend.snapshot_save_as(new_name=name)
         self.refresh_pedalboard()
 
     def modechange(self, mode=None):
@@ -526,7 +529,7 @@ class Presenter:
         print(f"prev:{prev},current:{current}") #-1 is released. 0,1,2,3 is pressed for each button
 
     def _build_view_effect(self, effect):
-        bypassed = ModepController.parameter_get(effect.instance, ":bypass")  # Fetch bypass state correctly
+        bypassed = self.backend.parameter_get(effect.instance, ":bypass")  # Fetch bypass state correctly
         return {
             "effect_instance": effect.instance,
             "effect_name": effect.name,
