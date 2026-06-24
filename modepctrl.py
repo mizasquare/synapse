@@ -407,6 +407,30 @@ class ModepController:
 		except Exception as e:
 			return f"An error occurred: {e}"
 
+
+# ── Backend seam ─────────────────────────────────────────────────────────────
+# The model classes (EffectPort/EffectPatch/Pedalboard) and the module-level
+# builder `initialize_modep_pedalboard` below reach the MODEP host through
+# `get_backend()` instead of naming `ModepController` directly. That lets an
+# off-device entry point (e.g. qt_app.py) `set_backend(fake)` to serve fixtures
+# with no Pi hardware. The default is `ModepController` itself, so the on-device
+# (Kivy/Pi) path is byte-for-byte unchanged — same staticmethods, no extra
+# indirection. Same inject-at-the-seam pattern as scheduler.py.
+_backend = None
+
+
+def set_backend(backend):
+	"""Install the active backend. Call once at startup, before building the
+	Presenter. Pass ``None`` to fall back to the real ``ModepController``."""
+	global _backend
+	_backend = backend
+
+
+def get_backend():
+	"""Return the active backend; defaults to ``ModepController`` (real host)."""
+	return _backend if _backend is not None else ModepController
+
+
 @dataclass
 class EffectPort:
 	"""Represents a single port (parameter) of an Effect."""
@@ -425,7 +449,7 @@ class EffectPort:
 
 	def get_value(self):
 		"""Fetch the latest value from MODEP."""
-		new_value = ModepController.parameter_get(self.instance, self.symbol)
+		new_value = get_backend().parameter_get(self.instance, self.symbol)
 		if new_value is not None:
 			self.value = new_value
 			return new_value
@@ -433,7 +457,7 @@ class EffectPort:
 	def set_value(self, effect_instance: str, new_value: float):
 		print('wow')
 		"""Update parameter in MODEP, and sync only if the request succeeds."""
-		error_msg = ModepController.parameter_set(effect_instance, self.symbol, new_value)
+		error_msg = get_backend().parameter_set(effect_instance, self.symbol, new_value)
 		if error_msg is None:  # Only update if MODEP successfully applied the change
 			self.value = new_value
 		else:
@@ -453,14 +477,14 @@ class EffectPatch:
 
 	def get_patch(self):
 		"""Fetch the latest patch from MODEP."""
-		new_patch = ModepController.patch_get(self.instance, self.uri)
+		new_patch = get_backend().patch_get(self.instance, self.uri)
 		if new_patch is not None:
 			self.value = new_patch
 			return new_patch
 
 	def set_patch(self, new_patch: str):
 		"""Load a new patch into MODEP and update UI if successful."""
-		error_msg = ModepController.patch_set(self.instance, self.uri, new_patch)
+		error_msg = get_backend().patch_set(self.instance, self.uri, new_patch)
 		if error_msg is None:  # Only update local data if request was successful
 			self.file_path = new_patch
 		else:
@@ -573,11 +597,11 @@ class Pedalboard:
 
 	def _get_current_snapshot_idx(self):
 		"""Fetches the current snapshot index from the pedalboard."""
-		self.current_snapshot_idx = ModepController.snapshot_current_idx()
+		self.current_snapshot_idx = get_backend().snapshot_current_idx()
 
 	def _get_list_of_snapshots(self):
 		"""Fetches the list of snapshots available in the pedalboard."""
-		self.list_of_snapshots = ModepController.get_snapshot_list()
+		self.list_of_snapshots = get_backend().get_snapshot_list()
 		pass
 
 	def print_info(self):
@@ -613,10 +637,10 @@ def initialize_modep_pedalboard() -> Optional[Pedalboard]:
 	#some parameters are desynced with the current pedalboard and pb data retrived from saved pedalboard
 	"""Fetches the current pedalboard, retrieves all effect details, and constructs a Pedalboard object."""
 	# Step 1: Get the current pedalboard bundle path
-	pb_path = ModepController.get_current_pedalboard()
+	pb_path = get_backend().get_current_pedalboard()
 
 	# Step 2: Retrieve the pedalboard details
-	pb_data = ModepController.get_pedalboard_info(pb_path)
+	pb_data = get_backend().get_pedalboard_info(pb_path)
 	if not pb_data:
 		print("⚠️ Failed to retrieve pedalboard data.")
 		return None
@@ -643,7 +667,7 @@ def initialize_modep_pedalboard() -> Optional[Pedalboard]:
 		x, y = effect_data["x"], effect_data["y"]
 
 		# Step 4: Fetch detailed effect properties
-		detailed_info = ModepController.effect_get_information(effect_uri)
+		detailed_info = get_backend().effect_get_information(effect_uri)
 		if not detailed_info:
 			print(f"⚠️ Failed to retrieve details for {effect_uri}")
 			continue
@@ -663,7 +687,7 @@ def initialize_modep_pedalboard() -> Optional[Pedalboard]:
 				print(patch_uri)
 				print(file_path)
 		# Fetch currently loaded patch file (if any)
-				current_patch = ModepController.patch_get(instance_name, patch_uri)
+				current_patch = get_backend().patch_get(instance_name, patch_uri)
 				if current_patch:
 					patch_value = current_patch[0]
 					patch_property = current_patch[1]
