@@ -1,12 +1,13 @@
-"""Off-device entry point: PySide6 + QML mock UI (Windows dev).
+"""Off-device dev entry: PyQt6 + QML mock, fake MODEP backend + fake hardware.
 
-Wires the real ``Presenter`` to a fake MODEP backend and fake hardware, then
-drives a QML view -- so the whole presenter/model stack runs with no Pi. The
-on-device Kivy path (app.py / view.py) is untouched.
+Wires the real ``Presenter`` to a fake MODEP backend and fake hardware, driving
+the QML view -- so the whole presenter/model stack runs with no Pi (screenshots,
+desktop dev). The on-device entry is ``qt_main.py`` (real ``ModepController`` +
+real I2C ``fsledctrl``); this file deliberately injects fakes only.
 
 Run:
-    .venv\\Scripts\\python.exe qt_app.py            # interactive window
-    .venv\\Scripts\\python.exe qt_app.py --shot out.png  # render one frame, save, quit
+    python qt_app.py                 # interactive window (fake backend + hardware)
+    python qt_app.py --shot out.png  # render one frame, save, quit
 """
 
 import os

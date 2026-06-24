@@ -31,7 +31,7 @@ class Presenter:
 
         # 0: pedalboard nav, 1: parameter assign, 2: pb snapshot assign
         self.footswitch_mode = 0
-        self.footswitch_assigns = {0: None, 1: None, 2: None, 3: None}
+        self.footswitch_assigns = [None, None, None, None]
         self.footswitch_combo_assigns = {}
         self.footswitch_input_que = [0] * 4
         # Tap-tempo engine (the C+D chord enters it; see handle_multiple_footswitches).
@@ -47,18 +47,16 @@ class Presenter:
         self.pedalboard = initialize_modep_pedalboard()
         # pb별 마지막 활성 스냅샷 기억 (세션 한정 인메모리). key=current_pb_path, value=snapshot idx
         self.pb_snapshot_memory = {}
-        # Load stored assignments from disk
-        # self.fs_mode2_assigns = load_footswitch_assignments()
-
-        # Build or refresh the pedalboard/snapshot assignment dictionary as needed
-        # e.g. ensures we have keys 0..3 present
-        self.fs_mode2_assigns = defaultdict(dict)
+        # Footswitch-mode-2 (RECALL) pedalboard+snapshot assignments, keyed "0".."3".
+        # Loaded from disk so they persist across runs; defaults guarantee all four
+        # keys exist. Key names ("pedalboard"/"snapshot_idx") match the writer
+        # (assign_pb_ss_to_footswitch) and reader (recall_pb_ss) below.
+        self.fs_assignment_data = utils.load_footswitch_assignments() or {}
         for i in range(4):
-            if str(i) not in self.fs_mode2_assigns:
-                self.fs_mode2_assigns[str(i)] = {
-                    "pedalboard_path": None,
-                    "snapshot_idx": None
-                }
+            self.fs_assignment_data.setdefault(str(i), {
+                "pedalboard": None,
+                "snapshot_idx": None,
+            })
 
         self.assign_footswitches()
         self.boot_lightshow()
@@ -290,7 +288,7 @@ class Presenter:
         # Persist to JSON
         utils.save_footswitch_assignments(self.fs_assignment_data)
 
-        print(f"Footswitch {fs_idx} assigned to PB {pedalboard_id}, snapshot {snapshot_idx}")
+        print(f"Footswitch {fs_idx_to_assign} assigned to PB {pedalboard}, snapshot {snapshot_idx}")
 
     def recall_pb_ss(self, fs_idx):
         """Load pedalboard and snapshot as stored in footswitch_assignments.json"""
@@ -311,7 +309,7 @@ class Presenter:
             self.refresh_pedalboard()
             # Then set the snapshot
             self.pedalboard.current_snapshot_idx = ss_idx
-            self.backend.set_snapshot(ss_idx)
+            self.backend.load_snapshot(ss_idx)
             self.view_update_effect()
             print(f"Recalled PB {pb_path}, snapshot {ss_idx}.")
         else:
@@ -454,19 +452,19 @@ class Presenter:
 
             # 4) Assign footswitch 0–3 to lambda toggles of the chosen effects
             self.footswitch_assigns = [
-                lambda idx, st: toggle_bypass(e0),
-                lambda idx, st: toggle_bypass(e1),
-                lambda idx, st: toggle_bypass(e2),
-                lambda idx, st: toggle_bypass(e3),
+                lambda: toggle_bypass(e0),
+                lambda: toggle_bypass(e1),
+                lambda: toggle_bypass(e2),
+                lambda: toggle_bypass(e3),
             ]
 
         elif self.footswitch_mode == 2:
             # Mode 2: recall pedalboard/snapshot from JSON
             self.footswitch_assigns = [
-                lambda idx, st: self.recall_pb_ss(0),
-                lambda idx, st: self.recall_pb_ss(1),
-                lambda idx, st: self.recall_pb_ss(2),
-                lambda idx, st: self.recall_pb_ss(3),
+                lambda: self.recall_pb_ss(0),
+                lambda: self.recall_pb_ss(1),
+                lambda: self.recall_pb_ss(2),
+                lambda: self.recall_pb_ss(3),
             ]
 
         elif self.footswitch_mode == 3: # WebUI mode
