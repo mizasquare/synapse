@@ -61,6 +61,8 @@ def main():
     presenter.initiate_view()
     if focus_inst:
         presenter.view_render_parameters(focus_inst)
+    if "--tap" in argv:
+        presenter.enter_tap_tempo()  # dev: open the TAP TEMPO screen for a screenshot
 
     engine = QQmlApplicationEngine()
     ctx = engine.rootContext()

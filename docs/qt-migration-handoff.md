@@ -137,3 +137,27 @@
 - **seam 주입만 추가, 로직 의미는 보존.** (스케줄러 때처럼 "이름/배선만 교체".)
 - 와이어 프로토콜 흉내 금지 — 가짜는 항상 **객체 seam**에서.
 - 커밋은 작게, 메시지에 "무엇을·왜". 새 위젯/엔트리는 기존 파일과 같은 결로.
+
+## 10. 후속 작업 / 알려진 미완성
+
+이번 세션에 추가됨(Stage 3 풋스위치 입력의 일부): **탭템포 모드**(C+D 콤보 진입, `taptempo.py`),
+목업 전용 **키보드 풋스위치 입력**(Z/X/C/V→FS0–3, `fakehardware.set_switch`+QML Keys). 설정값 TODO는
+`docs/config-todo.md`.
+
+### RECALL 모드(풋스위치 mode 2) 되살리기
+
+의도: 풋스위치 4개 = 리스트상 멀리 흩어진 **(페달보드+스냅샷) 조합 4개로 한 방에 점프**하는 라이브
+셋리스트 모드. (NAVIGATE=순차 탐색, STOMP=이펙트 bypass 토글, **RECALL=북마크 직점프**.) 지금은 변수
+배선이 어긋난 채 미완성이라 RECALL에서 풋스위치를 밟으면 죽는다. 되살리려면:
+
+- [ ] **변수명 통일**: `recall_pb_ss`/`assign_pb_ss_to_footswitch`는 `self.fs_assignment_data`를
+      읽고/쓰는데 `__init__`이 만드는 건 `self.fs_mode2_assigns`뿐 → 하나로 통일
+      ([presenter.py:55](../presenter.py), [276](../presenter.py), [295](../presenter.py)).
+- [ ] **키 이름 통일**: 초기화는 `"pedalboard_path"`로 저장, recall은 `assignment["pedalboard"]`로 읽음.
+- [ ] **부팅 시 디스크 로드 복구**: `load_footswitch_assignments()` 호출이 주석처리됨
+      ([presenter.py:51](../presenter.py)). 저장소 = `~/.modep/footswitch_assignments.json`
+      (`utils.save/load_footswitch_assignments`).
+- [ ] **배정 경로/ UI 추가**: 현재 `assign_pb_ss_to_footswitch`를 호출하는 곳이 없음(=북마크 등록 수단
+      자체가 없음). print문도 미정의 `fs_idx`/`pedalboard_id` 참조(NameError).
+- [ ] **`set_snapshot`**: 실제 `ModepController`엔 없고 `FakeModepController`만 stub — recall의 스냅샷
+      경로가 의존하므로 실 백엔드에도 구현 필요.

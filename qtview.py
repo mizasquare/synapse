@@ -38,8 +38,9 @@ class QtView(QObject):
         self._nodes = []
         self._cables = []
         self._foot = []
-        self._screen = "overview"   # "overview" | "focus"
+        self._screen = "overview"   # "overview" | "focus" | "taptempo"
         self._focus = {}            # FOCUS payload for QML
+        self._tap = {}              # TAP TEMPO payload for QML ({bpb, klass})
 
     def set_presenter(self, presenter):
         self.presenter = presenter
@@ -68,6 +69,10 @@ class QtView(QObject):
     @Property("QVariantMap", notify=dataChanged)
     def focus(self):
         return self._focus
+
+    @Property("QVariantMap", notify=dataChanged)
+    def tap(self):
+        return self._tap
 
     @Property("QVariantList", notify=dataChanged)
     def nodes(self):
@@ -116,6 +121,19 @@ class QtView(QObject):
     @Slot()
     def focusNext(self):
         self._focus_step(1)
+
+    @Slot(int, bool)
+    def footswitchKey(self, index, down):
+        """Dev: keyboard (Z/X/C/V in QML) -> a fake footswitch press/release.
+
+        Routed into the fake controller's ``set_switch`` so the poll loop turns
+        it into a real debounced/chorded event. No-op on real hardware (no
+        ``set_switch``), so it can stay wired without affecting the Pi build.
+        """
+        hwi = getattr(self.presenter, "hwi", None) if self.presenter else None
+        setter = getattr(hwi, "set_switch", None)
+        if setter is not None:
+            setter(index, down)
 
     def _focus_step(self, d):
         pb = getattr(self.presenter, "pedalboard", None) if self.presenter else None
@@ -179,9 +197,29 @@ class QtView(QObject):
         self.dataChanged.emit()
 
     def update_mode_display(self, mode):
-        self._mode = {0: "NAVIGATE", 1: "STOMP", 2: "RECALL", 3: "WEBUI"}.get(mode, str(mode))
+        self._mode = {0: "NAVIGATE", 1: "STOMP", 2: "RECALL", 3: "WEBUI",
+                      4: "TAP TEMPO"}.get(mode, str(mode))
         self._rebuild_footswitches()
         self.dataChanged.emit()
+
+    def show_tap_tempo(self, bpm, bpb):
+        """Presenter entered tap-tempo -> switch QML to the TAP TEMPO screen."""
+        self._bpm = ("%g" % bpm) if isinstance(bpm, (int, float)) else str(bpm)
+        self._tap = self._build_tap(bpm, bpb)
+        self._screen = "taptempo"
+        self.dataChanged.emit()
+
+    def hide_tap_tempo(self):
+        """Presenter left tap-tempo -> back to the overview screen."""
+        self._screen = "overview"
+        self._tap = {}
+        self.dataChanged.emit()
+
+    @staticmethod
+    def _build_tap(bpm, bpb):
+        n = max(1, int(bpb or 4))
+        klass = "WALTZ" if n % 3 == 0 else ("EVEN" if n % 2 == 0 else "ODD")
+        return {"bpb": n, "klass": klass}
 
     # presenter also calls these; no Qt UI for them in phase 1.
     def set_abcd_availability(self, availabilities):

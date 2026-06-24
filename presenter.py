@@ -1,6 +1,7 @@
 from collections import defaultdict
 import utils
 from modepctrl import initialize_modep_pedalboard, get_backend
+from taptempo import TapTempoEngine
 import subprocess
 import threading
 import time
@@ -8,6 +9,11 @@ import time
 import json
 import os
 from configs import LOCAL_STORAGE
+
+# Footswitch mode ids. 0-2 are the press-driven modes cycled by modechange();
+# 3 (WebUI) and 4 (tap tempo) are transient modes entered out-of-band (button /
+# chord) and kept out of that cycle.
+TAP_TEMPO_MODE = 4
 
 class Presenter:
     def __init__(self, view, scheduler, backend=None, hardware=None):
@@ -28,6 +34,11 @@ class Presenter:
         self.footswitch_assigns = {0: None, 1: None, 2: None, 3: None}
         self.footswitch_combo_assigns = {}
         self.footswitch_input_que = [0] * 4
+        # Tap-tempo engine (the C+D chord enters it; see handle_multiple_footswitches).
+        # Framework-agnostic: it only needs the scheduler + the two callbacks below.
+        self._mode_before_tap = 0
+        self.tap_tempo = TapTempoEngine(
+            self.scheduler, on_bpm=self._tap_on_bpm, on_beat=self._tap_on_beat)
         self._poll_thread = None
         self._poll_stop = None
         self.start_footswitch_polling(100)  # background thread @100Hz
@@ -366,7 +377,9 @@ class Presenter:
         print(f'Footswitch event: {status}')
         # For each pressed (or released) footswitch, trigger a blink on its corresponding LED.
         for i, s in enumerate(status):
-            if s == 1:
+            # In tap-tempo mode the metronome owns the LEDs; skip the per-press
+            # blink so it doesn't fight the beat flashes.
+            if s == 1 and self.footswitch_mode != TAP_TEMPO_MODE:
                 # Blink the red LED on the corresponding LED object. Here, one blink cycle.
                 self.hwi.LED.get_led(i).blink(color='red', times=1, interval=0.1)
         if sum(status) == 1:
@@ -381,17 +394,21 @@ class Presenter:
             self.handle_multiple_footswitches(status)
 
     def handle_multiple_footswitches(self, status):
-        if status == [1, 1, 0, 0]:
+        # While in tap-tempo mode, ANY chord exits back to the previous mode.
+        if self.footswitch_mode == TAP_TEMPO_MODE:
+            self.exit_tap_tempo()
+            return
+        # Adjacent-pair chords select a mode (footswitch-combo convention):
+        if status == [1, 1, 0, 0]:        # A+B -> cycle footswitch mode
+            self.modechange()
+        elif status == [0, 1, 1, 0]:      # B+C -> tuner (not implemented yet)
             pass
-        elif status == [0, 1, 1, 0]:
-            pass
-        elif status == [0, 0, 1, 1]:
-            pass
+        elif status == [0, 0, 1, 1]:      # C+D -> tap tempo
+            self.enter_tap_tempo()
         elif status == [0, 0, 0, 0]:
             print("How is this possible?")
         else:
             print("Invalid footswitch combination")
-        pass
 
 
     def assign_footswitches(self):
@@ -455,6 +472,10 @@ class Presenter:
         elif self.footswitch_mode == 3: # WebUI mode
             self.footswitch_assigns = [None, None, None, self.close_webui]
 
+        elif self.footswitch_mode == TAP_TEMPO_MODE:
+            # Any single press is a beat tap; chords exit (handle_multiple_footswitches).
+            self.footswitch_assigns = [self.tap_input] * 4
+
     def toggle_keyboard(self, *args):
         utils.toggle_wvkbd()
 
@@ -514,6 +535,51 @@ class Presenter:
         ...
     def view_update_bpm(self):
         self.view.update_bpm_display(self.pedalboard.bpm)
+
+    # ── Tap tempo (entered via the C+D footswitch chord) ─────────────────
+    def enter_tap_tempo(self):
+        """Switch into tap-tempo: every footswitch press becomes a beat tap and
+        the physical LEDs run a metronome at the current tempo."""
+        if self.footswitch_mode == TAP_TEMPO_MODE:
+            return
+        self._mode_before_tap = self.footswitch_mode
+        self.footswitch_mode = TAP_TEMPO_MODE
+        self.assign_footswitches()
+        self.hwi.LED.stop_all_blinking()   # clear before the metronome owns the LEDs
+        self.view.update_mode_display(TAP_TEMPO_MODE)
+        self.view.show_tap_tempo(self.pedalboard.bpm, self.pedalboard.bpb)
+        self.tap_tempo.start(self.pedalboard.bpm, self.pedalboard.bpb)
+
+    def exit_tap_tempo(self):
+        """Leave tap-tempo (any chord) -> stop the metronome, restore the prior mode."""
+        self.tap_tempo.stop()
+        self.hwi.LED.stop_all_blinking()
+        self.footswitch_mode = self._mode_before_tap
+        self.assign_footswitches()
+        self.view.hide_tap_tempo()
+        self.view.update_mode_display(self.footswitch_mode)
+
+    def tap_input(self, *args):
+        """A single footswitch press while in tap-tempo mode = one beat tap."""
+        self.tap_tempo.tap()
+
+    def _tap_on_bpm(self, bpm):
+        """Engine produced a refined BPM -> tell MODEP + update the on-screen widget."""
+        error_msg = self.backend.set_bpm(bpm)
+        if error_msg is None:
+            self.pedalboard.bpm = bpm
+        else:
+            print(error_msg)
+        self.view.update_bpm_display(bpm)
+
+    def _tap_on_beat(self, led_index, is_downbeat, duration):
+        """Metronome beat -> flash one LED (red downbeat / blue off-beat)."""
+        self.hwi.LED[led_index] = 0b10 if is_downbeat else 0b01
+        self.scheduler.schedule_once(
+            lambda dt, i=led_index: self._tap_beat_off(i), duration)
+
+    def _tap_beat_off(self, led_index):
+        self.hwi.LED[led_index] = 0
 
     def boot_lightshow(self, i=None):
         # for i in range(4):

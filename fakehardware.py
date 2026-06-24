@@ -1,8 +1,9 @@
 """Off-device footswitch/LED controller: a console-logging no-op.
 
 Implements ``hardware.HardwareController`` with no I2C, for the Windows PySide6
-mock. Phase 1 = footswitches disabled (always read released); LED operations log
-to the console so you can see what the box would light. Injected explicitly via
+mock. Footswitches are keyboard-driven (Z/X/C/V via QtView.footswitchKey ->
+set_switch); LED operations log to the console so you can see what the box would
+light. Injected explicitly via
 ``presenter.Presenter(hardware=FakeController())`` -- selection is never
 auto-detected (see hardware.py).
 
@@ -67,10 +68,19 @@ class FakeController(HardwareController):
         # Controller; the fake schedules nothing (blink just logs).
         self._n = num_footswitches
         self.LED = _FakeLEDContainer(num_footswitches)
+        # Dev input: the keyboard (Z/X/C/V in QML -> QtView.footswitchKey ->
+        # set_switch) drives these. The poll loop reads them exactly like the
+        # real I2C switches, so debounce + chord latching run for real -- which
+        # is how a mouse-less dev box can still fire combos.
+        self._pressed = [0] * num_footswitches
 
     def read_footswitches(self):
-        # Phase 1: footswitches disabled -> always released.
-        return [0] * self._n
+        return list(self._pressed)  # snapshot (poll thread reads, GUI writes)
+
+    def set_switch(self, index, down):
+        """Dev hook: set one footswitch's pressed state (keyboard-driven)."""
+        if 0 <= index < self._n:
+            self._pressed[index] = 1 if down else 0
 
     def cleanup(self):
         pass

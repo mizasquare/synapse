@@ -23,6 +23,33 @@ Window {
     readonly property color cMuted:  "#7e8694"
     readonly property color cDim:    "#5a6270"
 
+    // dev: map keyboard Z/X/C/V -> footswitch 0..3 (mouse can't chord)
+    function fsKeyIndex(k) {
+        if (k === Qt.Key_Z) return 0;
+        if (k === Qt.Key_X) return 1;
+        if (k === Qt.Key_C) return 2;
+        if (k === Qt.Key_V) return 3;
+        return -1;
+    }
+
+    // Key catcher: Z/X/C/V press/release -> view.footswitchKey -> fake controller,
+    // which the poll loop debounces + latches into real (combo-capable) events.
+    Item {
+        anchors.fill: parent
+        focus: true
+        Component.onCompleted: forceActiveFocus()
+        Keys.onPressed: function(event) {
+            if (event.isAutoRepeat) return;
+            var i = win.fsKeyIndex(event.key);
+            if (i >= 0) { view.footswitchKey(i, true); event.accepted = true; }
+        }
+        Keys.onReleased: function(event) {
+            if (event.isAutoRepeat) return;
+            var i = win.fsKeyIndex(event.key);
+            if (i >= 0) { view.footswitchKey(i, false); event.accepted = true; }
+        }
+    }
+
     // =========================================================== OVERVIEW
     Item {
         id: overviewScreen
@@ -172,6 +199,13 @@ Window {
                     height: 64
                     radius: 8
                     color: cPanel
+                    // dev keymap hint: which keyboard key fires this footswitch
+                    Text {
+                        anchors.right: parent.right; anchors.top: parent.top
+                        anchors.rightMargin: 7; anchors.topMargin: 4
+                        text: ["Z", "X", "C", "V"][index]
+                        color: cDim; font.family: uiFont; font.pixelSize: 15
+                    }
                     Row {
                         anchors.left: parent.left
                         anchors.leftMargin: 12
@@ -361,6 +395,57 @@ Window {
             x: 12; anchors.bottom: parent.bottom; anchors.bottomMargin: 10
             text: "노브를 위/아래로 드래그 · 값은 로컬 반영 (가짜 백엔드)"
             color: cDim; font.family: uiFont; font.pixelSize: 15
+        }
+    }
+
+    // ============================================================ TAP TEMPO
+    // Beat blinking lives on the PHYSICAL footswitch LEDs (presenter drives them);
+    // this screen is just the last-set BPM + meter readout (design: no on-screen LEDs).
+    Item {
+        id: tapScreen
+        anchors.fill: parent
+        visible: view.screen === "taptempo"
+        property var t: view.tap
+
+        // header: title (left) + meter class (right)
+        Text {
+            x: 16; y: 16
+            text: "TAP TEMPO"
+            color: cGreen; font.family: uiFont; font.pixelSize: 44
+        }
+        Text {
+            anchors.right: parent.right; anchors.rightMargin: 16; y: 26
+            text: tapScreen.t && tapScreen.t.klass ? tapScreen.t.klass : ""
+            color: cMuted; font.family: uiFont; font.pixelSize: 28
+        }
+
+        // big last-set BPM, centred
+        Column {
+            anchors.centerIn: parent
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: view.bpm
+                color: cText; font.family: uiFont; font.pixelSize: 200
+            }
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "BPM"
+                color: cMuted; font.family: uiFont; font.pixelSize: 38
+            }
+        }
+
+        // meter + how-to footer
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: parent.height - 92
+            text: (tapScreen.t && tapScreen.t.bpb ? tapScreen.t.bpb : 4) + " BEATS / BAR"
+            color: cGreen; font.family: uiFont; font.pixelSize: 30
+        }
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom; anchors.bottomMargin: 16
+            text: "탭: 풋스위치 아무거나  ·  종료: 콤보(2개 동시)"
+            color: cDim; font.family: uiFont; font.pixelSize: 22
         }
     }
 }
