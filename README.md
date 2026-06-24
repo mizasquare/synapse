@@ -168,7 +168,8 @@ Custom endpoints added by the patches (see [`REFERENCES.md`](REFERENCES.md) for 
 - [`REFERENCES.md`](REFERENCES.md) — external dependencies, the live Pi as ground truth,
   patch/deploy details, and known issues.
 - [`docs/snapshot-sync-diagnosis.md`](docs/snapshot-sync-diagnosis.md) — snapshot sync investigation.
-- [`docs/ui-migration-review.md`](docs/ui-migration-review.md) — new-UI migration review (Claude Design ↔ current bitmap UI gaps).
+- [`docs/qt-roadmap.md`](docs/qt-roadmap.md) — Qt app roadmap (remaining features / reliability / cleanup / boot).
+- [`docs/qt-migration-FINISHED.md`](docs/qt-migration-FINISHED.md) — Qt migration archive (completed stack work: PyQt6+QML+eglfs).
 
 ---
 

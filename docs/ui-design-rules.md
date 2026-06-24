@@ -2,7 +2,7 @@
 
 > Pedal Prototype(Claude Design 시안)을 실 하드웨어에 맞춰 구현하기 위한 룰.
 > **값은 전부 튜너블** — 온디바이스 테스트 후 조정 전제(특히 §2 헤더 크기).
-> 시안 출처: claude.ai/design `Pedal Prototype.dc.html`. 관련: `docs/qt-migration-handoff.md`.
+> 시안 출처: claude.ai/design `Pedal Prototype.dc.html`. 관련: `docs/qt-roadmap.md`.
 
 ## 1. 디스플레이 / 물리
 - 800×480, **5:3, ~133 PPI**, ≈152×91mm. → **1mm ≈ 5.25px.**
