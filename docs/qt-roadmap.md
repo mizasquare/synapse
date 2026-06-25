@@ -4,9 +4,10 @@
 > (검증 내역 = [`qt-migration-FINISHED.md`](qt-migration-FINISHED.md) 아카이브).
 > 이 문서는 그 위의 **남은 기능·신뢰성·정리·부팅·설계결정·검증**을 모은 살아있는 로드맵이다.
 > 구 `qt-migration-handoff`(후속작업) + `ui-migration-review`(시안↔현행 갭 분석)를 **흡수·통합**했다.
-> 마지막 갱신: 2026-06-25 (6에이전트 코드 감사 + 라인단위 검증 + 시안 갭 분석 통합).
+> 마지막 갱신: 2026-06-25 (FOCUS 컨트롤/모니터 렌더링 + 라이브 미터 피드 세션 — 완료분 `[x]` 반영).
 
 **현재 사실관계:** PyQt6+QML+eglfs 앱이 Pi에서 라이브 동작하고 autostart도 전환됨(`dfd42c6`).
+FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이브 검증됨(커밋 `1074b5e`).
 "못 뜨는" 하드 블로커는 없다. 남은 일 = ① 라이브 신뢰성 ② 기능 패리티/신규 ③ 정리/폴리시
 ④ 무컴포지터 부팅 ⑤ 검증 ⑥ 열린 설계결정 ⑦ 미래. 우선순위 = Tier 1 → 부팅 → Tier 2 → Tier 3.
 
@@ -18,8 +19,10 @@
 
 앱은 잘 뜨지만, 호스트가 죽거나 느릴 때 **무대에서 얼어붙지 않게** 만드는 게 핵심.
 
-- [ ] **HTTP timeout 추가** — [`modepctrl.py:25`](../modepctrl.py) `_request`가 get/post에 `timeout=`이 없어
-      MODEP가 죽거나 느리면 **GUI 스레드가 영구 정지**. 모든 호출에 `timeout=`(예 3~5s) 부여.
+- [x] **HTTP timeout 추가 ✅(2026-06-25, 커밋 `1074b5e`)** — `_request`에 `setdefault("timeout", 2.0)` +
+      8개 직접 get/post 호출 전부 `timeout=2.0`. `parameter_set`/`parameter_get`는 예외처리로 감쌈.
+      ★이게 노브/토글 드래그 시 앱 프리즈의 **실제 원인**이었음(동기 `requests.post` 무타임아웃 → mod-ui 핸들러
+      wedge에 GUI 스레드 영구블록). 남은 안전화는 아래 None 가드.
 - [ ] **`_request` None 반환 가드** — `_request`는 실패 시 None 반환([`modepctrl.py:30`](../modepctrl.py)).
       호출부 `get_snapshot_list`([:170](../modepctrl.py)) · `effect_get_information`([:289](../modepctrl.py)) ·
       `parameter_get` 등이 None 체크 없이 `.json()`/`.content` 호출 → 호스트 500/거부 시 **크래시**. 각 호출부에 None 가드.
@@ -40,6 +43,14 @@
 
 **개별 기능**
 
+- [x] **FOCUS 컨트롤/모니터 렌더링 개편 + 라이브 미터 ✅(2026-06-25, 커밋 `1074b5e`)** — 기존 FOCUS가
+      **모든 컨트롤을 원형 노브 하나**로 그리고 **출력(모니터) 포트를 통째로 버리던** 문제 해결.
+      ① 컨트롤 포트를 LV2 properties로 **6종 분류**(knob/int/log/toggle/trigger/enum), 출력 포트를 **신규 지원**
+      (meter/clip/gauge/numeric). 드로잉 분해 `qml/ControlWidget`·`MonitorWidget`, 해석 집약 `model.EffectPort`.
+      ② **라이브 레벨미터 피드** `monitorfeed.py`(의존성無 raw WS)가 mod-ui 웹소켓 수동구독→`output_set`→미터(~30Hz throttle, `data_ready` ack).
+      ③ 미터 **dB 매핑**(modmeter 출력=선형진폭 0..1이라 선형 norm이면 바가 ~1%만 차 안 보임 → `20·log10`, -60dB 바닥).
+      라이브 검증 OK(HighGainRig 신호→바 가시적 움직임). 설계=[`focus-control-rendering.md`](focus-control-rendering.md).
+      후속(미완): 패치선택기(아래 별도) · enum/trigger 위젯 **실조작** 검증 · 모니터 tier-2 하드코딩 레지스트리는 빈 채 둠.
 - [ ] **튜너** — 콤보 B+C가 `pass`([`presenter.py:402`](../presenter.py)), Qt 튜너 화면 없음.
       ★피치검출 `yin.py`가 `under_vsersion1/`로 빠져 **누락**([`tunerpopup.py:8`](../tunerpopup.py) import 실패).
       필요: YIN DSP 복원(또는 대체) + presenter 배선(탭템포 패턴) + 풀스크린 QML 튜너 화면. (오디오버퍼 파이프는 아이캔디와 공유.)
@@ -82,10 +93,12 @@
       **Qt 경로선 호출조차 안 됨(죽은 코드)**, 온디바이스 웹UI는 스펙서 폐기 결정.
 - [ ] **죽은 스텁 제거** — `view_mode_change`([`presenter.py:149`](../presenter.py)), `view_update_footsw_display`([:152](../presenter.py)),
       `footswitch_combo_assigns` 빈 dict([:35](../presenter.py)), `boot_lightshow` 주석처리([:582](../presenter.py)).
-- [ ] **노드 라벨 elide** — [`main.qml:144`](../qml/main.qml) 긴 이펙트명이 박스폭 초과로 겹침(라이브 관찰). `Text.ElideRight`+width 클램프.
-- [ ] **`[undefined]→bool` 경고** — [`main.qml:295`](../qml/main.qml) FOCUS 패치 visible 바인딩, 무해. `!!(...)`로 정리.
+- [x] **노드 라벨 겹침 ✅(2026-06-25, 커밋 `b06dbad`)** — 단순 elide 대신 **스네이크 그리드**로 개편(행당 4노드
+      170×72, 라벨 2줄 wrap+elide, 세로스크롤 Flickable). 6이펙트 박스겹침0. ★Pi 라이브 육안검증만 추후.
+- [ ] **`[undefined]→bool` 경고** — [`main.qml:307`](../qml/main.qml) FOCUS 패치 visible 바인딩, 무해. `!!(...)`로 정리.
 - [ ] **docstring 'PySide6' 잔존** — [`qtview.py:1`](../qtview.py) 등 코드는 PyQt6인데 도크스트링은 PySide6. (경위는 FINISHED §2.)
-- [ ] **untracked 파일 정리** — `qt_smoke.py`(스모크앱, 보존가치 판단), `requirements.txt`(원래 master/Kivy용 → Qt용 정리).
+- [x] **untracked 파일 커밋 ✅(2026-06-25, 커밋 `1074b5e`)** — `qt_smoke.py`(스모크앱, 보존)·`requirements.txt`
+      (Kivy 베이스라인 insurance로 보존) 둘 다 커밋. Qt 런타임 deps 별도 핀은 `requirements-dev.txt`(PyQt6 6.4.2)가 담당.
 - [ ] **`EffectPort.set_value` 잉여 인자** — [`modepctrl.py:457`](../modepctrl.py) 안 쓰는 `effect_instance`를 받음(self.instance 있음). 무해, 시그니처 정리.
 - [ ] **LED 블링크 후 정상색 미복원** — [`fsledctrl.py`](../hardwares/fsledctrl.py) blink 끝나면 OFF, 이전색 기억 없음(cosmetic; 위 'LED 정상상태 색'과 연동).
 - [ ] **HTTP 50-왕복 초기화 배칭/캐시** — `initialize_modep_pedalboard`가 포트마다 1요청 → 느린망에서 로드 지연. 배칭/캐시 검토.
@@ -93,9 +106,10 @@
 
 ## 라이브 검증 백로그 (Pi 실물)
 
-- [ ] **FOCUS 실백엔드** — 노브 드래그가 실제 MODEP 파라미터를 바꾸는지(가짜 아닌 실 호스트).
+- [x] **FOCUS 실백엔드 ✅(2026-06-25)** — 노브 드래그가 실 MODEP 파라미터 바꿈 확인(라이브, 실 호스트).
 - [ ] **탭템포 실검증** — 탭→BPM 반영 + LED 메트로놈 + `set_bpm` 동기.
-- [ ] **역방향 싱크** — `qt_main` 소켓(`/tmp/synapsin.sock`)으로 웹/HMI 변경이 앱에 실시간 반영되는지.
+- [x] **역방향 싱크 ✅(2026-06-25)** — 소켓(`/tmp/synapsin.sock`)으로 웹발 PB전환이 앱에 실시간 반영 확인 +
+      모니터 피드 `output_set`도 라이브 수신(미터 동작). 한계: MIDI/HMI **직접** 변경은 mod-ui가 notify 안 함(기존 한계).
 
 ## 열린 설계 결정
 
