@@ -18,6 +18,14 @@
 `/usr/lib/python3/dist-packages/mod/` 와 byte-identical 로 유지된다.
 `mod-tweaks/org/` 는 upstream 원본 + `.diff`.
 
+**적용된 핵심 거동 패치(패키지 업데이트 시 덮어써짐 → 재배포 필요):**
+- `host.py` 페달보드 저장 (`save()` asNew=0 분기, ~L3964): ttl 파일 심볼을 클라이언트가 보낸 `title` 이 아니라
+  **현재 번들 디렉토리명**에서 도출(`titlesym = basename(bundlepath)[:-len('.pedalboard')]`). stale 제목(예: 앱 풋스위치
+  내비 중 웹UI에 남은 이전 보드명)으로 저장해도 `dir==ttl==manifest` 가 깨지지 않아 **ttl 부패/고아 불가**. 표시명(`doap:name`)은
+  별도 `title` 인자라 이름변경은 그대로 동작. 경위·포렌식 = `docs/save-corruption-postmortem.md`.
+- `host.py` Gap D (~L3679): 모든 PB 로드에서 `pedalboard_name` 방송(앱/REST/MIDI 발 로드도 웹UI 타이틀 갱신).
+- `webserver.py`/`host.py`/`session.py` 역방향 `notify_synapsin` + `syn_*` 엔드포인트 (아래 커스텀 엔드포인트 참조).
+
 ## mod 코드 배포 (mod-tweaks/deploy.sh)
 
 mod 코드(host/session/webserver) 수정 시 **파일 통째 cp** 전략을 쓴다(diff-patch 아님 —

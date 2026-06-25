@@ -26,11 +26,24 @@ FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이
       8개 직접 get/post 호출 전부 `timeout=2.0`. `parameter_set`/`parameter_get`는 예외처리로 감쌈.
       ★이게 노브/토글 드래그 시 앱 프리즈의 **실제 원인**이었음(동기 `requests.post` 무타임아웃 → mod-ui 핸들러
       wedge에 GUI 스레드 영구블록). 남은 안전화는 아래 None 가드.
-- [ ] **`_request` None 반환 가드** — `_request`는 실패 시 None 반환([`modepctrl.py:30`](../modepctrl.py)).
-      호출부 `get_snapshot_list`([:170](../modepctrl.py)) · `effect_get_information`([:289](../modepctrl.py)) ·
-      `parameter_get` 등이 None 체크 없이 `.json()`/`.content` 호출 → 호스트 500/거부 시 **크래시**. 각 호출부에 None 가드.
-- [ ] **콜드부팅 게이트 차단화** — [`qt_main.py:96`](../qt_main.py) `_wait_for_modep`가 타임아웃돼도 그냥 진행 →
-      MODEP가 30s 넘게 안 뜨면 **빈/깨진 첫 화면**. 차단 유지 또는 "MODEP 대기" 스플래시.
+- [x] **`_request` None 반환 가드 ✅(2026-06-26)** — `_request` 실패 시 None인데 호출부가 무가드로 deref하던 것 →
+      9개 메서드에 명시적 None 가드. 부수로 선재 크래시 3건 수정: `effect_get_information`의 `logging(...)`(모듈을
+      함수로 호출→TypeError), `get_current_pedalboard`/`get_last_pedalboard`의 bare 클래스속성 참조 `NameError`(콜드부팅 경로).
+- [x] **콜드부팅 게이트 = 스플래시 후 차단 대기 ✅(2026-06-26)** — `_modep_ready()`(`_request` non-None 프로브, 기존
+      `get_current_pedalboard`은 실패 시 DEFAULT 반환=truthy라 무력했음) + QML 먼저 로드해 "MODEP 대기 중…" 스플래시
+      (`view.screen=="booting"`) → 백그라운드 무한 대기 후 GUI스레드서 presenter 구성 → overview. 깨진 첫 화면 제거.
+
+### Tier 1 후속 — 페달보드 저장 영속성 + ttl 부패 (2026-06-26 세션, 중대)
+> 오래 망가진 `save_current_pedalboard`를 고치는 과정에서 mod-ui 저장의 ttl-이름 부패 버그를 발견·차단.
+> 상세 포스트모템 = [`save-corruption-postmortem.md`](save-corruption-postmortem.md).
+- [x] **페달보드 저장 영속성 복구** — `save_current_pedalboard`가 ① full-URL을 endpoint로 넘겨 더블-prefix 404,
+      ② 고친 뒤엔 `json=` 바디라 Tornado `get_argument`가 못 읽어 400. → 바른 endpoint + `data=`(form-encoded, 웹UI와 동일)로
+      수정. snapshot save/save-as의 PB저장 묶음도 같이 복구.
+- [x] **앱측 저장 가드** — `save_current_pedalboard`가 `symbolify(title)[:16]`(mod-ui와 동일)이 번들 dir과 어긋나면
+      **저장 중단+로그**. stale title이 와도 앱이 ttl을 잘못 명명/고아화 못 함.
+- [x] **서버측 구조적 차단(mod-tweak)** — `host.py:3965`(asNew=0 분기) ttl 심볼을 클라이언트 title이 아니라
+      **번들 dir명**에서 도출 → `dir==ttl==manifest` 구조 보장. **웹발 stale-title 저장도 파일 부패 불가**(`doap:name`은 별도
+      `title` 인자라 이름변경은 유지). `mod-tweaks/host.py` 반영, `sudo deploy.sh` 배포.
 
 ## 부팅 — 무컴포지터 (남은 이주 항목) — ⏸ 보류 (원격 개발 중 컴포지터 유지)
 
@@ -63,17 +76,21 @@ FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이
 - [ ] **패치/IR 파일 선택기** — [`qtview.py:192`](../qtview.py) `update_patch_display`가 `pass` →
       FOCUS는 IR/NAM/cabsim을 **읽기전용**([`main.qml:297`](../qml/main.qml))으로만 표시, 기기에서 새 파일 못 부름 +
       역방향 패치변경도 라벨 미갱신. QML 파일선택기 + `PATCH_FILE_DIR_MAP`([`configs.py`](../configs.py)) 재사용.
-- [ ] **RECALL 북마크 등록 + FS 설정화면** — recall **실행**은 정상(A+B 모드순환으로 mode 2 진입,
-      [`recall_pb_ss`](../presenter.py) `presenter.py:293`). 그러나 [`assign_pb_ss_to_footswitch`](../presenter.py) `presenter.py:274`가
-      **어디서도 호출 안 됨** → 현재 PB+스냅샷을 풋스위치에 **북마크 등록할 방법이 없음**(그래서 'No assignment'서 멈춤).
-      필요: 등록 캡처 제스처(롱프레스/전용콤보) + 풋스위치 **설정화면**(할당·전역기능 BYPASS ALL/MODE/BOARD◄►/SNAP◄►/TAP/TUNER 매핑).
-      (영속화 `utils.load/save_footswitch_assignments`는 정상.)
+- [x] **풋스위치 모드 스펙 재정의 ✅(2026-06-26)** — mode 0(NAVIGATE)는 **전체 페달보드 라이브러리** 순회
+      (`get_all_pedalboards`, 기존 뱅크 한정→전체). mode 2(BANK)는 **RECALL 폐기 → 뱅크 페달보드를 풋스위치에 바인딩**:
+      뱅크 자체를 고르는 게 아니라, 활성 뱅크(`current_bank`, 현재 0 고정; **뱅크 전환·편집은 추후 터치UI** placeholder)의
+      **첫 4보드를 FS0~3에 직접 바인딩**(`get_bank_pedalboard_entries`) → 밟으면 그 보드 로드. 뱅크 없으면 토스트+mode 1 복귀.
+      스트립이 바인딩된 4보드명+"●현재" 표시. 포커스 중 FS PB변경 시 오버뷰 복귀(`_return_to_overview`).
+      옛 `recall_pb_ss`/`assign_pb_ss_to_footswitch`는 죽은코드로 잔존(Tier 3 정리).
 - [ ] **STOMP 스트립 캡션 일치** — [`qtview.py:351`](../qtview.py) 스트립이 **첫 4개** 이펙트를 보여주는데
       presenter는 **카테고리필터 [0,1,-2,-1]**을 토글([`presenter.py:427`](../presenter.py)) → 캡션이 실제 토글대상과 다름. presenter가 선택 4개를 노출하도록.
 - [ ] **스냅샷 브라우저 / 페달보드 브라우저** — 이름으로 점프. 데이터·백엔드 있음(`get_snapshot_list`+`load_snapshot`,
       `get_pedalboards_in_bank`+`set_pedalboard`) → 리스트/모달 UI만. 현재 헤더 라벨([`main.qml:69`](../qml/main.qml),[:82](../qml/main.qml))뿐, prev/next만 가능.
 - [ ] **페달보드 다른이름 저장** — `save_current_pedalboard`가 `asNew:0`만 → `asNew:1`+title 확장 + 이름입력 연결.
-- [ ] **스냅샷 save-as 이름입력 UI** — 백엔드 배선됨(`save_snapshot_as` [`presenter.py:591`](../presenter.py))이나 Qt 진입점/입력 없음(인앱 키보드 의존).
+- [x] **스냅샷 SAVE / SAVE AS / EDIT 버튼 + SAVE AS 네이밍 모달 ✅(2026-06-26)** — 오버뷰 헤더에 3버튼. SAVE=
+      `save_snapshot`, SAVE AS=**3+2 네이밍 모달**(무대용어 칩 탭→`Drive-cupcake`식 제안[중복회피 무작위 접미사],
+      제안 탭 저장/칩 재탭 재롤/✎ HW키보드 직접입력/취소). 접미사 풀=외부 `resources/snapshot_words.txt`(Hunspell 6천단어,
+      lazy-load+모듈캐시). EDIT=`edit` 화면(플레이스홀더, 실 편집기는 추후). 신규 **토스트 시스템**(`view.show_toast`+QML 자동소멸).
 - [ ] **볼륨페달**(ADS1115→MIDI CC) — [`volumepedal.py`](../volumepedal.py)는 독립 프로세스로만 존재, 앱 폴링 미통합, 화면 미터 없음.
       ★먼저 정의할 미결 스펙: **페달이 물리적으로 미연결일 때 앱 거동**. 코드개선(미적용): 단발→연속모드, 860→64~128SPS, EMA+히스테리시스로 CC 지터 제거.
 - [ ] **모멘터리(홀드) 모드** — [`presenter.py:365`](../presenter.py) 폴링이 릴리스엣지 전용 → press-ON/release-OFF 모멘터리 없음.
@@ -87,7 +104,8 @@ FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이
 
 - [ ] **뷰 라우터 / 화면 상태머신 보강** — `view.screen` 프로퍼티로 3화면은 전환되나([`qtview.py:41`](../qtview.py)) **모달**(menu/keyboard/browser/toast)이 없음. 상태머신 확장.
 - [ ] **메뉴(☰) 화면** — 3층위 저장/불러오기. 현재 스냅샷 save/saveas만.
-- [ ] **토스트 / 온스크린 알림** — presenter가 stdout `print`([`presenter.py:162`](../presenter.py)) → `view.show_toast()` 없음.
+- [x] **토스트 / 온스크린 알림 ✅(2026-06-26)** — `QtView.show_toast`+`toastRequested` 시그널 + QML 자동소멸 오버레이(2.6s).
+      presenter `_notify()`가 사용(Kivy 가드). 뱅크 없음 등 메시지에 쓰임. (presenter의 잔여 `print`는 점진 이전.)
 - [ ] **인앱 키보드** — `toggle_keyboard`(wvkbd) 있으나([`presenter.py:477`](../presenter.py)) Qt 경로서 호출 안 됨. 시안=자체 QWERTY. (→ 열린 설계결정: 라이브러리 vs 커스텀.)
 
 > 시안 화면 매핑(참고): Overview·Focus·TapTempo=구현됨 / Tuner·Menu·Keyboard·Browser·Toast=미구현 / HW 풋스위치 행=스트립으로 존재.
