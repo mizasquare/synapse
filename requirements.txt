@@ -1,0 +1,49 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Synapse — current (Kivy) app dependency snapshot / known-good baseline
+# Captured 2026-06-24 from the live Pi (GCaMP6s box): Patchbox OS, Python 3.11.2.
+#
+# The app's venv was created WITH --system-site-packages:
+#     python3 -m venv --system-site-packages /home/miza/gcamp6s-venv
+# so MOST runtime deps come from the SYSTEM python (apt) and only a small layer
+# was pip-installed into the venv. This file pins that pip layer (= the exact
+# output of `pip freeze --local`). To recreate the venv on the same OS image:
+#     python3 -m venv --system-site-packages gcamp6s-venv
+#     gcamp6s-venv/bin/pip install -r requirements.txt
+#
+# (For absolute disaster recovery you can also keep a full lock with
+#  `gcamp6s-venv/bin/pip freeze > requirements.lock.txt` — that captures the
+#  system packages too, but most of those are apt-provided, not pip-installable.)
+#
+# A Qt rewrite is planned; the Qt app will get its own deps (binding TBD). This
+# file documents the Kivy baseline as insurance before that environment churn.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# --- pip layer (actually installed into the venv) ---
+Kivy==2.3.1
+Kivy-Garden==0.1.5
+JACK-Client==0.5.5
+scipy==1.15.2        # used by the tuner's pitch detection (see "yin" note below)
+
+# transitive deps pulled in by the above (pinned for reproducibility):
+cffi==1.17.1
+pycparser==2.22
+Pygments==2.18.0
+docutils==0.21.2
+filetype==1.2.0
+
+# --- system site-packages the app imports (NOT pip-installed here) ---
+# Provided by the system python (apt); versions as observed on the live Pi.
+# Listed for reference only — do not uncomment unless rebuilding on a clean env.
+#   Pillow==9.4.0          # PIL  — images
+#   numpy==1.24.2
+#   requests==2.28.1       # mod-ui HTTP client (modepctrl)
+#   mido==1.2.10           # MIDI
+#   python-rtmidi==1.4.7   # mido backend
+#   smbus2==0.4.2          # I2C: footswitches / ring LEDs / pedals
+#
+# KNOWN GAP (tracked separately): tunerpopup.py:8 does `from yin import
+# find_pitch`, but module `yin` is not present in this venv or on the system, so
+# opening the tuner raises ModuleNotFoundError (the import is lazy, so app
+# startup itself is unaffected). `yin.py` — a custom YIN pitch-detection module,
+# almost certainly the reason scipy is in the venv — appears to be missing from
+# the repo.

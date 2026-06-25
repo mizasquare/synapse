@@ -30,6 +30,7 @@ from PyQt6.QtQuick import QQuickWindow  # noqa: F401  registers QtQuick types fo
 import modepctrl
 from configs import SOCKET_PATH
 from hardwares import fsledctrl
+from monitorfeed import MonitorFeed
 from presenter import Presenter
 from qtscheduler import QtScheduler
 from qtview import QtView
@@ -85,6 +86,17 @@ def _start_reverse_listener(scheduler, presenter):
 
 
 def main():
+    # SIGUSR1 -> dump all thread stacks (kill -USR1 <pid>); ptrace-free live debug.
+    import faulthandler
+    import signal
+    faulthandler.enable()
+    try:
+        # chain=False: dump stacks and KEEP RUNNING (chain=True would re-raise to
+        # SIGUSR1's default action = terminate the process).
+        faulthandler.register(signal.SIGUSR1, all_threads=True, chain=False)
+    except (AttributeError, ValueError):
+        pass
+
     app = QGuiApplication(sys.argv)
 
     # Bundle VT323 (OFL) and hand its real family name to QML.
@@ -105,10 +117,15 @@ def main():
     presenter.initiate_view()
 
     sock = _start_reverse_listener(scheduler, presenter)
+    # Live monitor feed: passive mod-ui websocket -> output_set -> meters.
+    # SYNAPSE_NOFEED=1 disables it (isolation lever while debugging the feed).
+    feed = None if os.environ.get("SYNAPSE_NOFEED") else MonitorFeed(presenter.update_monitor, scheduler)
 
     def _cleanup():
         # Order matters: stop the poll thread before tearing down the hardware it reads.
         presenter.stop_footswitch_polling()
+        if feed:
+            feed.stop()
         try:
             hardware.cleanup()
         except Exception as e:

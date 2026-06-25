@@ -23,9 +23,21 @@ from typing import Dict, List, Optional, Tuple
 from modepctrl import get_backend
 
 
+# Tier-2 hardcode registry (see docs/focus-control-rendering.md §4): (plugin_uri,
+# symbol) -> widget kind, for monitors the heuristic gets wrong or that need a
+# bespoke widget. "skip" means tier-3 (don't render). Data, not code: the
+# classifier itself never names a plugin -- it only consults this map.
+MONITOR_WIDGET_OVERRIDES: Dict[Tuple[str, str], str] = {}
+
+
 @dataclass
 class EffectPort:
-	"""Represents a single port (parameter) of an Effect."""
+	"""Represents a single port (parameter) of an Effect.
+
+	``is_output`` flags a monitor (LV2 output control port) vs an interactive
+	input control. ``widget_kind`` is the *interpretation* layer the view reads
+	to pick a widget without hardcoding -- derived from LV2 properties (inputs)
+	or (type/units/range) (monitors). See docs/focus-control-rendering.md."""
 	instance: str
 	name: str
 	symbol: str
@@ -38,6 +50,42 @@ class EffectPort:
 	port_properties: List[str] = field(default_factory=list)
 	range_steps: Optional[int] = None
 	scale_points: Optional[List[Tuple[float, float]]] = None
+	is_output: bool = False          # monitor port (output control) vs input control
+	forced_kind: Optional[str] = None  # tier-2 registry override (None = use heuristic)
+
+	@property
+	def widget_kind(self) -> str:
+		"""How the view should render this port (no per-plugin hardcoding here)."""
+		if self.forced_kind:
+			return self.forced_kind
+		props = self.port_properties or []
+		if self.is_output:
+			return self._monitor_kind(props)
+		# input control: mirror mod-ui's getTemplateData property branching
+		if "enumeration" in props:
+			return "enum"
+		if "trigger" in props:      # check before toggled: triggers are often also toggled
+			return "trigger"
+		if "toggled" in props:
+			return "toggle"
+		if "logarithmic" in props:
+			return "knob_log"
+		if "integer" in props:
+			return "knob_int"
+		return "knob"
+
+	def _monitor_kind(self, props) -> str:
+		mn, mx = self.min_value, self.max_value
+		unit = (self.units or "").strip().lower()
+		if ("toggled" in props or "integer" in props) and mn == 0 and mx == 1:
+			return "clip"                       # boolean-ish indicator (clip LED)
+		if mn is not None and mx is not None and mn < 0 < mx:
+			return "gauge"                      # symmetric around 0 (e.g. cent ±50)
+		if mn == 0 and mx == 1:
+			return "meter"                      # 0..1 level bar
+		if unit:
+			return "numeric"                    # has a real unit -> number readout
+		return "numeric"                        # graceful fallback
 
 	def get_value(self):
 		"""Fetch the latest value from MODEP."""
@@ -96,6 +144,7 @@ class Effect:
 	y: float = 0.0  # UI position Y
 	ports: Dict[str, EffectPort] = field(default_factory=dict)
 	patches: Dict[str, EffectPatch] = field(default_factory=dict)
+	monitors: Dict[str, EffectPort] = field(default_factory=dict)  # output (monitor) ports
 
 @dataclass
 class Connection:
@@ -266,6 +315,7 @@ def initialize_modep_pedalboard() -> Optional[Pedalboard]:
 
 		patches = {}
 		ports = {}
+		monitors = {}
 
 
 
@@ -300,7 +350,7 @@ def initialize_modep_pedalboard() -> Optional[Pedalboard]:
 		for port_data in effect_data["ports"]:
 			symbol = port_data["symbol"]
 			current_value = port_data["value"]
-			if current_value:
+			if current_value is not None:  # keep value-0 controls (0 dB gains, reset triggers, off toggles)
 				# Find detailed port info
 				detailed_ports = detailed_info.get("ports", {}).get("control", {}).get("input", [])
 				matching_port = next((p for p in detailed_ports if p["symbol"] == symbol), None)
@@ -323,6 +373,37 @@ def initialize_modep_pedalboard() -> Optional[Pedalboard]:
 					)
 
 
+		# Step 6b: Monitor (output control) ports — only those the plugin flags
+		# streamable (gui.monitoredOutputs), looked up in ports.control.output.
+		# Atom ports (e.g. modspectre 'notify') aren't in control.output, so they
+		# fall through here = tier-3 skip automatically.
+		mon_syms = detailed_info.get("gui", {}).get("monitoredOutputs", []) or []
+		out_ports = detailed_info.get("ports", {}).get("control", {}).get("output", [])
+		out_by_sym = {p["symbol"]: p for p in out_ports}
+		for sym in mon_syms:
+			mp = out_by_sym.get(sym)
+			if not mp:
+				continue
+			forced = MONITOR_WIDGET_OVERRIDES.get((effect_uri, sym))
+			if forced == "skip":
+				continue
+			rng = mp.get("ranges", {})
+			monitors[sym] = EffectPort(
+				instance=instance_name,
+				name=mp.get("name", sym),
+				symbol=sym,
+				value=rng.get("default", 0.0),   # seed; live value arrives via the feed (increment 2)
+				min_value=rng.get("minimum"),
+				max_value=rng.get("maximum"),
+				default_value=rng.get("default"),
+				units=(mp.get("units") or {}).get("symbol", ""),
+				port_properties=mp.get("properties", []),
+				range_steps=mp.get("rangeSteps"),
+				scale_points=mp.get("scalePoints"),
+				is_output=True,
+				forced_kind=forced,
+			)
+
 		# Step 7: Create the effect instance
 		effects.append(Effect(
 			instance=instance_name,
@@ -334,7 +415,8 @@ def initialize_modep_pedalboard() -> Optional[Pedalboard]:
 			x=x,
 			y=y,
 			ports=ports,
-			patches=patches  # ✅ Now correctly stores patch information
+			patches=patches,  # ✅ Now correctly stores patch information
+			monitors=monitors
 		))
 
 	# Step 8: Create the Pedalboard instance

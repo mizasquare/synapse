@@ -32,6 +32,7 @@ _LED_BLUE, _LED_GREEN, _LED_RED, _LED_OFF = "#3b6fe0", "#5fd0a0", "#e6402e", "#2
 
 class QtView(QObject):
     dataChanged = Signal()
+    monitorUpdated = Signal(str, float, float, str)  # (symbol, norm, value, display): per-meter live update
 
     def __init__(self):
         super().__init__()
@@ -195,8 +196,26 @@ class QtView(QObject):
             if k["symbol"] == symbol:
                 mn, mx = k["min"], k["max"]
                 k["value"] = value
-                k["norm"] = 0.0 if mx == mn else max(0.0, min(1.0, (value - mn) / (mx - mn)))
+                k["norm"] = self._norm(value, mn, mx, k.get("kind", "knob"))
                 k["display"] = ("%g %s" % (value, k.get("unit", ""))).strip()
+                break
+
+    def update_monitor_display(self, instance, symbol, value):
+        # Live monitor (output port) value -> update only that meter. High-rate,
+        # so NO full rebuild: recompute norm/display in place and emit a targeted
+        # signal the matching MonitorWidget listens for (mirrors the no-emit knob
+        # discipline, but monitors aren't drag-owned so they need the push).
+        if not self._focus or self._focus.get("instance") != instance:
+            return
+        for m in self._focus.get("monitors", []):
+            if m["symbol"] == symbol:
+                mn, mx = m["min"], m["max"]
+                kind = m.get("kind", "numeric")
+                m["value"] = value
+                m["norm"] = self._norm(value, mn, mx, kind)
+                m["display"] = (self._meter_display(value, mn, mx) if kind == "meter"
+                                else ("%g %s" % (value, m.get("unit", ""))).strip())
+                self.monitorUpdated.emit(symbol, m["norm"], value, m["display"])
                 break
 
     def update_patch_display(self, instance, uri, file_path):
@@ -245,28 +264,80 @@ class QtView(QObject):
         pass
 
     # --------------------------------------------------------- FOCUS builder
+    @staticmethod
+    def _norm(v, mn, mx, kind="knob"):
+        if mn is None or mx is None or mx == mn:
+            return 0.0
+        if kind == "knob_log" and mn > 0 and mx > 0 and v > 0:
+            import math
+            return max(0.0, min(1.0, math.log(v / mn) / math.log(mx / mn)))
+        if kind == "meter":
+            # Level meters emit LINEAR amplitude (≈0..1). A plain linear bar makes a
+            # -37 dB signal fill ~1% of its height = looks dead. Map to dB like MOD's
+            # modmeter skin so quiet signals are visible. Floor -60 dB, ceiling 0 dB.
+            import math
+            span = (mx - mn) or 1.0
+            amp = max(0.0, (v - mn) / span)
+            if amp <= 1e-6:
+                return 0.0
+            return max(0.0, min(1.0, (20.0 * math.log10(amp) + 60.0) / 60.0))
+        return max(0.0, min(1.0, (v - mn) / (mx - mn)))
+
+    @staticmethod
+    def _meter_display(v, mn, mx):
+        """Linear amplitude -> 'NN.N dB' readout (matches the dB-mapped meter bar)."""
+        import math
+        span = (mx - mn) or 1.0
+        amp = max(0.0, (v - mn) / span)
+        return "-inf dB" if amp <= 1e-6 else "%.1f dB" % (20.0 * math.log10(amp))
+
+    @staticmethod
+    def _enum_options(p):
+        """scale_points -> [{value,label}] for enum selectors; [] otherwise.
+        Handles both real mod-ui dict form ({value,label}) and tuple form."""
+        out = []
+        for sp in (p.get("port_scalepoints") or []):
+            try:
+                if isinstance(sp, dict):
+                    out.append({"value": float(sp["value"]), "label": str(sp["label"])})
+                else:
+                    out.append({"value": float(sp[0]), "label": str(sp[1])})
+            except (TypeError, ValueError, IndexError, KeyError):
+                pass
+        return out
+
+    def _focus_entry(self, p, default_kind):
+        rng = p.get("port_range", {}) or {}
+        mn = rng.get("min", 0.0)
+        mx = rng.get("max", 1.0)
+        v = p.get("port_value")
+        if v is None:
+            v = mn
+        unit = p.get("port_unit") or ""
+        kind = p.get("port_kind", default_kind)
+        opts = self._enum_options(p) if kind == "enum" else []
+        display = ("%g %s" % (v, unit)).strip()
+        if kind == "enum":  # show the matching option label, not the raw number
+            match = next((o for o in opts if abs(o["value"] - v) < 1e-6), None)
+            if match:
+                display = match["label"]
+        elif kind == "meter":
+            display = self._meter_display(v, mn, mx)
+        return {"symbol": p["port_symbol"], "name": p["port_name"],
+                "value": v, "norm": self._norm(v, mn, mx, kind), "min": mn, "max": mx,
+                "unit": unit, "kind": kind, "options": opts, "display": display}
+
     def _build_focus(self, d):
         inst = d.get("effect_instance", "")
-        knobs = []
-        for p in d.get("effect_ports", []):
-            rng = p.get("port_range", {}) or {}
-            mn = rng.get("min", 0.0)
-            mx = rng.get("max", 1.0)
-            v = p.get("port_value")
-            if v is None:
-                v = mn
-            unit = p.get("port_unit") or ""
-            norm = 0.0 if mx == mn else max(0.0, min(1.0, (v - mn) / (mx - mn)))
-            knobs.append({"symbol": p["port_symbol"], "name": p["port_name"],
-                          "value": v, "norm": norm, "min": mn, "max": mx, "unit": unit,
-                          "display": ("%g %s" % (v, unit)).strip()})
+        knobs = [self._focus_entry(p, "knob") for p in d.get("effect_ports", [])]
+        monitors = [self._focus_entry(p, "numeric") for p in d.get("effect_monitors", [])]
         cat = d.get("effect_category")
         cat = cat[0] if isinstance(cat, (list, tuple)) and cat else (cat or "")
         ins, outs = self._routing_for(inst)
         patches = [{"label": pt.get("patch_label", ""), "value": self._patch_str(pt.get("patch_value"))}
                    for pt in d.get("patches", [])]
         return {"instance": inst, "name": d.get("effect_name", inst), "category": cat,
-                "bypassed": bool(d.get("effect_bypassed")), "knobs": knobs,
+                "bypassed": bool(d.get("effect_bypassed")), "knobs": knobs, "monitors": monitors,
                 "inputs": ins, "outputs": outs, "patches": patches}
 
     @staticmethod

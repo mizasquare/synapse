@@ -22,6 +22,7 @@ class ModepController:
 	def _request(method: str, endpoint: str, **kwargs):
 		url = ModepController.SERVER_URI + endpoint
 		try:
+			kwargs.setdefault("timeout", 2.0)
 			response = getattr(ModepController.session, method)(url, **kwargs)
 			response.raise_for_status()
 			return response
@@ -162,7 +163,7 @@ class ModepController:
 	@staticmethod
 	def get_snapshot_list():
 		try:
-			r = requests.get(ModepController.SERVER_URI + "snapshot/list")
+			r = requests.get(ModepController.SERVER_URI + "snapshot/list", timeout=2.0)
 			if r.status_code == 200:
 				return r.json()
 		except:
@@ -201,7 +202,7 @@ class ModepController:
 			idx = 0 #fallback to the first snapshot
 		try:
 			url = f"{ModepController.SERVER_URI}snapshot/load"
-			r = requests.get(url, params={'id': idx})
+			r = requests.get(url, params={'id': idx}, timeout=2.0)
 			if r.status_code == 200:
 				return r.json()
 			else:
@@ -310,7 +311,7 @@ class ModepController:
 			encoded_symbol = quote(symbol, safe=':')
 			url = f"{ModepController.SERVER_URI}effect/parameter/syn_set/graph/{encoded_instance_id}/{encoded_symbol}"
 
-			r = requests.post(url, json={"value": value})
+			r = requests.post(url, json={"value": value}, timeout=2.0)
 			if r.status_code == 200:
 				return None  # Success
 			else:
@@ -324,7 +325,7 @@ class ModepController:
 			encoded_instance_id = quote(instance_id, safe='')
 			encoded_symbol = quote(symbol, safe=':')
 			url = f"{ModepController.SERVER_URI}effect/parameter/syn_get/graph/{encoded_instance_id}/{encoded_symbol}"
-			r = requests.get(url)
+			r = requests.get(url, timeout=2.0)
 			if r.status_code == 200:
 				value = r.json()
 
@@ -347,7 +348,7 @@ class ModepController:
 					   'uri': uri,
 					   'value_type': 'p', # not sure but presumably 'p'ath of lv2atom#Path
 					   'value_data': value}
-			r = requests.post(url, json=payload)
+			r = requests.post(url, json=payload, timeout=2.0)
 			if r.status_code == 200:
 				return None
 			else:
@@ -360,7 +361,7 @@ class ModepController:
 		try:
 			url = f"{ModepController.SERVER_URI}effect/parameter/syn_get//graph/{instance}/:patch"
 
-			r = requests.get(url)
+			r = requests.get(url, timeout=2.0)
 			if r.status_code == 200:
 				return r.json()[uri]
 			else:
@@ -377,7 +378,7 @@ class ModepController:
 			formatted_value = "%.1f" % value
 
 			# Send the POST request with the formatted value as payload
-			r = requests.post(url, json={"cmd": "transport-bpm", "value": formatted_value})
+			r = requests.post(url, json={"cmd": "transport-bpm", "value": formatted_value}, timeout=2.0)
 
 			if r.status_code == 200:
 				return None
@@ -395,7 +396,7 @@ class ModepController:
 			formatted_value = "%.1f" % value
 
 			# Send the POST request with the formatted value as payload
-			r = requests.post(url, json={"cmd": "transport-bpb", "value": formatted_value})
+			r = requests.post(url, json={"cmd": "transport-bpb", "value": formatted_value}, timeout=2.0)
 
 			if r.status_code == 200:
 				return None

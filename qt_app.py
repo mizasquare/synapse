@@ -47,14 +47,19 @@ def main():
     fams = QFontDatabase.applicationFontFamilies(fid)
     ui_font = fams[0] if fams else "monospace"
 
-    # Inject the fakes at their seams: backend module-level (for the shared
-    # builder + model methods) and via the presenter constructor.
-    backend = FakeModepController()
-    modepctrl.set_backend(backend)
-
+    # Backend: fake fixtures by default; --real talks to the live MODEP host
+    # (HTTP, read-only) to screenshot the actual loaded pedalboard. Hardware is
+    # always fake here (no I2C bus grab) and there is no reverse-socket listener,
+    # so --real never disturbs a running qt_main.
     view = QtView()
     scheduler = QtScheduler()
-    presenter = Presenter(view, scheduler, backend=backend, hardware=FakeController())
+    if "--real" in argv:
+        # No backend= / no set_backend -> default get_backend() = real ModepController.
+        presenter = Presenter(view, scheduler, hardware=FakeController())
+    else:
+        backend = FakeModepController()
+        modepctrl.set_backend(backend)
+        presenter = Presenter(view, scheduler, backend=backend, hardware=FakeController())
     view.set_presenter(presenter)
 
     # Populate the view from the presenter before loading QML, so first paint is
@@ -82,6 +87,42 @@ def main():
 
     if shot:
         win = engine.rootObjects()[0]
+
+        # --animate: drive the focused effect's monitors through the live path
+        # (presenter.update_monitor -> view.monitorUpdated -> MonitorWidget) and
+        # grab several frames, so meter movement is verifiable without real audio.
+        if "--animate" in argv and focus_inst:
+            import math
+            base, ext = os.path.splitext(shot)
+            eff = presenter.pedalboard.get_effect_by_instance(focus_inst) if presenter.pedalboard else None
+            mons = list(eff.monitors.values()) if eff else []
+            ph = {"t": 0}
+
+            def step():
+                ph["t"] += 1
+                for k, mon in enumerate(mons):
+                    mn = mon.min_value if mon.min_value is not None else 0.0
+                    mx = mon.max_value if mon.max_value is not None else 1.0
+                    frac = 0.5 + 0.5 * math.sin((ph["t"] + k * 4) * 0.5)
+                    presenter.update_monitor(focus_inst, mon.symbol, mn + frac * (mx - mn))
+
+            osc = QTimer()
+            osc.timeout.connect(step)
+            osc.start(60)
+            n = {"i": 0}
+
+            def grabframe():
+                n["i"] += 1
+                p = "%s-f%d%s" % (base, n["i"], ext)
+                img = win.grabWindow()
+                img.save(p)
+                print("[qt_app] frame %s (%dx%d)" % (p, img.width(), img.height()))
+                if n["i"] >= 3:
+                    app.quit()
+
+            for ms in (500, 1100, 1700):
+                QTimer.singleShot(ms, grabframe)
+            return app.exec()
 
         def grab():
             try:

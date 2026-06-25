@@ -335,76 +335,56 @@ Window {
             }
         }
 
-        // -- knobs (vertical-drag to change; local value reflected) --
+        // -- controls (one widget per port, by kind; single row, horizontal-scroll if many) --
         Rectangle {
-            id: knobpanel
+            id: ctrlpanel
             x: 12; y: routing.y + routing.height + 10
-            width: parent.width - 24
-            height: 200
+            width: parent.width - 24; height: 150
             radius: 10; color: cPanel
-            Row {
-                anchors.centerIn: parent
-                spacing: 24
-                Repeater {
-                    model: focusScreen.f ? focusScreen.f.knobs : []
-                    Item {
-                        width: 150; height: 168
-                        property real dispNorm: modelData.norm
-                        property real liveVal: modelData.min + dispNorm * (modelData.max - modelData.min)
-
-                        Column {
-                            anchors.centerIn: parent
-                            spacing: 8
-                            // ring
-                            Item {
-                                width: 96; height: 96
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                Shape {
-                                    anchors.fill: parent
-                                    ShapePath {
-                                        strokeColor: cBorder; strokeWidth: 9; fillColor: "transparent"
-                                        PathAngleArc { centerX: 48; centerY: 48; radiusX: 40; radiusY: 40; startAngle: -90; sweepAngle: 360 }
-                                    }
-                                    ShapePath {
-                                        strokeColor: cGreen; strokeWidth: 9; fillColor: "transparent"
-                                        capStyle: ShapePath.RoundCap
-                                        PathAngleArc { centerX: 48; centerY: 48; radiusX: 40; radiusY: 40; startAngle: -90; sweepAngle: 360 * dispNorm }
-                                    }
-                                }
-                                MouseArea {
-                                    anchors.fill: parent
-                                    preventStealing: true
-                                    property real sy: 0
-                                    property real sv: 0
-                                    onPressed: { sy = mouseY; sv = dispNorm }
-                                    onPositionChanged: {
-                                        var nv = Math.max(0, Math.min(1, sv + (sy - mouseY) / 180))
-                                        dispNorm = nv
-                                        if (focusScreen.f)
-                                            view.setParameter(focusScreen.f.instance, modelData.symbol,
-                                                              modelData.min + nv * (modelData.max - modelData.min))
-                                    }
-                                }
-                            }
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: modelData.name; color: cMuted; font.family: uiFont; font.pixelSize: 18
-                            }
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: liveVal.toFixed(2) + (modelData.unit ? (" " + modelData.unit) : "")
-                                color: cGreen; font.family: uiFont; font.pixelSize: 20
-                            }
-                        }
+            clip: true
+            Flickable {
+                id: ctrlflick
+                anchors.fill: parent; anchors.margins: 8
+                contentWidth: ctrlrow.width; contentHeight: height
+                flickableDirection: Flickable.HorizontalFlick
+                boundsBehavior: Flickable.StopAtBounds
+                Row {
+                    id: ctrlrow
+                    height: ctrlflick.height
+                    spacing: 6
+                    Repeater {
+                        model: focusScreen.f ? focusScreen.f.knobs : []
+                        ControlWidget { m: modelData; instance: focusScreen.f ? focusScreen.f.instance : "" }
                     }
                 }
             }
+            Text {  // overflow hint
+                visible: ctrlrow.width > ctrlflick.width
+                anchors.right: parent.right; anchors.rightMargin: 10
+                anchors.bottom: parent.bottom; anchors.bottomMargin: 6
+                text: "⟷ 스크롤"; color: cDim; font.family: uiFont; font.pixelSize: 14
+            }
         }
 
-        Text {
-            x: 12; anchors.bottom: parent.bottom; anchors.bottomMargin: 10
-            text: "노브를 위/아래로 드래그 · 값은 로컬 반영 (가짜 백엔드)"
-            color: cDim; font.family: uiFont; font.pixelSize: 15
+        // -- monitors (output ports, read-only) --
+        Rectangle {
+            id: monpanel
+            x: 12; y: ctrlpanel.y + ctrlpanel.height + 8
+            width: parent.width - 24; height: 104
+            radius: 10; color: cPanel
+            Text {
+                visible: monrow.children.length <= 1
+                anchors.centerIn: parent; text: "모니터 없음"
+                color: cDim; font.family: uiFont; font.pixelSize: 16
+            }
+            Row {
+                id: monrow
+                anchors.centerIn: parent; spacing: 18
+                Repeater {
+                    model: focusScreen.f ? focusScreen.f.monitors : []
+                    MonitorWidget { m: modelData }
+                }
+            }
         }
     }
 

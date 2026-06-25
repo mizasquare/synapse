@@ -238,6 +238,21 @@ class Presenter:
             port.value = value  # 캐시만 갱신
             self.view.update_parameter_display(instance, symbol, value)
 
+    def update_monitor(self, instance, symbol, value):
+        """Live monitor (output port) value from the feed — GUI thread only.
+        Updates the cached EffectPort + pushes to the view (no host call)."""
+        pb = self.pedalboard
+        if pb is None:
+            return
+        effect = pb.get_effect_by_instance(instance)
+        if not effect:
+            return
+        mon = effect.monitors.get(symbol)
+        if mon is None:
+            return
+        mon.value = value
+        self.view.update_monitor_display(instance, symbol, value)
+
     def apply_external_patch(self, instance, patch_uri, patch_file):
         """외부에서 바뀐 패치파일(IR/NAM/cabsim 등)을 모델 캐시 + 화면에 반영(host 되쏨 없음)."""
         effect = self.pedalboard.get_effect_by_instance(instance)
@@ -628,10 +643,29 @@ class Presenter:
                     },
                     "port_properties": port.port_properties,
                     "port_rangesteps": port.range_steps,
-                    "port_scalepoints": port.scale_points
+                    "port_scalepoints": port.scale_points,
+                    "port_kind": port.widget_kind
                 }
                 for port in effect.ports.values()
                 if (port_value := port.get_value()) is not None  # Exclude ports with None value
+            ],
+            # Monitor (output) ports: cached/seeded value -- NOT get_value() (output
+            # ports aren't readable via parameter_get), and never None-excluded.
+            "effect_monitors": [
+                {
+                    "port_name": mon.name,
+                    "effect_instance": effect.instance,
+                    "port_symbol": mon.symbol,
+                    "port_value": mon.value,
+                    "port_unit": mon.units,
+                    "port_range": {
+                        "min": mon.min_value,
+                        "max": mon.max_value,
+                        "default": mon.default_value,
+                    },
+                    "port_kind": mon.widget_kind
+                }
+                for mon in effect.monitors.values()
             ],
             "patches": [
                 {
