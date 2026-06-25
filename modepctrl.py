@@ -2,6 +2,8 @@ import configs
 import requests
 from urllib.parse import quote
 import os
+import re
+import unicodedata
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -46,12 +48,28 @@ class ModepController:
 		result = []
 		try:
 			r = ModepController._request("get", "banks/")
-			if r.status_code == 200:
+			if r is not None and r.status_code == 200:
 				j = r.json()
 				for i in j[bank_id]["pedalboards"]:
 					result.append(i["bundle"])
-		finally:
-			return result
+		except Exception as e:
+			logging.error(f"Error fetching pedalboards in bank: {e}")
+		return result
+
+	@staticmethod
+	def get_bank_pedalboard_entries(bank_id=DEFAULT_BANK):
+		"""First bank's pedalboards as ``[{'bundle','title'}]`` for the mode-2 bank
+		selector. Empty list if there is no such bank / it's empty / host error."""
+		try:
+			r = ModepController._request("get", "banks/")
+			if r is not None and r.status_code == 200:
+				banks = r.json()
+				if 0 <= bank_id < len(banks):
+					return [{"bundle": p["bundle"], "title": p.get("title", "")}
+							for p in banks[bank_id].get("pedalboards", [])]
+		except Exception as e:
+			logging.error(f"Error fetching bank pedalboards: {e}")
+		return []
 
 	@staticmethod
 	def get_current_pedalboard():
@@ -61,12 +79,14 @@ class ModepController:
 				return r.content.decode('utf-8')
 		except Exception as e:
 			logging.error(f"Error fetching current pedalboard: {e}")
-		return DEFAULT_PEDALBOARD
+		return ModepController.DEFAULT_PEDALBOARD
 
 	@staticmethod
 	def get_pedalboard_info(pbpath=DEFAULT_PEDALBOARD):
 		try:
 			r = ModepController._request("get", "pedalboard/info/?bundlepath=" + quote(pbpath, safe=''))
+			if r is None:
+				return {}
 			return r.json()
 		except Exception as e:
 			logging.error(f"An error occurred: {e}")
@@ -86,7 +106,7 @@ class ModepController:
 			return open(ModepController.LAST_PEDALBOARD, "rt").read()
 		except FileNotFoundError:
 			logging.error("Last pedalboard file not found.")
-			return Default_PEDALBOARD
+			return ModepController.DEFAULT_PEDALBOARD
 
 	@staticmethod
 	def set_last_pedalboard(board):
@@ -98,7 +118,10 @@ class ModepController:
 
 	@staticmethod
 	def set_next_pedalboard():
-		boards = ModepController.get_pedalboards_in_bank()
+		# Navigate ALL pedalboards, not just the active bank: the user expects the
+		# footswitch to reach every board in pedalboard/list (a bank is a curated
+		# subset that silently hides boards like 'BluesBreaker' from nav).
+		boards = ModepController.get_all_pedalboards()
 		if len(boards) == 0:
 			print("No banks or pedalboards!")
 			return
@@ -115,7 +138,7 @@ class ModepController:
 
 	@staticmethod
 	def set_prev_pedalboard():
-		boards = ModepController.get_pedalboards_in_bank()
+		boards = ModepController.get_all_pedalboards()   # full list, not the bank (see set_next)
 		if len(boards) == 0:
 			print("No banks or pedalboards!")
 			return
@@ -154,7 +177,7 @@ class ModepController:
 	def get_current_snapshot():
 		try:
 			r = ModepController._request("get", "snapshot/current")
-			if r.status_code == 200:
+			if r is not None and r.status_code == 200:
 				return r.content.decode('utf-8')
 		except Exception as e:
 			logging.error(f"Error fetching current pedalboard: {e}")
@@ -214,10 +237,11 @@ class ModepController:
 	def get_snapshot_name(snapshot_id=0):
 		try:
 			r = ModepController._request("get", "snapshot/name?id=%d" % snapshot_id)
-			if r.status_code == 200:
+			if r is not None and r.status_code == 200:
 				return r.json()
 		except:
-			return ""
+			pass
+		return ""
 
 
 	@staticmethod
@@ -225,6 +249,8 @@ class ModepController:
 		try:
 			# Send the POST request with the formatted value as payload
 			r = ModepController._request("post", "snapshot/save")
+			if r is None:
+				return False
 			if r.status_code == 200:
 				print("Snapshot saved successfully.", r.text)
 				if save_pb_also:
@@ -245,6 +271,8 @@ class ModepController:
 	def snapshot_save_as(new_name="New Snapshot", save_pb_also=True):
 		try:
 			r = ModepController._request("get", "snapshot/saveas", params={'title': new_name})
+			if r is None:
+				return
 			if r.status_code == 200:
 				newindex = len(ModepController.get_snapshot_list()) - 1
 				ModepController.load_snapshot(newindex) #Nessessary?
@@ -259,36 +287,68 @@ class ModepController:
 		return
 
 	@staticmethod
+	def _symbolify(name):
+		"""Mirror mod-ui's symbolify (mod/__init__.py:188): NFKD ASCII-fold,
+		collapse non-alphanumerics to '_', prefix '_' if it starts with a digit.
+		mod-ui truncates this to 16 for the ttl/bundle symbol (host.py save)."""
+		if not name:
+			return "_"
+		name = unicodedata.normalize('NFKD', name).encode('ascii', 'ignore').decode('ascii', 'ignore')
+		name = re.sub("[^_a-zA-Z0-9]+", "_", name)
+		if name and name[0].isdigit():
+			name = "_" + name
+		return name
+
+	@staticmethod
 	def save_current_pedalboard():
 		try:
 			current_bundlepath = ModepController.get_current_pedalboard()
-			title = ModepController.get_pedalboard_info(current_bundlepath)['title']
-			url = f"{ModepController.SERVER_URI}pedalboard/save"
-			# Send the POST request with the formatted value as payload
-			r = ModepController._request("post", url, json={'title': title, 'asNew': 0})
+			if not current_bundlepath or not current_bundlepath.endswith('.pedalboard'):
+				logging.error("save_current_pedalboard aborted: no valid current bundlepath (%r)", current_bundlepath)
+				return False
+			dir_basename = os.path.basename(current_bundlepath)[:-len('.pedalboard')]
+			info = ModepController.get_pedalboard_info(current_bundlepath)
+			title = (info or {}).get('title', '')
 
+			# GUARD (root-cause fix): mod-ui's asNew=0 save writes the ttl into the
+			# CURRENT bundle dir but names it symbolify(title)[:16]. If the title's
+			# symbol diverges from the dir, the save creates a mismatched ttl and
+			# orphans the real one -- exactly how Exct_NAM_Widr.pedalboard got a
+			# Crunch_0.ttl (a foreign title was read for the wrong board). Refuse +
+			# log so a wrong-title read can never corrupt a bundle (and is visible
+			# for live repro). The dir is symbolify(title)[:16], optionally with a
+			# mod-ui '-NNNN' collision suffix, so accept either form.
+			sym = ModepController._symbolify(title)[:16]
+			if not (dir_basename == sym or dir_basename.startswith(sym + "-")):
+				logging.error("save_current_pedalboard aborted: title %r (sym=%r) does not match "
+							  "bundle dir %r; refusing to rename/orphan the ttl", title, sym, dir_basename)
+				return False
+
+			# Send FORM-encoded (data=), NOT json=: the PedalboardSave handler reads
+			# get_argument('title'/'asNew'), which only sees query/form fields -- a
+			# JSON body leaves them empty -> 400. Mirrors the web UI's $.ajax.
+			r = ModepController._request("post", "pedalboard/save", data={'title': title, 'asNew': 0})
+
+			if r is None:
+				return False
 			if r.status_code == 200:
 				print("Pedalboard saved successfully.", r.text)
 				return True
-
-			else:
-				logging.error("Failed to save pedalboard.", r.text)
-
-				return False
-		except:
-			logging.error("Failed to save current pedalboard.")
-
+			logging.error("Failed to save pedalboard. %s", r.text)
+			return False
+		except Exception as e:
+			logging.error("Failed to save current pedalboard: %s", e)
 			return False
 
 	@staticmethod
 	def effect_get_information(uri=""):
 		try:
 			r = ModepController._request("get", "effect/get?uri=" + quote(uri, safe=''))
-			if r.status_code == 200:
+			if r is not None and r.status_code == 200:
 				return r.json()
 		except Exception as e:
-			logging(f"An error occurred: {e}")
-			return {}
+			logging.error(f"An error occurred: {e}")
+		return {}
 
 	@staticmethod
 	def bypass_effect(instance, value):
@@ -297,6 +357,8 @@ class ModepController:
 				"post",
 				f"effect/parameter/syn_set/graph/{quote(instance, safe='')}/:bypass",
 				json={"value": bool(value)})
+			if r is None:
+				return "MODEP host did not respond"
 			if r.status_code == 200:
 				return None
 			else:

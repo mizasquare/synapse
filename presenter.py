@@ -59,6 +59,12 @@ class Presenter:
                 "snapshot_idx": None,
             })
 
+        # Mode-2 BANK selector: the active bank's first 4 boards map to FS0-3.
+        # current_bank is the seam a future touch UI (bank switch/edit) drives;
+        # for now it stays 0. bank_boards is the live [{bundle,title}] for the strip.
+        self.current_bank = 0
+        self.bank_boards = []
+
         self.assign_footswitches()
         self.boot_lightshow()
 
@@ -263,17 +269,57 @@ class Presenter:
             patch.value = patch_file  # 캐시만 갱신 (set_patch는 host로 쓰므로 호출 안 함)
         self.view.update_patch_display(instance, patch_uri, patch_file)
 
+    def _return_to_overview(self):
+        """Leave any stale FOCUS card after a footswitch pedalboard change.
+
+        The focused effect may not exist in the new board, and even a same-named
+        plugin is a different instance with severed connections -- so the FOCUS
+        card would dangle. Guarded (getattr) so a view without goOverview (the
+        Kivy rollback) is a no-op rather than a crash."""
+        go = getattr(self.view, "goOverview", None)
+        if callable(go):
+            go()
+
+    def _notify(self, text):
+        """Transient on-screen message (toast). Guarded so a view without
+        show_toast (the Kivy rollback) just logs instead of crashing."""
+        print(text)
+        toast = getattr(self.view, "show_toast", None)
+        if callable(toast):
+            toast(text)
+
+    def _go_to_pedalboard(self, bundle):
+        """Load a specific pedalboard via the footswitch path (same remember /
+        restore-snapshot / return-to-overview discipline as prev/next)."""
+        self._remember_current_snapshot()
+        self.backend.set_pedalboard(bundle)
+        self.refresh_pedalboard()
+        self._restore_snapshot_for_current_pb()
+        self._return_to_overview()
+
+    def load_bank_pedalboard(self, slot):
+        """Mode-2: load the bank board mapped to footswitch ``slot`` (0-3)."""
+        if slot >= len(self.bank_boards):
+            return
+        bundle = self.bank_boards[slot]["bundle"]
+        if bundle == self.pedalboard.current_pb_path:
+            self._return_to_overview()      # already here -> just leave any FOCUS card
+            return
+        self._go_to_pedalboard(bundle)
+
     def prev_pedalboard(self):
         self._remember_current_snapshot()   # /reset 으로 날아가기 전에 떠나는 보드 기록
         self.backend.set_prev_pedalboard()
         self.refresh_pedalboard()
         self._restore_snapshot_for_current_pb()
+        self._return_to_overview()
 
     def next_pedalboard(self):
         self._remember_current_snapshot()
         self.backend.set_next_pedalboard()
         self.refresh_pedalboard()
         self._restore_snapshot_for_current_pb()
+        self._return_to_overview()
 
     def prev_snapshot(self):
         if self.pedalboard.current_snapshot_idx > 0:
@@ -475,12 +521,22 @@ class Presenter:
             ]
 
         elif self.footswitch_mode == 2:
-            # Mode 2: recall pedalboard/snapshot from JSON
+            # Mode 2: BANK board selector. The active bank's first 4 boards map to
+            # FS0-3 (extra boards ignored); a press loads that board. Future: a
+            # touch UI switches self.current_bank / edits banks. No bank -> message
+            # + fall back to STOMP (mode 1).
+            entries = self.backend.get_bank_pedalboard_entries(self.current_bank)
+            if not entries:
+                self._notify("뱅크 없음 — STOMP 모드로")
+                self.bank_boards = []
+                self.footswitch_mode = 1
+                self.assign_footswitches()
+                self.view.update_mode_display(self.footswitch_mode)
+                return
+            self.bank_boards = entries[:4]
             self.footswitch_assigns = [
-                lambda: self.recall_pb_ss(0),
-                lambda: self.recall_pb_ss(1),
-                lambda: self.recall_pb_ss(2),
-                lambda: self.recall_pb_ss(3),
+                (lambda s=i: self.load_bank_pedalboard(s)) if i < len(self.bank_boards) else None
+                for i in range(4)
             ]
 
         elif self.footswitch_mode == 3: # WebUI mode
@@ -612,12 +668,14 @@ class Presenter:
         if mode is None:
             mode = (self.footswitch_mode + 1) % 3
         self.footswitch_mode = mode
-        self.view.update_mode_display(self.footswitch_mode)
         if self.footswitch_mode == 0:
             self.abcd_availability(False)
         else:
             self.abcd_availability(True)
+        # Assign FIRST (mode 2 fills self.bank_boards and may fall back to mode 1),
+        # THEN refresh the mode label + strip so it reflects the final state.
         self.assign_footswitches()
+        self.view.update_mode_display(self.footswitch_mode)
 
     def abcd_button_state(self,prev,current):
         print(f"prev:{prev},current:{current}") #-1 is released. 0,1,2,3 is pressed for each button

@@ -50,6 +50,43 @@ Window {
         }
     }
 
+    // =========================================================== BOOTING (splash)
+    // Shown while qt_main waits for the MODEP host to start answering (cold boot).
+    // The presenter/overview are only built once the host is ready, so this avoids
+    // a blank/broken first paint. `view.screen` flips to "overview" then.
+    Item {
+        id: bootingScreen
+        anchors.fill: parent
+        visible: view.screen === "booting"
+
+        Column {
+            anchors.centerIn: parent
+            spacing: 20
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "SYNAPSE"
+                color: cText
+                font.family: uiFont
+                font.pixelSize: 56
+            }
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "MODEP 대기 중…"
+                color: cMuted
+                font.family: uiFont
+                font.pixelSize: 30
+                // Pulse while the splash is up; stops when hidden (no idle work).
+                SequentialAnimation on opacity {
+                    running: bootingScreen.visible
+                    loops: Animation.Infinite
+                    NumberAnimation { from: 1.0; to: 0.25; duration: 750; easing.type: Easing.InOutSine }
+                    NumberAnimation { from: 0.25; to: 1.0; duration: 750; easing.type: Easing.InOutSine }
+                }
+            }
+        }
+    }
+
     // =========================================================== OVERVIEW
     Item {
         id: overviewScreen
@@ -71,25 +108,49 @@ Window {
                 font.family: uiFont
                 font.pixelSize: 96            // ~80px glyph @133PPI -> glance @1.5m
                 elide: Text.ElideRight
-                width: 540
+                width: 500
             }
             Column {
                 anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 2
+                anchors.top: parent.top
+                anchors.topMargin: 4
+                spacing: 6
                 Text {
                     anchors.right: parent.right
                     text: "◆ " + view.snapshotLabel
                     color: cMuted
                     font.family: uiFont
-                    font.pixelSize: 44
+                    font.pixelSize: 40
                 }
                 Text {
                     anchors.right: parent.right
                     text: view.modeLabel
                     color: cGreen
                     font.family: uiFont
-                    font.pixelSize: 22
+                    font.pixelSize: 20
+                }
+                // snapshot save / pedalboard edit actions
+                Row {
+                    anchors.right: parent.right
+                    spacing: 6
+                    Rectangle {
+                        width: 72; height: 38; radius: 8
+                        color: "#1b2230"; border.width: 1; border.color: cBorder
+                        Text { anchors.centerIn: parent; text: "SAVE"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 19 }
+                        MouseArea { anchors.fill: parent; onClicked: view.saveSnapshot() }
+                    }
+                    Rectangle {
+                        width: 98; height: 38; radius: 8
+                        color: "#1b2230"; border.width: 1; border.color: cBorder
+                        Text { anchors.centerIn: parent; text: "SAVE AS"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 19 }
+                        MouseArea { anchors.fill: parent; onClicked: saveAsModal.open = true }
+                    }
+                    Rectangle {
+                        width: 66; height: 38; radius: 8
+                        color: "#241b2e"; border.width: 1; border.color: "#54407a"
+                        Text { anchors.centerIn: parent; text: "EDIT"; color: "#cdb6f0"; font.family: uiFont; font.pixelSize: 19 }
+                        MouseArea { anchors.fill: parent; onClicked: view.enterEdit() }
+                    }
                 }
             }
         }
@@ -436,6 +497,188 @@ Window {
             anchors.bottom: parent.bottom; anchors.bottomMargin: 16
             text: "탭: 풋스위치 아무거나  ·  종료: 콤보(2개 동시)"
             color: cDim; font.family: uiFont; font.pixelSize: 22
+        }
+    }
+
+    // ====================================================== PEDALBOARD EDIT
+    // Placeholder shell (screen transition only). The real editor -- add /
+    // remove / connect effects wired to the MODEP host -- is the next phase.
+    Item {
+        id: editScreen
+        anchors.fill: parent
+        visible: view.screen === "edit"
+
+        // top bar: back + title
+        Row {
+            id: editNav
+            x: 12; y: 12
+            spacing: 8
+            Rectangle {
+                width: 124; height: 44; radius: 8
+                color: "#1b2230"; border.width: 1; border.color: cBorder
+                Text { anchors.centerIn: parent; text: "◄ OVERVIEW"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 20 }
+                MouseArea { anchors.fill: parent; onClicked: view.goOverview() }
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: "PEDALBOARD EDIT"
+                color: "#cdb6f0"; font.family: uiFont; font.pixelSize: 26
+            }
+        }
+
+        Column {
+            anchors.centerIn: parent
+            spacing: 12
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: view.boardName
+                color: cText; font.family: uiFont; font.pixelSize: 56
+            }
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "편집 모드 — 구현 예정"
+                color: cMuted; font.family: uiFont; font.pixelSize: 30
+            }
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "이펙트 추가 · 연결 · 삭제 (다음 단계)"
+                color: cDim; font.family: uiFont; font.pixelSize: 20
+            }
+        }
+    }
+
+    // ============================================ SAVE SNAPSHOT AS (modal)
+    // 3+2 naming: tap a stage term -> "term-quirkysuffix" suggestion (re-tap to
+    // re-roll), tap the suggestion to save. ✎ opens a HW-keyboard text field for a
+    // fully custom name (the on-screen keyboard will later host the same field).
+    Item {
+        id: saveAsModal
+        objectName: "saveAsModal"
+        anchors.fill: parent
+        property bool open: false
+        property string suggestion: ""
+        property bool typing: false
+        visible: open
+
+        function close() { open = false; suggestion = ""; typing = false; kb.text = ""; }
+
+        // scrim: dim everything behind + tap-outside cancels
+        Rectangle {
+            anchors.fill: parent
+            color: "#000000"; opacity: 0.62
+            MouseArea { anchors.fill: parent; onClicked: saveAsModal.close() }
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 660; height: 424
+            radius: 14; color: cPanel; border.width: 1; border.color: cBorder
+            MouseArea { anchors.fill: parent }   // swallow clicks so they don't reach the scrim
+
+            Column {
+                anchors.fill: parent
+                anchors.margins: 20
+                spacing: 14
+
+                Text { text: "스냅샷 다른 이름으로 저장"; color: cText; font.family: uiFont; font.pixelSize: 28 }
+
+                // suggestion box: tap to save (or, when typing, a text field)
+                Rectangle {
+                    width: parent.width; height: 56; radius: 10
+                    color: "#10212a"
+                    border.width: 1
+                    border.color: (saveAsModal.suggestion !== "" || saveAsModal.typing) ? cGreen : cBorder
+                    Text {
+                        visible: !saveAsModal.typing
+                        anchors.centerIn: parent
+                        text: saveAsModal.suggestion !== "" ? saveAsModal.suggestion : "아래 용어를 눌러 이름 제안 받기"
+                        color: saveAsModal.suggestion !== "" ? cGreen : cDim
+                        font.family: uiFont; font.pixelSize: 26
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        visible: !saveAsModal.typing
+                        enabled: saveAsModal.suggestion !== ""
+                        onClicked: { view.saveSnapshotNamed(saveAsModal.suggestion); saveAsModal.close(); }
+                    }
+                    TextInput {
+                        id: kb
+                        visible: saveAsModal.typing
+                        anchors.fill: parent; anchors.margins: 14
+                        verticalAlignment: TextInput.AlignVCenter
+                        color: cText; font.family: uiFont; font.pixelSize: 26; clip: true
+                        onAccepted: if (text.trim().length) { view.saveSnapshotNamed(text); saveAsModal.close(); }
+                    }
+                }
+                Text {
+                    text: saveAsModal.typing ? "Enter로 저장"
+                        : (saveAsModal.suggestion !== "" ? "↑ 이 이름을 누르면 저장 · 용어 다시 누르면 새 제안"
+                                                         : "용어를 누르면 무작위 접미사가 붙은 제안이 떠요")
+                    color: cDim; font.family: uiFont; font.pixelSize: 16
+                }
+
+                // stage-term grid (tap -> suggestion)
+                Grid {
+                    width: parent.width
+                    columns: 4
+                    rowSpacing: 8; columnSpacing: 8
+                    Repeater {
+                        model: view.snapshotTerms
+                        Rectangle {
+                            width: (660 - 40 - 8 * 3) / 4; height: 46; radius: 8
+                            color: "#1b2230"; border.width: 1; border.color: cBorder
+                            Text { anchors.centerIn: parent; text: modelData; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 20 }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: { saveAsModal.typing = false; saveAsModal.suggestion = view.suggestSnapshotName(modelData); }
+                            }
+                        }
+                    }
+                }
+
+                // keyboard escape hatch + cancel
+                Row {
+                    spacing: 8
+                    Rectangle {
+                        width: 156; height: 44; radius: 8
+                        color: saveAsModal.typing ? cGreen : "#1b2230"; border.width: 1; border.color: cBorder
+                        Text { anchors.centerIn: parent; text: "✎ 직접입력"; color: saveAsModal.typing ? "#0e1118" : "#cfd6e2"; font.family: uiFont; font.pixelSize: 20 }
+                        MouseArea { anchors.fill: parent; onClicked: { saveAsModal.typing = true; kb.forceActiveFocus(); } }
+                    }
+                    Rectangle {
+                        width: 120; height: 44; radius: 8
+                        color: "#241b2e"; border.width: 1; border.color: cBorder
+                        Text { anchors.centerIn: parent; text: "취소"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 20 }
+                        MouseArea { anchors.fill: parent; onClicked: saveAsModal.close() }
+                    }
+                }
+            }
+        }
+    }
+
+    // ===================================================== TOAST (transient)
+    // Presenter messages (e.g. "뱅크 없음 — STOMP 모드로"). Auto-hides. Top-most so
+    // it floats over every screen + the SAVE AS modal.
+    Rectangle {
+        id: toast
+        property string msg: ""
+        visible: false
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: 22
+        width: toastText.implicitWidth + 44
+        height: 52
+        radius: 10
+        color: "#1d2433"; border.width: 1; border.color: cGreen
+        Text {
+            id: toastText
+            anchors.centerIn: parent
+            text: toast.msg
+            color: cText; font.family: uiFont; font.pixelSize: 22
+        }
+        Timer { id: toastTimer; interval: 2600; onTriggered: toast.visible = false }
+        Connections {
+            target: view
+            function onToastRequested(text) { toast.msg = text; toast.visible = true; toastTimer.restart() }
         }
     }
 }

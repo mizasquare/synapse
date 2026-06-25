@@ -15,8 +15,46 @@ Visual tokens (colors/fonts) live in QML; this bridge passes data + flags only.
 """
 
 import os
+import random
 
 from PyQt6.QtCore import QObject, pyqtProperty as Property, pyqtSignal as Signal, pyqtSlot as Slot
+
+# SAVE AS naming (tap a stage term -> "term-quirkysuffix", e.g. "Drive-cupcake").
+# The stage terms are the names you actually want (song section / tone); the random
+# suffix just keeps them unique so two "Drive"s don't collide. A keyboard escape
+# hatch in the modal covers full-custom names.
+_SNAPSHOT_TERMS = ["Clean", "Crunch", "Drive", "Lead", "Rhythm", "Solo",
+                   "Verse", "Chorus", "Bridge", "Boost", "Ambient", "Heavy"]
+
+# The suffix pool lives in an external, editable text file (one word per line).
+_WORDS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "resources", "snapshot_words.txt")
+# Tiny built-in fallback so SAVE AS still works if the file is missing/unreadable.
+_SNAPSHOT_WORDS_FALLBACK = ["chainsaw", "cupcake", "walrus", "thunder", "pickle",
+                            "comet", "goblin", "biscuit", "tornado", "noodle"]
+_snapshot_words = None   # process-wide cache; loaded once on first SAVE AS
+
+
+def _load_snapshot_words():
+    """Return the suffix word pool, loading the file once and caching it.
+
+    This caching IS the efficiency trick: read+parse the file exactly once,
+    lazily (on first SAVE AS, so app startup pays nothing), keep the list in
+    memory, and let ``random.choice`` do O(1) picks. ~6k words is ~50KB -- free
+    to hold. The "don't load it all" tricks (reservoir sampling, random seek)
+    only earn their complexity for corpora too big for RAM, which this isn't.
+    """
+    global _snapshot_words
+    if _snapshot_words is None:
+        try:
+            with open(_WORDS_PATH, "r", encoding="utf-8") as f:
+                _snapshot_words = [w for w in (ln.strip() for ln in f)
+                                   if w and not w.startswith("#")]
+        except OSError:
+            _snapshot_words = []
+        if not _snapshot_words:                  # missing/empty file -> fallback
+            _snapshot_words = list(_SNAPSHOT_WORDS_FALLBACK)
+    return _snapshot_words
 
 # Graph canvas coordinate space. MUST match the QML graph Item size
 # (qml/main.qml `graph` is 776x176) -- cable paths are precomputed here in this
@@ -33,6 +71,7 @@ _LED_BLUE, _LED_GREEN, _LED_RED, _LED_OFF = "#3b6fe0", "#5fd0a0", "#e6402e", "#2
 class QtView(QObject):
     dataChanged = Signal()
     monitorUpdated = Signal(str, float, float, str)  # (symbol, norm, value, display): per-meter live update
+    toastRequested = Signal(str)                     # transient on-screen message
 
     def __init__(self):
         super().__init__()
@@ -45,12 +84,22 @@ class QtView(QObject):
         self._cables = []
         self._graph_h = _GH
         self._foot = []
-        self._screen = "overview"   # "overview" | "focus" | "taptempo"
+        self._screen = "overview"   # "booting" | "overview" | "focus" | "taptempo" | "edit"
         self._focus = {}            # FOCUS payload for QML
         self._tap = {}              # TAP TEMPO payload for QML ({bpb, klass})
 
     def set_presenter(self, presenter):
         self.presenter = presenter
+
+    def show_toast(self, text):
+        """Presenter -> transient on-screen message (QML toast auto-hides)."""
+        self.toastRequested.emit(str(text))
+
+    def show_booting(self):
+        """Entry-point splash state, shown until the MODEP host is ready (qt_main
+        builds the presenter only once it answers). ``goOverview`` flips out of it."""
+        self._screen = "booting"
+        self.dataChanged.emit()
 
     # ------------------------------------------------------------------ QML
     @Property(str, notify=dataChanged)
@@ -107,6 +156,48 @@ class QtView(QObject):
     @Slot()
     def goOverview(self):
         self._screen = "overview"
+        self.dataChanged.emit()
+
+    @Slot()
+    def saveSnapshot(self):
+        """Overwrite the current snapshot (and persist the pedalboard)."""
+        if self.presenter:
+            self.presenter.save_snapshot()
+
+    @Property("QVariantList", constant=True)
+    def snapshotTerms(self):
+        """Stage-vocabulary grid for the SAVE AS modal."""
+        return _SNAPSHOT_TERMS
+
+    @Slot(str, result=str)
+    def suggestSnapshotName(self, term):
+        """A stage term + a random quirky suffix, avoiding existing snapshot names
+        ("Drive-cupcake"). Re-tapping a term just re-rolls the suffix."""
+        existing = set()
+        if self.presenter:
+            try:
+                lst = self.presenter.backend.get_snapshot_list() or {}
+                existing = set(lst.values()) if isinstance(lst, dict) else set(lst)
+            except Exception:
+                pass
+        words = _load_snapshot_words()
+        for _ in range(12):
+            name = "%s-%s" % (term, random.choice(words))
+            if name not in existing:
+                return name
+        return "%s-%s" % (term, random.choice(words))
+
+    @Slot(str)
+    def saveSnapshotNamed(self, name):
+        """Save the current state as a NEW snapshot under the given name."""
+        name = (name or "").strip()
+        if self.presenter and name:
+            self.presenter.save_snapshot_as(name)
+
+    @Slot()
+    def enterEdit(self):
+        """Switch to the pedalboard EDIT screen (placeholder for now)."""
+        self._screen = "edit"
         self.dataChanged.emit()
 
     @Slot(str, str, float)
@@ -226,7 +317,7 @@ class QtView(QObject):
         self.dataChanged.emit()
 
     def update_mode_display(self, mode):
-        self._mode = {0: "NAVIGATE", 1: "STOMP", 2: "RECALL", 3: "WEBUI",
+        self._mode = {0: "NAVIGATE", 1: "STOMP", 2: "BANK", 3: "WEBUI",
                       4: "TAP TEMPO"}.get(mode, str(mode))
         self._rebuild_footswitches()
         self.dataChanged.emit()
@@ -481,7 +572,22 @@ class QtView(QObject):
                 else:
                     cells.append({"label": "—", "sub": "OFF", "led": _LED_OFF})
             self._foot = cells
-        else:  # NAVIGATE (0) / RECALL (2): board + snapshot scroll
+        elif mode == 2:  # BANK: the active bank's first 4 boards mapped to FS0-3
+            boards = getattr(self.presenter, "bank_boards", []) if self.presenter else []
+            cur = getattr(pb, "current_pb_path", None) if pb else None
+            cells = []
+            for i in range(4):
+                if i < len(boards):
+                    b = boards[i]
+                    name = b.get("title") or b.get("bundle", "").split("/")[-1].replace(".pedalboard", "")
+                    is_cur = b.get("bundle") == cur
+                    cells.append({"label": name[:12],
+                                  "sub": "● 현재" if is_cur else "BOARD",
+                                  "led": _LED_GREEN if is_cur else _LED_BLUE})
+                else:
+                    cells.append({"label": "—", "sub": "OFF", "led": _LED_OFF})
+            self._foot = cells
+        else:  # NAVIGATE (0): board + snapshot scroll
             self._foot = [
                 {"label": "BOARD", "sub": "◄", "led": _LED_BLUE},
                 {"label": "BOARD", "sub": "►", "led": _LED_BLUE},
