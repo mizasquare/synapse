@@ -1,7 +1,7 @@
 from collections import defaultdict
 import utils
 from modepctrl import get_backend
-from model import initialize_modep_pedalboard
+from model import initialize_modep_pedalboard, Connection
 from taptempo import TapTempoEngine
 import subprocess
 import threading
@@ -224,10 +224,22 @@ class Presenter:
                     pb = self.pedalboard.current_pb_path
                     if pb and str(idx) in self.pedalboard.list_of_snapshots:
                         self.pb_snapshot_memory[pb] = idx
+            elif cmd in ("EffectConnect", "EffectDisconnect"):
+                # 배선 변경은 라이브 호스트 그래프에서만 일어남 — /pedalboard/info(=refresh_
+                # pedalboard 의 소스)는 디스크 번들 .ttl 을 읽으므로 저장 전엔 새 케이블을 모름.
+                # → 디스크 재조회 대신 메시지의 두 포트로 모델 connections 에 델타를 직접 적용
+                #   (파라미터/패치의 apply_external_* 와 같은 패턴). 포트는 /graph/ 접두를 떼면
+                #   디스크 connection 포맷(예: "Click/out", "playback_2")과 일치한다.
+                a, _, b = rest.partition(",")
+                src = a.strip().split("/graph/", 1)[-1].lstrip("/")
+                tgt = b.strip().split("/graph/", 1)[-1].lstrip("/")
+                self.apply_external_connection(cmd == "EffectConnect", src, tgt)
             elif cmd in ("EffectAdd", "EffectRemove", "PedalboardLoadBundle",
                          "SnapshotName", "SnapshotRemove", "BankLoad"):
                 # 구조 변경 → 안전하게 전체 재동기화
                 # (웹발 PedalboardLoadBundle 은 복원 안 함: mod-ui 번들 저장 스냅샷 기본동작 유지)
+                # ★한계: EffectAdd/Remove 도 저장 전엔 디스크에 없어 refresh 가 stale 일 수 있음
+                #   (connect/disconnect 처럼 델타 적용하려면 플러그인 메타 조회 필요 — 추후).
                 self.refresh_pedalboard()
             else:
                 print(f"[reverse] unhandled: {message}")
@@ -273,6 +285,19 @@ class Presenter:
         if patch is not None:
             patch.value = patch_file  # 캐시만 갱신 (set_patch는 host로 쓰므로 호출 안 함)
         self.view.update_patch_display(instance, patch_uri, patch_file)
+
+    def apply_external_connection(self, connected, source, target):
+        """외부(웹/HMI)에서 바뀐 배선을 모델 connections 에 직접 반영(디스크/host 미조회).
+        /pedalboard/info 는 디스크 번들을 읽어 저장 전 라이브 배선을 모르므로, 메시지의 두
+        포트로 그래프만 갱신한다. source/target 은 /graph/ 를 뗀 디스크 포맷."""
+        conns = self.pedalboard.connections
+        existing = next((c for c in conns if c.source == source and c.target == target), None)
+        if connected:
+            if existing is None:
+                conns.append(Connection(source, target))
+        elif existing is not None:
+            conns.remove(existing)
+        self.view_update_effect()   # _rebuild_graph 가 connections 로 케이블 다시 그림
 
     def _return_to_overview(self):
         """Leave any stale FOCUS card after a footswitch pedalboard change.

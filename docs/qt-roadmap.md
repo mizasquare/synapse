@@ -4,7 +4,7 @@
 > (검증 내역 = [`qt-migration-FINISHED.md`](qt-migration-FINISHED.md) 아카이브).
 > 이 문서는 그 위의 **남은 기능·신뢰성·정리·부팅·설계결정·검증**을 모은 살아있는 로드맵이다.
 > 구 `qt-migration-handoff`(후속작업) + `ui-migration-review`(시안↔현행 갭 분석)를 **흡수·통합**했다.
-> 마지막 갱신: 2026-06-25 (FOCUS 컨트롤/모니터 렌더링 + 라이브 미터 피드 세션 — 완료분 `[x]` 반영).
+> 마지막 갱신: 2026-06-26 (Tier 1 신뢰성 + 저장 영속성/ttl 부패 완료분 반영 + **페달보드 에디터를 다음 최우선 전용 섹션으로 정리**).
 
 **현재 사실관계:** PyQt6+QML+eglfs 앱이 Pi에서 라이브 동작하고 autostart도 전환됨(`dfd42c6`).
 FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이브 검증됨(커밋 `1074b5e`).
@@ -13,6 +13,9 @@ FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이
 **우선순위 = Tier 1 → Tier 2 → Tier 3 → 부팅(보류).** ★부팅(무컴포지터 eglfs)은 의도적으로 **내림**:
 원격 개발 동안 labwc 창모드가 remote desktop(PiConnect/VNC) 접속 이득이 커서, 당분간 컴포지터 유지.
 무대 실사용/기기 확정 단계에서 다시 올린다. (2026-06-25 사용자 결정.)
+
+**★다음 최우선 = 페달보드 에디터(아래 전용 섹션). Tier 1 신뢰성이 다 `[x]`라 다음 큰 덩어리이자 가장 무거운 태스크.**
+EDIT 버튼은 이미 붙었으나 화면이 placeholder뿐 — 이펙트 추가/삭제/연결을 실호스트에 배선하는 본체가 통째로 남았다.
 
 각 항목은 `파일:라인` 근거로 검증됨. 작업은 한 번에 하나씩, 변경 전 사용자 승인.
 
@@ -44,6 +47,63 @@ FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이
 - [x] **서버측 구조적 차단(mod-tweak)** — `host.py:3965`(asNew=0 분기) ttl 심볼을 클라이언트 title이 아니라
       **번들 dir명**에서 도출 → `dir==ttl==manifest` 구조 보장. **웹발 stale-title 저장도 파일 부패 불가**(`doap:name`은 별도
       `title` 인자라 이름변경은 유지). `mod-tweaks/host.py` 반영, `sudo deploy.sh` 배포.
+
+## ★ 페달보드 에디터 (다음 최우선 — 가장 무겁고 힘든 태스크)
+
+> 앱이 **그래프 자체를 편집**(이펙트 추가·삭제·연결·끊기·노브 MIDI 바인딩)하게 만드는 본체.
+> 옛 Kivy 로드맵의 "트랙2"(앱이 직접 이펙터 추가/라우팅/바인딩)에 해당하고, **볼륨페달 자동 라우팅**도
+> 이 백엔드(`/effect/add`+`/connect`+`/parameter/address`)를 공유한다. 여러 화면·백엔드·역방향싱크가 동시에
+> 엮여서 지금까지 손댄 어떤 항목보다 표면이 크다. 한 번에 하나씩, 단계별로 라이브 검증하며 진행할 것.
+
+**현재 상태 (placeholder뿐):**
+- EDIT 버튼은 동작 — [`qtview.py:198`](../qtview.py) `enterEdit()` → `screen=="edit"`.
+- 하지만 화면은 빈 껍데기 — [`qml/main.qml:504-547`](../qml/main.qml) `editScreen`이 보드명 + "편집 모드 — 구현 예정 / 이펙트 추가 · 연결 · 삭제 (다음 단계)" 안내문만.
+
+**백엔드 완전 부재 (가장 큰 덩어리):**
+- [`modepctrl.py`](../modepctrl.py)에 **그래프 변형 메서드가 하나도 없다** — 현재는 parameter/bypass/patch/snapshot/PB-load뿐.
+  추가/삭제/연결/끊기/주소(바인딩) 래퍼를 **전부 신규 작성** 해야 함.
+- mod-ui 엔드포인트는 **이미 다 존재** (mod-tweak 불필요할 수 있음, notify만 보강):
+  - `/effect/add/<instance>/<uri>?x=&y=` ([`mod-tweaks/webserver.py:2486`](../mod-tweaks/webserver.py))
+  - `/effect/remove/<instance>` ([:2487](../mod-tweaks/webserver.py))
+  - `/effect/connect/<port_a>,<port_b>` ([:2512](../mod-tweaks/webserver.py)) · `/effect/disconnect/<port_a>,<port_b>` ([:2513](../mod-tweaks/webserver.py))
+  - `/effect/list` (LV2 카탈로그 — "추가" 브라우저용, [:899](../mod-tweaks/webserver.py)) · `/effect/get` (플러그인 메타, 포트/카테고리, [:1096](../mod-tweaks/webserver.py))
+  - MIDI 바인딩은 `/effect/parameter/address`(트랙2 스펙, 볼륨페달과 공유) — 엔드포인트 존재 재확인 필요.
+
+**역방향 싱크 — 부분만 됨 (갭 있음):**
+- `EffectAdd`/`EffectRemove`는 이미 notify_synapsin 발화([`webserver.py:1086,1094`](../mod-tweaks/webserver.py)) +
+  presenter가 전체 재동기화로 처리 ([`presenter.py:227`](../presenter.py)). → 추가/삭제는 앱이 따라옴.
+- **★connect/disconnect 배선 변경 싱크 = 구현+라이브 검증 OK(2026-06-26). 2단 수정:**
+  검증: `/effect/disconnect` HTTP → 앱 그래프서 해당 케이블 즉시 사라짐, `/effect/connect` → 즉시 복원(grim before/after 확인).
+  서버 notify 발화는 `journalctl -u modep-mod-ui`의 "Notification sent: EffectDisconnect/Connect …"로 확인.
+  **사용자가 실제 웹UI(폰)에서 직접 배선 변경 → 앱 그래프 즉시 따라옴까지 양측 교차확인(2026-06-26).**
+  ① **서버 notify**(배포 완료): `/effect/connect`·`/effect/disconnect`가 성공시 `notify_synapsin("EffectConnect/Disconnect <a>, <b>")`
+  발화([`webserver.py`](../mod-tweaks/webserver.py) EffectConnect/EffectDisconnect, `sudo deploy.sh` 반영됨).
+  ② **★델타 적용**(presenter, 앱재실행만): notify를 `refresh_pedalboard()`(전체 재동기화)에 걸었더니 **안 그려짐** —
+  **근본원인:** `refresh_pedalboard`→`initialize_modep_pedalboard`→`get_pedalboard_info`가 `/pedalboard/info/?bundlepath=`로
+  **디스크 번들 .ttl 을 읽는다**. 웹 배선은 라이브 호스트 그래프에만 있고 **저장 전엔 디스크에 없어** 재조회해도 옛 케이블뿐.
+  → `handle_reverse_event`가 connect/disconnect를 메시지의 두 포트로 **모델 `connections` 에 직접 델타 적용**
+  (`apply_external_connection`, 파라미터/패치의 `apply_external_*` 패턴). 포트는 `/graph/` 접두만 떼면 디스크 포맷과 일치
+  (`mod-port`=`/graph/Click/out` ↔ 디스크 `Click/out`; JS도 로드 시 `/graph/` 재부착). [`presenter.py:227,287`](../presenter.py).
+- ★**EffectAdd/EffectRemove 도 같은 디스크-stale 잠복버그** — 여전히 `refresh_pedalboard`(디스크 재조회)라 웹발 추가/삭제도
+  저장 전엔 앱에 안 보일 수 있음. connect/disconnect처럼 델타 적용하려면 플러그인 메타(name/category/ports) 조회가 필요(추후).
+- ★저장은 **호스트 권위** — 앱 `save_current_pedalboard`는 그래프를 안 보내고([`modepctrl.py:330`](../modepctrl.py) title+asNew만)
+  mod-ui가 호스트 라이브 그래프를 직렬화 → 앱 뷰가 stale여도 **디스크엔 올바른 배선**이 써짐(무결성 위험 아님, 표시 문제일 뿐).
+  따라서 "stale 중 앱 저장 차단" 가드는 불필요.
+
+**UI 재사용:**
+- 스네이크 그리드 그래프([`qtview.py`](../qtview.py) `_rebuild_graph`)가 이미 체인을 렌더 → 에디터는 그 위에 **상호작용**만 얹음
+  (노드 선택→삭제, "+" →카탈로그서 플러그인 골라 추가, 노드↔노드 드래그→연결/끊기).
+- 플러그인 추가 브라우저(`/effect/list`+`/effect/get`) = 신규 리스트/모달 UI. 스냅샷/PB 브라우저(Tier 2)와 패턴 공유 가능.
+
+**제안 분해 (대략, 의존순):**
+1. modepctrl 래퍼 4종(add/remove/connect/disconnect) + 에러/timeout 가드(Tier 1 패턴 따라).
+2. 노드 선택 → 삭제, bypass 토글은 이미 있음.
+3. `/effect/list`·`/effect/get` 카탈로그 조회 + 추가 브라우저 UI → `/effect/add`.
+4. 노드 간 연결/끊기 인터랙션 + `/connect`·`/disconnect`.
+5. ~~connect/disconnect 역방향 notify 보강(mod-tweak)~~ ✅ 코드 반영(2026-06-26) — 배포+검증만 남음(위 참조).
+6. (연계) MIDI 바인딩 `/parameter/address` → 볼륨페달 자동 라우팅과 합류.
+
+**열린 설계 결정:** 편집을 **앱 단독**(웹발 배선변경 동기화 불필요 → 5번 생략)으로 둘지, 진짜 양방향으로 갈지 먼저 정할 것.
 
 ## 부팅 — 무컴포지터 (남은 이주 항목) — ⏸ 보류 (원격 개발 중 컴포지터 유지)
 
@@ -90,7 +150,7 @@ FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이
 - [x] **스냅샷 SAVE / SAVE AS / EDIT 버튼 + SAVE AS 네이밍 모달 ✅(2026-06-26)** — 오버뷰 헤더에 3버튼. SAVE=
       `save_snapshot`, SAVE AS=**3+2 네이밍 모달**(무대용어 칩 탭→`Drive-cupcake`식 제안[중복회피 무작위 접미사],
       제안 탭 저장/칩 재탭 재롤/✎ HW키보드 직접입력/취소). 접미사 풀=외부 `resources/snapshot_words.txt`(Hunspell 6천단어,
-      lazy-load+모듈캐시). EDIT=`edit` 화면(플레이스홀더, 실 편집기는 추후). 신규 **토스트 시스템**(`view.show_toast`+QML 자동소멸).
+      lazy-load+모듈캐시). EDIT=`edit` 화면(플레이스홀더, **실 편집기는 위 ★페달보드 에디터 섹션 = 다음 최우선**). 신규 **토스트 시스템**(`view.show_toast`+QML 자동소멸).
 - [ ] **볼륨페달**(ADS1115→MIDI CC) — [`volumepedal.py`](../volumepedal.py)는 독립 프로세스로만 존재, 앱 폴링 미통합, 화면 미터 없음.
       ★먼저 정의할 미결 스펙: **페달이 물리적으로 미연결일 때 앱 거동**. 코드개선(미적용): 단발→연속모드, 860→64~128SPS, EMA+히스테리시스로 CC 지터 제거.
 - [ ] **모멘터리(홀드) 모드** — [`presenter.py:365`](../presenter.py) 폴링이 릴리스엣지 전용 → press-ON/release-OFF 모멘터리 없음.
