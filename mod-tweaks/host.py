@@ -3962,7 +3962,14 @@ class Host(object):
         if self.pedalboard_path and not asNew and \
             os.path.isdir(self.pedalboard_path) and self.pedalboard_path.startswith(LV2_PEDALBOARDS_DIR):
             bundlepath = self.pedalboard_path
-            titlesym = symbolify(title)[:16]
+            # Save-in-place: name the ttl after the EXISTING bundle dir, NOT the
+            # client-supplied title. A stale title (e.g. the web UI still showing a
+            # previous board's name during app footswitch nav) would otherwise make
+            # symbolify(title) the ttl filename -> a mismatched ttl written into this
+            # dir, orphaning the real one and corrupting the bundle. The human title
+            # still lives in doap:name (set from `title` below), so renames work.
+            bn = os.path.basename(bundlepath.rstrip('/'))
+            titlesym = bn[:-len('.pedalboard')] if bn.endswith('.pedalboard') else bn
             newTitle = None
 
         # Save new
