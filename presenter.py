@@ -1,6 +1,7 @@
 from collections import defaultdict
 import utils
-from modepctrl import initialize_modep_pedalboard, get_backend
+from modepctrl import get_backend
+from model import initialize_modep_pedalboard
 from taptempo import TapTempoEngine
 import subprocess
 import threading
