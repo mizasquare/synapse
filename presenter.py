@@ -65,6 +65,11 @@ class Presenter:
         self.current_bank = 0
         self.bank_boards = []
 
+        # Mode-1 STOMP: the 4 category-filtered effects bound to FS0-3. Exposed so
+        # the QtView strip captions mirror exactly what a press toggles (kept in
+        # sync by assign_footswitches, same lifecycle as bank_boards).
+        self.stomp_effects = []
+
         self.assign_footswitches()
         self.boot_lightshow()
 
@@ -482,7 +487,6 @@ class Presenter:
             ]
 
         elif self.footswitch_mode == 1:
-            print("꺄홀르")
             # Mode 1: parameter assign mode (bypass toggles)
             # 1) Filter out any effects that are in “simulator” categories
             #    (or keep them, depending on your actual “excluded” vs. “included” logic).
@@ -500,12 +504,16 @@ class Presenter:
                 # you can just skip or implement partial assignment here.
                 print("Warning: Not enough non-simulator effects to assign all four footswitches.")
                 self.footswitch_assigns = [None, None, None, None]
+                self.stomp_effects = []
                 return
 
             e0 = valid_effects[0]  # first effect
             e1 = valid_effects[1]  # second effect
             e2 = valid_effects[-2]  # second-last effect
             e3 = valid_effects[-1]  # last effect
+
+            # Expose the chosen 4 so the QtView strip captions match the toggles.
+            self.stomp_effects = [e0, e1, e2, e3]
 
             # 3) Define a small helper to toggle bypass:
             def toggle_bypass(effect):

@@ -554,14 +554,13 @@ class QtView(QObject):
     def _rebuild_footswitches(self):
         mode = getattr(self.presenter, "footswitch_mode", 0) if self.presenter else 0
         pb = getattr(self.presenter, "pedalboard", None) if self.presenter else None
-        # STOMP placeholder: shows the first four effects. The presenter actually
-        # assigns toggles to a CATEGORY-FILTERED set ([0],[1],[-2],[-1] of effects
-        # excluding simulator/amp/cab/utility; none if <4). Stage 3 (footswitch
-        # input) must mirror presenter.assign_footswitches' selection here -- ideally
-        # by having the presenter expose the 4 chosen effects -- so captions match
-        # what a press toggles. Not exercised in Stage 1/2 (boots in NAVIGATE mode).
-        if mode == 1 and pb is not None:  # STOMP: first four effects as toggles
-            fx = list(pb.effects)
+        # STOMP: the presenter binds FS0-3 to a CATEGORY-FILTERED set ([0],[1],[-2],[-1]
+        # of effects excluding simulator/amp/cab/utility; none if <4) and exposes those
+        # exact 4 as presenter.stomp_effects. Read it here so captions match precisely
+        # what a press toggles (same pattern as bank_boards for mode 2). The Effect
+        # objects are live, so e.bypassed reflects the current ENGAGED/BYPASS state.
+        if mode == 1:  # STOMP: presenter's chosen four effects as toggles
+            fx = getattr(self.presenter, "stomp_effects", []) if self.presenter else []
             cells = []
             for i in range(4):
                 if i < len(fx):
