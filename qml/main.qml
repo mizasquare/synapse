@@ -101,15 +101,22 @@ Window {
             color: "#232b3a"
         }
 
-        // -- Routing graph --
-        // 776x176 MUST match qtview._GW/_GH — cable PathSvg coords are precomputed in
-        // that pixel space on the Python side; changing one without the other misaligns.
-        Item {
+        // -- Routing graph (snake-grid, vertical-scroll) --
+        // Width 776 MUST match qtview._GW — cable PathSvg coords are precomputed in
+        // that pixel space on the Python side. Height is dynamic: view.graphHeight
+        // (= rows * row-height) drives contentHeight; the viewport is capped so it
+        // never overlaps the legend / footswitch strip below.
+        Flickable {
             id: graph
             x: 12; y: hr.y + 10
-            width: 776; height: 176
+            width: 776
+            height: Math.min(view.graphHeight, 236)
+            contentWidth: 776
+            contentHeight: view.graphHeight
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
 
-            Rectangle { anchors.fill: parent; color: cGraph; radius: 10 }
+            Rectangle { width: 776; height: view.graphHeight; color: cGraph; radius: 10 }
 
             Repeater {
                 model: view.cables
@@ -140,13 +147,18 @@ Window {
 
                     Column {
                         anchors.centerIn: parent
+                        width: parent.width - 14
                         spacing: 1
                         Text {
-                            anchors.horizontalCenter: parent.horizontalCenter
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
                             text: modelData.label
                             color: modelData.isIo ? cGreen : cText
                             font.family: uiFont
-                            font.pixelSize: modelData.isIo ? 22 : 21
+                            font.pixelSize: modelData.isIo ? 22 : 20
+                            wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                            maximumLineCount: 2
+                            elide: Text.ElideRight
                         }
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter

@@ -22,6 +22,11 @@ from PyQt6.QtCore import QObject, pyqtProperty as Property, pyqtSignal as Signal
 # (qml/main.qml `graph` is 776x176) -- cable paths are precomputed here in this
 # pixel space, so changing one side without the other misaligns cables vs nodes.
 _GW, _GH = 776.0, 176.0
+# Snake-grid: nodes wrap every _PER_ROW columns, rows stack downward (the graph
+# grows past _GH and QML scrolls vertically). Row height includes inter-row gap.
+_PER_ROW = 4
+_ROW_H = 100.0
+_ROW_PAD = 10.0
 _LED_BLUE, _LED_GREEN, _LED_RED, _LED_OFF = "#3b6fe0", "#5fd0a0", "#e6402e", "#2a3140"
 
 
@@ -37,6 +42,7 @@ class QtView(QObject):
         self._mode = "NAVIGATE"
         self._nodes = []
         self._cables = []
+        self._graph_h = _GH
         self._foot = []
         self._screen = "overview"   # "overview" | "focus" | "taptempo"
         self._focus = {}            # FOCUS payload for QML
@@ -81,6 +87,10 @@ class QtView(QObject):
     @Property("QVariantList", notify=dataChanged)
     def cables(self):
         return self._cables
+
+    @Property(float, notify=dataChanged)
+    def graphHeight(self):
+        return self._graph_h
 
     @Property("QVariantList", notify=dataChanged)
     def footswitches(self):
@@ -302,28 +312,37 @@ class QtView(QObject):
         pb = getattr(self.presenter, "pedalboard", None) if self.presenter else None
         if pb is None:
             self._nodes, self._cables = [], []
+            self._graph_h = _GH
             return
 
         effects = list(pb.effects)
-        cols = len(effects) + 2  # IN + effects + OUT
-        slot = _GW / cols
-        center_x = lambda i: slot * i + slot / 2.0
-        fx_w, fx_h, io_w, io_h = 112.0, 58.0, 60.0, 58.0
+        # Snake-grid: nodes flow L->R on even rows, R->L on odd rows, wrapping
+        # every _PER_ROW columns and stacking downward (QML scrolls vertically).
+        cell_w = _GW / _PER_ROW
+        fx_w, fx_h, io_w, io_h = 170.0, 72.0, 104.0, 72.0
+
+        # (id, label, sub, is_io, on, w, h) in signal order: IN -> effects -> OUT
+        order = [("IN", "IN", "GUITAR", True, True, io_w, io_h)]
+        for e in effects:
+            cat = e.category[0] if isinstance(e.category, (list, tuple)) and e.category else ""
+            order.append((e.instance, e.name, cat, False, not e.bypassed, fx_w, fx_h))
+        order.append(("OUT", "OUT", "STEREO", True, True, io_w, io_h))
 
         nodes, idmap = [], {}
-
-        def add(nid, label, sub, is_io, on, cx, w, h):
+        for idx, (nid, label, sub, is_io, on, w, h) in enumerate(order):
+            row = idx // _PER_ROW
+            col = idx % _PER_ROW
+            vcol = col if row % 2 == 0 else (_PER_ROW - 1 - col)  # snake
+            cx = cell_w * vcol + cell_w / 2.0
+            cy = _ROW_PAD + row * _ROW_H + _ROW_H / 2.0
             box = {"id": nid, "label": label, "sub": sub or "", "isIo": is_io,
-                   "on": bool(on), "selected": False,
-                   "x": cx - w / 2.0, "y": (_GH - h) / 2.0, "w": w, "h": h}
+                   "on": bool(on), "selected": False, "row": row,
+                   "x": cx - w / 2.0, "y": cy - h / 2.0, "w": w, "h": h}
             nodes.append(box)
             idmap[nid] = box
 
-        add("IN", "IN", "GUITAR", True, True, center_x(0), io_w, io_h)
-        for i, e in enumerate(effects):
-            cat = e.category[0] if isinstance(e.category, (list, tuple)) and e.category else ""
-            add(e.instance, e.name, cat, False, not e.bypassed, center_x(i + 1), fx_w, fx_h)
-        add("OUT", "OUT", "STEREO", True, True, center_x(cols - 1), io_w, io_h)
+        n_rows = (len(order) + _PER_ROW - 1) // _PER_ROW
+        self._graph_h = 2 * _ROW_PAD + n_rows * _ROW_H
 
         # One cable per (source-effect, target-effect) pair: stereo L/R links
         # collapse to a single schematic line, and connections whose endpoint
@@ -341,11 +360,33 @@ class QtView(QObject):
 
     @staticmethod
     def _cable_path(a, b):
-        x1, y1 = a["x"] + a["w"], a["y"] + a["h"] / 2.0
-        x2, y2 = b["x"], b["y"] + b["h"] / 2.0
-        dx = max(28.0, (x2 - x1) * 0.5)
+        # Same row -> horizontal bezier between the facing side-ports; different
+        # row -> vertical bezier (the snake's U-turn) between bottom/top ports.
+        # Direction a->b is preserved (M starts at a's exit port).
+        if a["row"] == b["row"]:
+            if a["x"] <= b["x"]:           # a is left of b
+                x1, x2 = a["x"] + a["w"], b["x"]
+            else:                          # a is right of b
+                x1, x2 = a["x"], b["x"] + b["w"]
+            y1 = a["y"] + a["h"] / 2.0
+            y2 = b["y"] + b["h"] / 2.0
+            dx = max(28.0, abs(x2 - x1) * 0.5)
+            cx1 = x1 + dx if x2 >= x1 else x1 - dx
+            cx2 = x2 - dx if x2 >= x1 else x2 + dx
+            return "M%.1f,%.1f C%.1f,%.1f %.1f,%.1f %.1f,%.1f" % (
+                x1, y1, cx1, y1, cx2, y2, x2, y2)
+        # vertical U-turn between rows
+        x1 = a["x"] + a["w"] / 2.0
+        x2 = b["x"] + b["w"] / 2.0
+        if a["y"] <= b["y"]:               # a above b
+            y1, y2 = a["y"] + a["h"], b["y"]
+        else:                              # a below b
+            y1, y2 = a["y"], b["y"] + b["h"]
+        dy = max(24.0, abs(y2 - y1) * 0.5)
+        cy1 = y1 + dy if y2 >= y1 else y1 - dy
+        cy2 = y2 - dy if y2 >= y1 else y2 + dy
         return "M%.1f,%.1f C%.1f,%.1f %.1f,%.1f %.1f,%.1f" % (
-            x1, y1, x1 + dx, y1, x2 - dx, y2, x2, y2)
+            x1, y1, x1, cy1, x2, cy2, x2, y2)
 
     # ---------------------------------------------------- footswitch strip
     def _rebuild_footswitches(self):
