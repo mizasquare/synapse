@@ -4,7 +4,7 @@
 > (검증 내역 = [`qt-migration-FINISHED.md`](qt-migration-FINISHED.md) 아카이브).
 > 이 문서는 그 위의 **남은 기능·신뢰성·정리·부팅·설계결정·검증**을 모은 살아있는 로드맵이다.
 > 구 `qt-migration-handoff`(후속작업) + `ui-migration-review`(시안↔현행 갭 분석)를 **흡수·통합**했다.
-> 마지막 갱신: 2026-06-26 (Tier 1 신뢰성 + 저장 영속성/ttl 부패 완료분 반영 + **페달보드 에디터를 다음 최우선 전용 섹션으로 정리**).
+> 마지막 갱신: 2026-06-27 (**페달보드 에디터 라이브 배선 착수 — M1 임베드 + M2 읽기전용 로드 완료**; 라이브 앱 풀스크린+Ctrl+Q).
 
 **현재 사실관계:** PyQt6+QML+eglfs 앱이 Pi에서 라이브 동작하고 autostart도 전환됨(`dfd42c6`).
 FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이브 검증됨(커밋 `1074b5e`).
@@ -55,9 +55,15 @@ EDIT 버튼은 이미 붙었으나 화면이 placeholder뿐 — 이펙트 추가
 > 이 백엔드(`/effect/add`+`/connect`+`/parameter/address`)를 공유한다. 여러 화면·백엔드·역방향싱크가 동시에
 > 엮여서 지금까지 손댄 어떤 항목보다 표면이 크다. 한 번에 하나씩, 단계별로 라이브 검증하며 진행할 것.
 
-**현재 상태 (placeholder뿐):**
-- EDIT 버튼은 동작 — [`qtview.py:198`](../qtview.py) `enterEdit()` → `screen=="edit"`.
-- 하지만 화면은 빈 껍데기 — [`qml/main.qml:504-547`](../qml/main.qml) `editScreen`이 보드명 + "편집 모드 — 구현 예정 / 이펙트 추가 · 연결 · 삭제 (다음 단계)" 안내문만.
+**현재 상태 (라이브 배선 진행 중 — 2026-06-27):**
+- **목업 본체 완성**(브랜치 `pedalboard-editor`): `editor_bridge.py`(브레인) + `qml/PedalboardEditorView.qml`(본문, advanced 포트그래프·레이디얼연결·bake·인스펙터) + standalone `qt_editor.py`. P1~P3 완료(메모리 로드맵 참조).
+- **라이브 앱 배선을 마일스톤으로 진행**(각 끝에서 Pi 육안검증). 진실원 = `presenter.pedalboard`; 에디터는 거기서 advanced 그래프를 시드하고 쓰기는 backend로, 리버스 채널이 자동 갱신:
+  - [x] **M1 — 임베드 ✅(2026-06-27)** — `PedalboardEditor.qml` 본문을 `PedalboardEditorView.qml`(Item)로 분리 → standalone Window와 라이브 EDIT 화면이 **같은 본문** 공유. [`main.qml`](../qml/main.qml) `editScreen` = `PedalboardEditorView` Loader(`source:`, EDIT 진입마다 새로 생성), 헤더 `◄ 나가기`→`view.goOverview()`. `editor` 컨텍스트 프로퍼티를 `qt_main.py`/`qt_app.py`에 등록. **+ 라이브 앱도 `showFullScreen()`+`Ctrl+Q`**(에디터와 동일).
+  - [x] **M2 — 읽기전용 라이브 로드 ✅(2026-06-27)** — `editor.enterLive()`(Loader onLoaded)가 `_seed_from_pedalboard(presenter.pedalboard)` 호출 → 실제 체인 렌더. 식별자 매핑: **정수 gnode id ↔ 라이브 인스턴스**(`_gid_by_inst`/`_inst_by_gid`; 피드백 DFS의 `int()` 제약 + 이후 backend 주소지정용). `Connection`(`bluesbreaker/out0`) → 포트키(`gid:out:audio:idx`), HW(`capture_N`/`playback_N`)→IN/OUT. 좌표 정규화·`vals`=라이브 포트값·보드명=`pb.title`. `live` 프로퍼티가 목업 크롬(BOARD/UNDO/REDO/SHUF) 숨김. ClaudeCanEdit 검증 OK.
+  - [ ] **M3 — 파라미터·바이패스 라이브 쓰기** — 인스펙터 노브/토글/enum→기존 `parameter_set`, bypass→`bypass_effect`(신규 backend API 0). 라이브 `_focus` 경로 재사용 검토(노브 검증 품질). gnode id→인스턴스로 키.
+  - [ ] **M4 — backend 그래프변형 4종 신규** — `modepctrl` add/remove/connect/disconnect(`parameter_set` 패턴: 동기 requests, None/에러), `Backend` ABC + `fakemodep` 구현. off-device 검증.
+  - [ ] **M5 — 구조편집 + 식별자 매핑** — remove/disconnect→connect→add 순. 포트키↔jack포트명(`/graph/<inst>/<port>`) 매핑, 인스턴스 minting(add), 리버스 채널 이중적용 가드.
+  - [ ] **M6 — 저장 + bake/undo** — `save_current_pedalboard`로 .ttl 영속화, bake/undo를 diff-and-apply 시퀀스로 재표현. 라운드트립 검증.
 
 **백엔드 완전 부재 (가장 큰 덩어리):**
 - [`modepctrl.py`](../modepctrl.py)에 **그래프 변형 메서드가 하나도 없다** — 현재는 parameter/bypass/patch/snapshot/PB-load뿐.

@@ -154,6 +154,12 @@ class EditorBridge(QObject):
         self._dirty = False
         self._boards = []             # cached saved-board list
 
+        # live wiring (None/False in the standalone mock; set when embedded in the app)
+        self.presenter = None         # Presenter seam — source of truth is presenter.pedalboard
+        self._live_flag = False       # True once seeded from a live MODEP board (Property: live)
+        self._gid_by_inst = {}        # live instance string -> integer gnode id
+        self._inst_by_gid = {}        # integer gnode id -> live instance string
+
         # seed a small serial chain so the canvas isn't empty on first run
         for nm in ('bluesbreaker', 'GxCompressor', 'Bollie Delay', 'Dragonfly Hall Reverb'):
             uri = self.by_name.get(nm.lower())
@@ -219,6 +225,137 @@ class EditorBridge(QObject):
             if str(n['id']) == str(nid):
                 return n
         return None
+
+    # ===================================================== live wiring (app embed)
+    def set_presenter(self, presenter):
+        """Inject the app's Presenter. The live MODEP board (presenter.pedalboard)
+        becomes the source of truth; enterLive() seeds the advanced graph from it."""
+        self.presenter = presenter
+
+    @Slot()
+    def enterLive(self):
+        """Called when the app opens the EDIT screen: (re)seed the advanced graph
+        from the currently-loaded live pedalboard. No-op in the standalone mock."""
+        pb = getattr(self.presenter, 'pedalboard', None) if self.presenter else None
+        if pb is None:
+            return
+        self._seed_from_pedalboard(pb)
+
+    @staticmethod
+    def _audio_idx_from_symbol(sym, count):
+        """Map a real audio port symbol to its 0-based channel index. Single-port
+        sides are always 0; for stereo, prefer a trailing digit in the symbol
+        (mod convention in0/in1, out0/out1), else 0. Clamped to < count."""
+        if count <= 1:
+            return 0
+        m = ''.join(ch for ch in sym[::-1] if ch.isdigit())
+        if m:
+            idx = int(m[::-1])
+            if 0 <= idx < count:
+                return idx
+        return 0
+
+    @staticmethod
+    def _norm_inst(s):
+        """Strip a mod-host '/graph/' prefix (and stray leading '/') so disk-format
+        ('bluesbreaker/out0') and jack-format ('/graph/bluesbreaker/out0') endpoints
+        compare equal to bare instance names."""
+        s = (s or '').strip()
+        if s.startswith('/graph/'):
+            s = s[len('/graph/'):]
+        return s.lstrip('/')
+
+    def _port_key_from_endpoint(self, ep, side):
+        """Turn a live Connection endpoint ("capture_1", "playback_2",
+        "bluesbreaker/out0", "nam/input") into a mock port key "nid:side:type:idx".
+        Returns None if the effect isn't a seeded node."""
+        ep = self._norm_inst(ep)
+        base = ep.split('/', 1)[0]
+        sym = ep.split('/', 1)[1] if '/' in ep else ''
+        if base.startswith('capture'):                    # HW input -> IN node output
+            tail = base.rsplit('_', 1)
+            idx = int(tail[1]) - 1 if len(tail) == 2 and tail[1].isdigit() else 0
+            return 'IN:out:audio:%d' % max(0, idx)
+        if base.startswith('playback'):                   # HW output -> OUT node input
+            tail = base.rsplit('_', 1)
+            idx = int(tail[1]) - 1 if len(tail) == 2 and tail[1].isdigit() else 0
+            return 'OUT:in:audio:%d' % max(0, idx)
+        gid = self._gid_by_inst.get(base)
+        if gid is None:
+            return None
+        n = self._gnode(gid)
+        p = self.by_uri.get(n['uri']) if n else None
+        count = (p['ao'] if side == 'out' else p['ai']) if p else 1
+        # ClaudeCanEdit is audio-only; MIDI/CV symbol typing is a later milestone.
+        return '%d:%s:audio:%d' % (gid, side, self._audio_idx_from_symbol(sym, count))
+
+    def _seed_from_pedalboard(self, pb):
+        """Build the advanced graph (gnodes + gwires) from a live Pedalboard.
+        Integer gnode ids (the feedback DFS does int()) are mapped to live instance
+        strings so structural edits can later address the real MODEP graph."""
+        self._live_flag = True
+        self.mode = 'advanced'
+        self.board_name = pb.title or 'Untitled'
+        self.board_path = None
+        self._dirty = False
+        self.in_mode = 'stereo' if (getattr(pb, 'audio_ins', 2) or 2) >= 2 else 'mono'
+        self.sel = -1
+        self.gwire_sel = None
+        self.conn = None
+        self._fly_id = -1
+        self._undo = []
+        self._redo = []
+
+        effects = list(pb.effects)
+        self._gid_by_inst = {}
+        self._inst_by_gid = {}
+        xs = [e.x for e in effects] or [0.0]
+        ys = [e.y for e in effects] or [0.0]
+        minx, maxx, miny, maxy = min(xs), max(xs), min(ys), max(ys)
+
+        def _norm(v, lo, hi, out_lo, out_hi, center):
+            # Don't stretch a near-degenerate axis (a serial chain's y differs by a few
+            # px in mod-ui coords) into the whole canvas — center it instead.
+            if hi - lo < 60:
+                return center
+            return out_lo + (v - lo) / (hi - lo) * (out_hi - out_lo)
+
+        def sx(x):
+            return _norm(x, minx, maxx, 120, CANVAS_W - 220, CANVAS_W / 2 - NODEW / 2)
+
+        def sy(y):
+            return _norm(y, miny, maxy, 44, CANVAS_H - 130, CANVAS_H / 2 - 50)
+
+        gnodes, missing = [], []
+        for i, e in enumerate(effects):
+            if e.uri not in self.by_uri:
+                # plugin installed but absent from the frozen catalog dump — skip so
+                # the editor renders the rest rather than crashing on geometry lookups.
+                missing.append(e.name or e.uri)
+                continue
+            gid = i + 1
+            inst = self._norm_inst(e.instance)
+            self._gid_by_inst[inst] = gid
+            self._inst_by_gid[gid] = inst
+            vals = {sym: port.value for sym, port in (e.ports or {}).items()}
+            gnodes.append({'id': gid, 'uri': e.uri, 'inst': inst,
+                           'x': sx(e.x), 'y': sy(e.y),
+                           'bypass': bool(e.bypassed), 'vals': vals})
+        self.gnodes = gnodes
+        if missing:
+            self.toast.emit('카탈로그 누락 %d개 생략: %s' % (len(missing), ', '.join(missing[:3])))
+
+        wires, have = [], set()
+        for c in pb.connections:
+            frm = self._port_key_from_endpoint(c.source, 'out')
+            to = self._port_key_from_endpoint(c.target, 'in')
+            if frm and to and (frm, to) not in have:
+                have.add((frm, to))
+                wires.append({'id': self._new_wid(), 'frm': frm, 'to': to})
+        self.gwires = wires
+
+        self._rebuild()
+        self.boardsChanged.emit()
 
     # ---------------------------------------------------- quick graph (round-trip)
     def _inline(self, nodes):
@@ -823,6 +960,12 @@ class EditorBridge(QObject):
     @Property(bool, notify=changed)
     def advanced(self):
         return self.mode == 'advanced'
+
+    @Property(bool, notify=changed)
+    def live(self):
+        """True when seeded from a live MODEP board (vs the standalone mock).
+        QML hides mock-only chrome (QUICK/evolve/mock board manager) when live."""
+        return self._live_flag
 
     @Property(int, notify=changed)
     def effectCount(self):

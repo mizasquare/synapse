@@ -29,6 +29,7 @@ from PyQt6.QtQuick import QQuickWindow  # noqa: F401  registers QtQuick types fo
 
 import modepctrl
 from configs import SOCKET_PATH
+from editor_bridge import EditorBridge
 from hardwares import fsledctrl
 from monitorfeed import MonitorFeed
 from presenter import Presenter
@@ -124,6 +125,10 @@ def main():
     view = QtView()
     view.show_booting()                          # splash until the MODEP host is ready
     scheduler = QtScheduler()                    # GUI thread (QtScheduler asserts this)
+    # Pedalboard EDIT screen brain. Built up front so its `editor` context property
+    # exists at QML load; the presenter is injected later (in _bring_up) once MODEP
+    # is ready, after which entering EDIT seeds it from the live board.
+    editor = EditorBridge()
 
     # Built only after the host answers (see _bring_up). Held here so aboutToQuit
     # cleanup can reach them whether or not bring-up has run yet.
@@ -137,6 +142,7 @@ def main():
         # No backend= -> Presenter uses get_backend()'s default: the real ModepController.
         presenter = Presenter(view, scheduler, hardware=hardware)
         view.set_presenter(presenter)
+        editor.set_presenter(presenter)              # EDIT screen seeds from the live board
         presenter.initiate_view()
         sock = _start_reverse_listener(scheduler, presenter)
         # Live monitor feed: passive mod-ui websocket -> output_set -> meters.
@@ -174,11 +180,16 @@ def main():
     engine = QQmlApplicationEngine()
     ctx = engine.rootContext()
     ctx.setContextProperty("view", view)
+    ctx.setContextProperty("editor", editor)
     ctx.setContextProperty("uiFont", ui_font)
     engine.load(QUrl.fromLocalFile(os.path.join(BASE, "qml", "main.qml")))
     if not engine.rootObjects():
         print("[qt_main] QML failed to load")
         return 1
+
+    # True fullscreen: on the Pi a title bar + taskbar otherwise steal ~40px and clip
+    # the bottom of the 800x480 layout. Ctrl+Q (QML Shortcut) quits the dev instance.
+    engine.rootObjects()[0].showFullScreen()
 
     # Splash is up; wait for the host off the GUI thread, then bring up the app.
     threading.Thread(target=_wait_then_bring_up, daemon=True, name="modep-wait").start()
