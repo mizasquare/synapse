@@ -95,13 +95,14 @@ class EffectPort:
 			return new_value
 
 	def set_value(self, effect_instance: str, new_value: float):
-		print('wow')
-		"""Update parameter in MODEP, and sync only if the request succeeds."""
+		"""Update parameter in MODEP, and sync only if the request succeeds.
+		Returns the backend error string (None on success) so callers can branch."""
 		error_msg = get_backend().parameter_set(effect_instance, self.symbol, new_value)
 		if error_msg is None:  # Only update if MODEP successfully applied the change
 			self.value = new_value
 		else:
 			print(f"⚠️ Failed to update {self.name} ({self.symbol}): {error_msg}")
+		return error_msg
 
 
 @dataclass

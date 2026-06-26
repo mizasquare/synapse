@@ -4,7 +4,7 @@
 > (검증 내역 = [`qt-migration-FINISHED.md`](qt-migration-FINISHED.md) 아카이브).
 > 이 문서는 그 위의 **남은 기능·신뢰성·정리·부팅·설계결정·검증**을 모은 살아있는 로드맵이다.
 > 구 `qt-migration-handoff`(후속작업) + `ui-migration-review`(시안↔현행 갭 분석)를 **흡수·통합**했다.
-> 마지막 갱신: 2026-06-27 (**페달보드 에디터 라이브 배선 착수 — M1 임베드 + M2 읽기전용 로드 완료**; 라이브 앱 풀스크린+Ctrl+Q).
+> 마지막 갱신: 2026-06-27 (**에디터 라이브 배선 M1~M3 완료** — 임베드·읽기전용로드·파라미터/바이패스 쓰기; FOCUS parameter_set 점검+throttle; patch_set은 **M3.5**로 예정).
 
 **현재 사실관계:** PyQt6+QML+eglfs 앱이 Pi에서 라이브 동작하고 autostart도 전환됨(`dfd42c6`).
 FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이브 검증됨(커밋 `1074b5e`).
@@ -60,7 +60,8 @@ EDIT 버튼은 이미 붙었으나 화면이 placeholder뿐 — 이펙트 추가
 - **라이브 앱 배선을 마일스톤으로 진행**(각 끝에서 Pi 육안검증). 진실원 = `presenter.pedalboard`; 에디터는 거기서 advanced 그래프를 시드하고 쓰기는 backend로, 리버스 채널이 자동 갱신:
   - [x] **M1 — 임베드 ✅(2026-06-27)** — `PedalboardEditor.qml` 본문을 `PedalboardEditorView.qml`(Item)로 분리 → standalone Window와 라이브 EDIT 화면이 **같은 본문** 공유. [`main.qml`](../qml/main.qml) `editScreen` = `PedalboardEditorView` Loader(`source:`, EDIT 진입마다 새로 생성), 헤더 `◄ 나가기`→`view.goOverview()`. `editor` 컨텍스트 프로퍼티를 `qt_main.py`/`qt_app.py`에 등록. **+ 라이브 앱도 `showFullScreen()`+`Ctrl+Q`**(에디터와 동일).
   - [x] **M2 — 읽기전용 라이브 로드 ✅(2026-06-27)** — `editor.enterLive()`(Loader onLoaded)가 `_seed_from_pedalboard(presenter.pedalboard)` 호출 → 실제 체인 렌더. 식별자 매핑: **정수 gnode id ↔ 라이브 인스턴스**(`_gid_by_inst`/`_inst_by_gid`; 피드백 DFS의 `int()` 제약 + 이후 backend 주소지정용). `Connection`(`bluesbreaker/out0`) → 포트키(`gid:out:audio:idx`), HW(`capture_N`/`playback_N`)→IN/OUT. 좌표 정규화·`vals`=라이브 포트값·보드명=`pb.title`. `live` 프로퍼티가 목업 크롬(BOARD/UNDO/REDO/SHUF) 숨김. ClaudeCanEdit 검증 OK.
-  - [ ] **M3 — 파라미터·바이패스 라이브 쓰기** — 인스펙터 노브/토글/enum→기존 `parameter_set`, bypass→`bypass_effect`(신규 backend API 0). 라이브 `_focus` 경로 재사용 검토(노브 검증 품질). gnode id→인스턴스로 키.
+  - [x] **M3 — 파라미터·바이패스 라이브 쓰기 ✅(2026-06-27)** — 인스펙터 노브/토글/enum/리셋→`parameter_set`, bypass→`bypass_effect`(신규 backend API 0). 에디터가 `self.presenter.view`(QtView)를 통해 써서 **FOCUS와 같은 throttle 재사용**(별도 배선 0): `_inst_of`/`_live_param`/`_live_bypass`, gnode id→라이브 인스턴스. 부수: **FOCUS parameter_set 점검(이미 동작 확인) + 정리** — `model.EffectPort.set_value` 디버그 `print('wow')` 제거·`return error_msg`, `qtview.setParameter`에 **드래그 throttle**(`(inst,sym)`별 coalesce, leading+trailing, 40ms≈25/s). ClaudeCanEdit GAIN/bypass 라이브 검증 OK.
+  - [ ] **M3.5 — patch_set(파일 로딩: NAM 모델·IR) 구현** — 제어포트(parameter_set)와 **별개 메커니즘**(속성 URI+파일경로, [[param-vs-patch-set]]). 라이브 앱 **FOCUS·에디터 둘 다 미구현**(IR/NAM 읽기전용 라벨만). 필요한 것: ① QtView `setPatch(inst,uri,path)` 슬롯 → 기존 `presenter.patch_changed`→`EffectPatch.set_patch`→`backend.patch_set`(이미 존재) ② `qtview.update_patch_display`(현재 `pass`)로 라벨 갱신 ③ 파일목록 소스(`configs.PATCH_FILE_DIR_MAP`의 디렉토리 스캔) ④ 파일 선택기 UI(FOCUS 카드 + 에디터 인스펙터). 모델은 이미 `effect.patches`(EffectPatch) 빌드, 역방향 `EffectPatchSet`도 처리됨(`apply_external_patch`). = UI + 표시갱신 + 파일목록이 핵심. (roadmap Tier 2 "패치/IR 파일 선택기"와 동일 작업 — 통합.)
   - [ ] **M4 — backend 그래프변형 4종 신규** — `modepctrl` add/remove/connect/disconnect(`parameter_set` 패턴: 동기 requests, None/에러), `Backend` ABC + `fakemodep` 구현. off-device 검증.
   - [ ] **M5 — 구조편집 + 식별자 매핑** — remove/disconnect→connect→add 순. 포트키↔jack포트명(`/graph/<inst>/<port>`) 매핑, 인스턴스 minting(add), 리버스 채널 이중적용 가드.
   - [ ] **M6 — 저장 + bake/undo** — `save_current_pedalboard`로 .ttl 영속화, bake/undo를 diff-and-apply 시퀀스로 재표현. 라운드트립 검증.
@@ -139,9 +140,10 @@ EDIT 버튼은 이미 붙었으나 화면이 placeholder뿐 — 이펙트 추가
 - [ ] **튜너** — 콤보 B+C가 `pass`([`presenter.py:402`](../presenter.py)), Qt 튜너 화면 없음.
       ★피치검출 `yin.py`가 `under_vsersion1/`로 빠져 **누락**([`tunerpopup.py:8`](../tunerpopup.py) import 실패).
       필요: YIN DSP 복원(또는 대체) + presenter 배선(탭템포 패턴) + 풀스크린 QML 튜너 화면. (오디오버퍼 파이프는 아이캔디와 공유.)
-- [ ] **패치/IR 파일 선택기** — [`qtview.py:192`](../qtview.py) `update_patch_display`가 `pass` →
-      FOCUS는 IR/NAM/cabsim을 **읽기전용**([`main.qml:297`](../qml/main.qml))으로만 표시, 기기에서 새 파일 못 부름 +
+- [ ] **패치/IR 파일 선택기 → 에디터 ★M3.5로 통합** — [`qtview.py`](../qtview.py) `update_patch_display`가 `pass` →
+      FOCUS는 IR/NAM/cabsim을 **읽기전용**([`main.qml`](../qml/main.qml))으로만 표시, 기기에서 새 파일 못 부름 +
       역방향 패치변경도 라벨 미갱신. QML 파일선택기 + `PATCH_FILE_DIR_MAP`([`configs.py`](../configs.py)) 재사용.
+      → 에디터 patch_set과 같은 작업이라 **★페달보드 에디터 섹션 M3.5**에서 FOCUS·에디터 함께 구현.
 - [x] **풋스위치 모드 스펙 재정의 ✅(2026-06-26)** — mode 0(NAVIGATE)는 **전체 페달보드 라이브러리** 순회
       (`get_all_pedalboards`, 기존 뱅크 한정→전체). mode 2(BANK)는 **RECALL 폐기 → 뱅크 페달보드를 풋스위치에 바인딩**:
       뱅크 자체를 고르는 게 아니라, 활성 뱅크(`current_bank`, 현재 0 고정; **뱅크 전환·편집은 추후 터치UI** placeholder)의

@@ -17,7 +17,7 @@ Visual tokens (colors/fonts) live in QML; this bridge passes data + flags only.
 import os
 import random
 
-from PyQt6.QtCore import QObject, pyqtProperty as Property, pyqtSignal as Signal, pyqtSlot as Slot
+from PyQt6.QtCore import QObject, QTimer, pyqtProperty as Property, pyqtSignal as Signal, pyqtSlot as Slot
 
 # SAVE AS naming (tap a stage term -> "term-quirkysuffix", e.g. "Drive-cupcake").
 # The stage terms are the names you actually want (song section / tone); the random
@@ -73,6 +73,8 @@ class QtView(QObject):
     monitorUpdated = Signal(str, float, float, str)  # (symbol, norm, value, display): per-meter live update
     toastRequested = Signal(str)                     # transient on-screen message
 
+    PARAM_THROTTLE_MS = 40   # max ~25 host writes/s during a knob drag
+
     def __init__(self):
         super().__init__()
         self.presenter = None
@@ -87,6 +89,16 @@ class QtView(QObject):
         self._screen = "overview"   # "booting" | "overview" | "focus" | "taptempo" | "edit"
         self._focus = {}            # FOCUS payload for QML
         self._tap = {}              # TAP TEMPO payload for QML ({bpb, klass})
+
+        # Parameter-write throttle: a knob drag fires setParameter on every
+        # positionChanged (~60/s), each a blocking HTTP POST on the GUI thread.
+        # Coalesce per (instance,symbol) to the latest value and flush at most
+        # every PARAM_THROTTLE_MS — leading edge (first move is immediate) +
+        # trailing (the release value always lands). Shared by FOCUS + editor.
+        self._pending_params = {}   # (instance, symbol) -> latest value
+        self._param_timer = QTimer(self)
+        self._param_timer.setInterval(self.PARAM_THROTTLE_MS)
+        self._param_timer.timeout.connect(self._flush_params)
 
     def set_presenter(self, presenter):
         self.presenter = presenter
@@ -202,8 +214,24 @@ class QtView(QObject):
 
     @Slot(str, str, float)
     def setParameter(self, instance, symbol, value):
-        """Knob drag -> presenter applies it (fake backend = local state)."""
-        if self.presenter:
+        """Knob drag -> presenter applies it (coalesced/throttled — see _flush_params).
+        Keeps only the latest value per (instance,symbol); sends the first move
+        immediately, then at most every PARAM_THROTTLE_MS, and the final value on
+        release (trailing flush)."""
+        self._pending_params[(instance, symbol)] = value
+        if not self._param_timer.isActive():
+            self._param_timer.start()
+            self._flush_params()      # leading edge: first move is immediate
+
+    def _flush_params(self):
+        if not self._pending_params:
+            self._param_timer.stop()  # idle -> stop ticking until the next drag
+            return
+        pending = self._pending_params
+        self._pending_params = {}
+        if not self.presenter:
+            return
+        for (instance, symbol), value in pending.items():
             self.presenter.parameter_changed(instance, symbol, value)
 
     @Slot(str, bool)

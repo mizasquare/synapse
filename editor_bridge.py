@@ -241,6 +241,29 @@ class EditorBridge(QObject):
             return
         self._seed_from_pedalboard(pb)
 
+    # ---- live host writes (no-op in the standalone mock) ----------------------
+    def _inst_of(self, nid):
+        """Live MODEP instance string for a gnode id (None in mock / unknown)."""
+        if not self._live_flag:
+            return None
+        n = self._gnode(nid)
+        return n.get('inst') if n else None
+
+    def _live_view(self):
+        """The QtView write surface (reuses its throttle). None in the mock."""
+        return getattr(self.presenter, 'view', None) if self.presenter else None
+
+    def _live_param(self, nid, sym, value):
+        """Push a control-port write to the host via QtView.setParameter (throttled)."""
+        inst, view = self._inst_of(nid), self._live_view()
+        if inst and view:
+            view.setParameter(inst, sym, float(value))
+
+    def _live_bypass(self, nid, bypassed):
+        inst, view = self._inst_of(nid), self._live_view()
+        if inst and view:
+            view.toggleBypass(inst, bool(bypassed))
+
     @staticmethod
     def _audio_idx_from_symbol(sym, count):
         """Map a real audio port symbol to its 0-based channel index. Single-port
@@ -1298,6 +1321,9 @@ class EditorBridge(QObject):
         p = self.by_uri[n['uri']]
         n['vals'] = {c['sym']: c['def'] for c in p.get('ctl', []) if c['w'] != 'bypass'}
         self._touch()
+        for c in p.get('ctl', []):
+            if c['w'] != 'bypass':
+                self._live_param(self.sel, c['sym'], c['def'])
         self._build_inspector()
         self.changed.emit()
 
@@ -1312,6 +1338,7 @@ class EditorBridge(QObject):
             return
         n['vals'][sym] = c['def']
         self._touch()
+        self._live_param(self.sel, sym, c['def'])
         self._build_inspector()
         self.changed.emit()
 
@@ -1336,6 +1363,7 @@ class EditorBridge(QObject):
         if n:
             n['bypass'] = not n['bypass']
             self._touch()
+            self._live_bypass(nid, n['bypass'])
             self._rebuild()
 
     @Slot(str, float, result=str)
@@ -1355,6 +1383,7 @@ class EditorBridge(QObject):
             v = round(v)
         n['vals'][sym] = v
         self._touch()
+        self._live_param(self.sel, sym, v)   # throttled host write (live mode only)
         return fmt(c, v)
 
     @Slot()
@@ -1371,6 +1400,7 @@ class EditorBridge(QObject):
         cur = n['vals'].get(sym, 0)
         n['vals'][sym] = 0 if cur >= 0.5 else 1
         self._touch()
+        self._live_param(self.sel, sym, n['vals'][sym])
         self._build_inspector()
         self.changed.emit()
 
@@ -1388,6 +1418,7 @@ class EditorBridge(QObject):
         i = (i + 1) % cnt
         n['vals'][sym] = (c['min'] or 0) + i
         self._touch()
+        self._live_param(self.sel, sym, n['vals'][sym])
         self._build_inspector()
         self.changed.emit()
 
