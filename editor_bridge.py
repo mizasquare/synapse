@@ -1,30 +1,37 @@
 """Pedalboard Editor mock — Python brain exposed to QML as ``editor``.
 
-A PyQt6 port of the Claude Design "Concept A" (free-canvas auto-routing) pedalboard
-maker, plus the five additions we agreed on:
+A PyQt6 port of the Claude Design "Pedalboard Editor" mock. Two modes share one canvas:
 
-  1. Graph model        — the connection graph (arcs) is the source of truth, not x,y.
-  2. layout_from_graph  — on open, positions are DERIVED from the graph (stored x,y ignored).
-  3. round-trip guard    — arcs_from_layout(layout_from_graph(g)) == g  decides quick-expressibility.
-  4. demo scenarios      — (a) "reopen a web-rearranged board": scramble x,y, keep arcs, re-derive
-                            the SAME chain (routing survives);  (b) a parallel split-merge board that
-                            is NOT quick-expressible.
-  5. advanced viewer     — when the guard fails, jump straight to a read-only ADVANCED view (no
-                            auto-routing) that renders the graph with its stored x,y.
+  QUICK    — free-canvas auto-routing (Concept A): drop effects, the sort-by-x router
+             builds a serial trunk with vertical taps/sources and 1↔2 channel adapter chips.
+  ADVANCED — manual port-level routing: every node exposes its real ports (audio L/R,
+             MIDI, CV); connect by touching a node EDGE → radial port menu → touching the
+             target edge. Supports fan/merge (⊕), feedback (z⁻¹, DFS back-edge), per-cable
+             delete, MIDI/CV cables.
 
-Mirrors the repo's qtview.py pattern: one QObject, data + flags as notified properties, QML owns
-the visual tokens. Routing math is a faithful port of the design's pb_logic.js (sort-by-x trunk,
-vertical taps/sources, 1↔2 channel negotiation chips).
+BAKE (evolve): drag the evolve slider in QUICK → the board is "baked" into ADVANCED as
+explicit cables (serial fx chain + taps/sources). One-way: you cannot return to QUICK.
+
+History: structural edits push an undo snapshot (cap 30); undo/redo restore it. Bake and
+New clear history.
+
+Mirrors the repo's qtview.py pattern: one QObject, data + flags as notified properties, QML
+owns the visual tokens. Routing math is a faithful port of the design's pb_logic.
+
+Not wired to MODEP — a UX prototype fed by resources/effects-catalog.json.
 """
 
 import json
 import math
 import os
 import random
+import time
 
-from PyQt6.QtCore import QObject, pyqtProperty as Property, pyqtSignal as Signal, pyqtSlot as Slot
+from PyQt6.QtCore import (QObject, QTimer, pyqtProperty as Property,
+                          pyqtSignal as Signal, pyqtSlot as Slot)
 
 BASE = os.path.dirname(os.path.abspath(__file__))
+MOCK_DIR = os.path.join(BASE, 'mock-pedalboards')   # mock persistence (UX prototype, not real MODEP)
 
 # bucket -> (color, 3-letter abbreviation) — verbatim from the design's BUCKET map
 BUCKET = {
@@ -36,13 +43,45 @@ BUCKET = {
     'MIDI': ('#e8694a', 'MID'),
 }
 
+PORTCOL = {'audio': '#3b6fe0', 'midi': '#e8694a', 'cv': '#b58af0'}
+
+# SAVE AS naming — mirrors qtview's snapshot suggester: a guitarist stage term +
+# '-' + a random quirky suffix (e.g. "Drive-cupcake"). Same word pool file.
+_BOARD_TERMS = ["Clean", "Crunch", "Drive", "Lead", "Rhythm", "Solo",
+                "Verse", "Chorus", "Bridge", "Boost", "Ambient", "Heavy"]
+_WORDS_PATH = os.path.join(BASE, "resources", "snapshot_words.txt")
+_WORDS_FALLBACK = ["chainsaw", "cupcake", "walrus", "thunder", "pickle",
+                   "comet", "goblin", "biscuit", "tornado", "noodle"]
+_words_cache = None
+
+
+def _load_words():
+    global _words_cache
+    if _words_cache is None:
+        try:
+            with open(_WORDS_PATH, encoding='utf-8') as fh:
+                _words_cache = [w.strip() for w in fh
+                                if w.strip() and not w.lstrip().startswith('#')] or _WORDS_FALLBACK
+        except OSError:
+            _words_cache = _WORDS_FALLBACK
+    return _words_cache
+
 NODEW = 124
-HALF = 27               # node visual half-height (node box ~54px tall)
+HALF = 27               # quick node visual half-height (node box ~54px tall)
 CANVAS_W = 734          # 800 - 66 (rail) ; MUST match the QML canvas width
 CANVAS_H = 446          # 480 - 34 (header)
 IN_X = 36
 OUT_X = CANVAS_W - 36
 MID_Y = CANVAS_H / 2
+
+# advanced port-card geometry (port dots stack down the card edges)
+HH = 24                 # card header height before ports start
+PTOP = 8                # padding above/below the port stack
+PR = 18                 # per-port row height
+PH = 13                 # port dot diameter
+RR = 74                 # radial menu radius
+IN_PX = 54              # HW IN port column x
+OUT_PX = CANVAS_W - 54  # HW OUT port column x
 
 
 def bcol(bucket):
@@ -58,7 +97,7 @@ def pin_lbl(n):
 
 
 def fmt(c, v):
-    """Format a control value for display — port of pb_logic.js fmt()."""
+    """Format a control value for display — port of pb_logic fmt()."""
     if v is None:
         v = c['def']
     if c['w'] == 'enum':
@@ -79,8 +118,11 @@ def fmt(c, v):
 
 class EditorBridge(QObject):
     changed = Signal()        # full rebuild (rail / fly / nodes / inspector / status / mode / advanced)
-    wiresChanged = Signal()   # wires + chips only (live during node drag — does not recreate nodes)
+    wiresChanged = Signal()   # wires + chips/ports only (live during node drag — no node recreate)
     toast = Signal(str)       # transient message for demo feedback
+    evolveFlash = Signal()    # tell QML to play the EVOLVING animation
+    spawnFly = Signal(str, str, float, float, float, float)  # name,color,fromX,fromY,toX,toY
+    boardsChanged = Signal()  # saved-board list / current name / dirty changed
 
     def __init__(self, catalog_path=None):
         super().__init__()
@@ -91,24 +133,35 @@ class EditorBridge(QObject):
         self.by_name = {p['name'].lower(): p['uri'] for p in self.cat['plugins']}
 
         self._uid = 0
+        self._wid = 0
         self.mode = 'quick'           # 'quick' | 'advanced'
         self.in_mode = 'mono'         # 'mono' | 'stereo'
         self.out_adapt = 'auto'
         self.sel = -1
         self.fly_bucket = None
-        self.nodes = []               # quick-mode nodes: {id,uri,x,y,bypass,vals,inAdapt,mergeAdapt}
-        self.adv_badge = ''
-        self.adv_nodes = []           # advanced viewer: read-only general-graph nodes
-        self.adv_wires = []
+        self.nodes = []               # quick nodes: {id,uri,x,y,bypass,vals,inAdapt,mergeAdapt}
+        self.gnodes = []              # advanced nodes: {id,uri,x,y,bypass,vals}
+        self.gwires = []              # advanced cables: {id, frm, to}  port keys "nid:side:type:idx"
+        self.gwire_sel = None         # selected cable id
+        self.conn = None              # radial connection state
+        self._evolving_flag = False
+        self.evolve_prog = 0.0
+        self._fly_id = -1             # node currently flying in (hidden until it lands)
+        self._undo = []
+        self._redo = []
+        self.board_name = 'Untitled'
+        self.board_path = None        # file this board was saved to/loaded from
+        self._dirty = False
+        self._boards = []             # cached saved-board list
 
         # seed a small serial chain so the canvas isn't empty on first run
         for nm in ('bluesbreaker', 'GxCompressor', 'Bollie Delay', 'Dragonfly Hall Reverb'):
             uri = self.by_name.get(nm.lower())
             if uri:
                 self._add(uri)
-        self._relayout_quick()        # canonical layout from the (implicit) chain order
+        self._relayout_quick()
 
-        # view caches (filled by _rebuild)
+        # view caches
         self._rail = []
         self._fly = []
         self._wires = []
@@ -116,19 +169,38 @@ class EditorBridge(QObject):
         self._nodes_view = []
         self._knobs = []
         self._status = ''
+        # advanced caches
+        self._g_nodes = []
+        self._g_ports = []
+        self._g_wires = []
+        self._g_merges = []
+        self._g_fbtags = []
+        self._g_hw = []
+        self._hw_edges = []
+        self._rad_items = []
+        self._g_pos = {}
         self._rebuild()
+        self._refresh_boards()
 
     # ---------------------------------------------------------------- helpers
     def _new_id(self):
         self._uid += 1
         return self._uid
 
+    def _new_wid(self):
+        self._wid += 1
+        return 'w%d' % self._wid
+
     def _add(self, uri, x=None, y=None):
         p = self.by_uri[uri]
+        vals = {}
+        for c in p.get('ctl', []):
+            if c['w'] != 'bypass':
+                vals[c['sym']] = c['def']
         node = {
             'id': self._new_id(), 'uri': uri,
             'x': x if x is not None else IN_X + 90, 'y': y if y is not None else MID_Y - HALF,
-            'bypass': False, 'vals': {}, 'inAdapt': 'auto', 'mergeAdapt': 'auto',
+            'bypass': False, 'vals': vals, 'inAdapt': 'auto', 'mergeAdapt': 'auto',
         }
         self.nodes.append(node)
         return node
@@ -137,24 +209,26 @@ class EditorBridge(QObject):
         for n in self.nodes:
             if n['id'] == nid:
                 return n
+        for n in self.gnodes:
+            if n['id'] == nid:
+                return n
         return None
 
-    # ---------------------------------------------------- ADDITION 1+2+3: graph
+    def _gnode(self, nid):
+        for n in self.gnodes:
+            if str(n['id']) == str(nid):
+                return n
+        return None
+
+    # ---------------------------------------------------- quick graph (round-trip)
     def _inline(self, nodes):
-        """Inline fx = audio-in AND audio-out (form the serial trunk)."""
         return [n for n in nodes if self.by_uri[n['uri']]['ai'] > 0 and self.by_uri[n['uri']]['ao'] > 0]
 
     def arcs_from_layout(self, nodes):
-        """The canonical quick-graph the auto-router PRODUCES from a layout.
-
-        Returns a hashable structure: (trunk_uri_order, frozenset of (branch_uri, seg_index, role)).
-        This is exactly what the sort-by-x router derives — so it is what gets persisted as arcs.
-        """
         sorted_n = sorted(nodes, key=lambda n: n['x'])
         inline = [n for n in sorted_n if n in self._inline(nodes)]
         trunk = tuple(n['uri'] for n in inline)
-        # branch attaches to the trunk segment under its x; seg count = len(inline)+1 (IN..fx..OUT)
-        seg_x = [IN_X] + [n['x'] + NODEW for n in inline]  # right edge of each trunk producer
+        seg_x = [IN_X] + [n['x'] + NODEW for n in inline]
         branches = []
         for n in sorted_n:
             if n in inline:
@@ -170,13 +244,8 @@ class EditorBridge(QObject):
         return (trunk, frozenset(branches))
 
     def layout_from_graph(self, qgraph):
-        """ADDITION 2: derive positions FROM the graph, ignoring any stored x,y.
-
-        Inline fx spread evenly left->right in trunk order; branches sit above (source)
-        or below (tap) the line at their segment. This is what quick-mode shows on open.
-        """
         trunk, branches = qgraph
-        out = []  # list of (uri, x, y, is_branch)
+        out = []
         n = len(trunk)
         gap = (OUT_X - IN_X) / (n + 1) if n else (OUT_X - IN_X)
         seg_mid_x = []
@@ -193,15 +262,12 @@ class EditorBridge(QObject):
         return out
 
     def round_trip_ok(self, nodes):
-        """ADDITION 3: a layout is quick-safe iff re-deriving it from its own graph
-        reproduces the same graph. True by construction for quick-built boards."""
         g = self.arcs_from_layout(nodes)
         relaid = self.layout_from_graph(g)
         fake = [{'id': i, 'uri': u, 'x': x, 'y': y} for i, (u, x, y, _b) in enumerate(relaid)]
         return self.arcs_from_layout(fake) == g
 
     def _apply_layout(self, graph):
-        """Position the current nodes from a graph (matching by uri occurrence)."""
         relaid = self.layout_from_graph(graph)
         by_uri_q = {}
         for n in self.nodes:
@@ -215,33 +281,11 @@ class EditorBridge(QObject):
                 used[uri] = q + 1
 
     def _relayout_quick(self, graph=None):
-        """Open behavior: derive canonical positions FROM the graph.
-
-        With graph=None the graph is read off the current (still-valid) coords — a no-op
-        re-tidy. The scramble demo passes the SAVED graph so the re-open ignores the
-        (web-UI-mangled) coords entirely — that is the whole point of the decoupling."""
         self._apply_layout(graph if graph is not None else self.arcs_from_layout(self.nodes))
 
-    # ------------------------------------------------ ADDITION 4+5: general graph
-    @staticmethod
-    def _is_quick_expressible(board):
-        """Can a general arc-board be expressed as quick-mode's single trunk + pure taps/sources?
-
-        board = {'nodes':[{id,uri,ai,ao,...}], 'arcs':[(fromId,toId)]}  (IN/OUT are terminals).
-        Fails if any inline fx branches/merges among fx (the parallel case).
-        """
-        fx = {n['id'] for n in board['nodes'] if n['ai'] > 0 and n['ao'] > 0}
-        succ, pred = {i: 0 for i in fx}, {i: 0 for i in fx}
-        for a, b in board['arcs']:
-            if a in fx and b in fx:
-                succ[a] += 1
-                pred[b] += 1
-        # single chain: no fx with >1 fx-successor or >1 fx-predecessor
-        return all(succ[i] <= 1 for i in fx) and all(pred[i] <= 1 for i in fx)
-
-    # ============================================================ view rebuild
+    # ============================================================ QUICK routing
     def _route(self, nodes):
-        """Auto-routing — faithful port of pb_logic.js Concept A. Returns (wires, chips, roles)."""
+        """Auto-routing — faithful port of the design. Returns (wires, chips, roles)."""
         sorted_n = sorted(nodes, key=lambda n: n['x'])
         in_ch = 2 if self.in_mode == 'stereo' else 1
 
@@ -291,7 +335,6 @@ class EditorBridge(QObject):
             segments.append({'x1': trunk_x, 'y1': trunk_y, 'x2': in_p[0], 'y2': in_p[1], 'ch': trunk_ch})
             roles[n['id']] = 'fx'
             trunk_ch, trunk_x, trunk_y = ao, out_p[0], out_p[1]
-        # trunk -> HW OUT (always stereo)
         oa = adapt(trunk_ch, 2, self.out_adapt)
         wires.append(mkwire(trunk_x, trunk_y, OUT_X, MID_Y, '#d99a4e', trunk_ch == 2))
         if oa:
@@ -320,10 +363,10 @@ class EditorBridge(QObject):
             line_above = mp[1] <= n['y'] + HALF
             conn_y = n['y'] if line_above else n['y'] + 2 * HALF
             conn_x = cx
-            if ao == 0:  # TAP: line -> meter
+            if ao == 0:
                 wires.append(vwire(mp[0], mp[1], conn_x, conn_y, '#2c3648' if n['bypass'] else '#5a6270'))
                 roles[n['id']] = 'tap'
-            else:        # SOURCE: meter -> line
+            else:
                 a = adapt(ao, mp[2], n.get('mergeAdapt', 'auto'))
                 wires.append(vwire(conn_x, conn_y, mp[0], mp[1], '#2c3648' if n['bypass'] else '#5fd0a0', ao == 2))
                 if a:
@@ -361,9 +404,202 @@ class EditorBridge(QObject):
                 'glow': 'transparent' if n['bypass'] else bcol(b), 'bypass': n['bypass'], 'sel': sel,
                 'inPins': 0 if is_branch else p['ai'], 'outPins': 0 if is_branch else p['ao'],
                 'badge': badge, 'badgeColor': badge_color, 'hasBadge': bool(badge),
+                'flying': n['id'] == self._fly_id,
             })
         return out
 
+    # ===================================================== ADVANCED port graph
+    def _audio_outs(self, nid):
+        if nid == 'IN':
+            return ['IN:out:audio:%d' % i for i in range(2 if self.in_mode == 'stereo' else 1)]
+        if nid == 'OUT':
+            return []
+        n = self._gnode(nid)
+        if not n:
+            return []
+        return ['%s:out:audio:%d' % (nid, i) for i in range(self.by_uri[n['uri']]['ao'])]
+
+    def _audio_ins(self, nid):
+        if nid == 'OUT':
+            return ['OUT:in:audio:0', 'OUT:in:audio:1']
+        if nid == 'IN':
+            return []
+        n = self._gnode(nid)
+        if not n:
+            return []
+        return ['%s:in:audio:%d' % (nid, i) for i in range(self.by_uri[n['uri']]['ai'])]
+
+    def _connect_audio(self, from_id, to_id, out):
+        fo, ti = self._audio_outs(from_id), self._audio_ins(to_id)
+        if not fo or not ti:
+            return
+        if len(fo) == 1 and len(ti) > 1:
+            for t in ti:
+                out.append({'id': self._new_wid(), 'frm': fo[0], 'to': t})
+        elif len(fo) > 1 and len(ti) == 1:
+            for f in fo:
+                out.append({'id': self._new_wid(), 'frm': f, 'to': ti[0]})
+        else:
+            for i in range(min(len(fo), len(ti))):
+                out.append({'id': self._new_wid(), 'frm': fo[i], 'to': ti[i]})
+
+    def _port_counts(self, nid, side):
+        if nid == 'IN':
+            return {'a': (2 if self.in_mode == 'stereo' else 1), 'm': 1, 'cv': 0} if side == 'out' else {'a': 0, 'm': 0, 'cv': 0}
+        if nid == 'OUT':
+            return {'a': 2, 'm': 1, 'cv': 0} if side == 'in' else {'a': 0, 'm': 0, 'cv': 0}
+        n = self._gnode(nid)
+        if not n:
+            return {'a': 0, 'm': 0, 'cv': 0}
+        p = self.by_uri[n['uri']]
+        outs = side == 'out'
+        cv = p['cv'] if (p['cv'] and ((outs and p['bucket'] == 'CV') or (not outs and p['bucket'] != 'CV'))) else 0
+        return {'a': p['ao'] if outs else p['ai'], 'm': p['mo'] if outs else p['mi'], 'cv': cv}
+
+    def _opts_for(self, nid, side):
+        c = self._port_counts(nid, side)
+        o = []
+        if c['a'] == 1:
+            o.append({'label': 'AUDIO', 'type': 'audio', 'idx': [0]})
+        elif c['a'] >= 2:
+            o += [{'label': 'L', 'type': 'audio', 'idx': [0]},
+                  {'label': 'R', 'type': 'audio', 'idx': [1]},
+                  {'label': 'BOTH', 'type': 'audio', 'idx': [0, 1]}]
+        if c['m'] > 0:
+            o.append({'label': 'MIDI', 'type': 'midi', 'idx': [0]})
+        if c['cv'] > 0:
+            o.append({'label': 'CV', 'type': 'cv', 'idx': [0]})
+        return o
+
+    def _opt_angle(self, side, i, n):
+        base = 0.0 if side == 'out' else math.pi
+        spread = math.pi * 0.62
+        off = 0.0 if n <= 1 else (i - (n - 1) / 2) * (spread / (n - 1))
+        return base + off
+
+    def _clamp_c(self, cx, cy):
+        return (max(86, min(CANVAS_W - 86, cx)), max(76, min(CANVAS_H - 76, cy)))
+
+    def _ports_of(self, gnode):
+        p = self.by_uri[gnode['uri']]
+        ins, outs = [], []
+        for i in range(p['ai']):
+            ins.append({'type': 'audio', 'ti': i, 'ch': ('R' if i else 'L') if p['ai'] > 1 else ''})
+        for i in range(p['mi']):
+            ins.append({'type': 'midi', 'ti': i, 'ch': ''})
+        if p['cv'] and p['bucket'] != 'CV':
+            for i in range(p['cv']):
+                ins.append({'type': 'cv', 'ti': i, 'ch': ''})
+        for i in range(p['ao']):
+            outs.append({'type': 'audio', 'ti': i, 'ch': ('R' if i else 'L') if p['ao'] > 1 else ''})
+        for i in range(p['mo']):
+            outs.append({'type': 'midi', 'ti': i, 'ch': ''})
+        if p['cv'] and p['bucket'] == 'CV':
+            for i in range(p['cv']):
+                outs.append({'type': 'cv', 'ti': i, 'ch': ''})
+        return ins, outs
+
+    def _card_h(self, gnode):
+        ins, outs = self._ports_of(gnode)
+        rows = max(len(ins), len(outs), 1)
+        return HH + PTOP + rows * PR + PTOP
+
+    def _free_spot(self, mode, uri):
+        """Top-left position for a new node: the empty grid slot nearest the canvas
+        center that does not overlap an existing node (so spawns are obvious)."""
+        w = NODEW
+        h = self._card_h({'uri': uri}) if mode == 'advanced' else 54
+        nodes = self.gnodes if mode == 'advanced' else self.nodes
+        cx, cy = CANVAS_W / 2, CANVAS_H / 2
+        minx, maxx = 72, CANVAS_W - w - 60
+        miny, maxy = 8, CANVAS_H - h - 8
+
+        def overlaps(x, y):
+            for n in nodes:
+                nh = (self._card_h(n) if mode == 'advanced' else 54)
+                if (abs((x + w / 2) - (n['x'] + w / 2)) < w + 16
+                        and abs((y + h / 2) - (n['y'] + nh / 2)) < (h + nh) / 2 + 16):
+                    return True
+            return False
+
+        step = 24
+        cands = []
+        gy = miny
+        while gy <= maxy:
+            gx = minx
+            while gx <= maxx:
+                cands.append((gx, gy))
+                gx += step
+            gy += step
+        cands.sort(key=lambda p: (p[0] + w / 2 - cx) ** 2 + (p[1] + h / 2 - cy) ** 2)
+        for gx, gy in cands:
+            if not overlaps(gx, gy):
+                return (float(gx), float(gy))
+        return (float(cx - w / 2), float(cy - h / 2))
+
+    # ------------------------------------------------------------- bake / evolve
+    def _bake_from_quick(self):
+        src = sorted(self.nodes, key=lambda n: n['x'])
+        gnodes = [{'id': n['id'], 'uri': n['uri'], 'x': n['x'], 'y': n['y'],
+                   'bypass': n['bypass'], 'vals': dict(n['vals'])} for n in src]
+        self.gnodes = gnodes
+        wires = []
+        fx = [n for n in gnodes if self.by_uri[n['uri']]['ai'] > 0 and self.by_uri[n['uri']]['ao'] > 0]
+        prev = 'IN'
+        for n in fx:
+            self._connect_audio(prev, n['id'], wires)
+            prev = n['id']
+        if fx:
+            self._connect_audio(prev, 'OUT', wires)
+        for n in gnodes:
+            p = self.by_uri[n['uri']]
+            if p['ai'] > 0 and p['ao'] > 0:
+                continue
+            if p['ao'] == 0 and p['ai'] > 0:           # tap: feed from nearest prior fx
+                prior = [f for f in fx if f['x'] < n['x']]
+                self._connect_audio(prior[-1]['id'] if prior else 'IN', n['id'], wires)
+            elif p['ai'] == 0 and p['ao'] > 0:         # source: into OUT
+                self._connect_audio(n['id'], 'OUT', wires)
+        self.gwires = wires
+        self.mode = 'advanced'
+        self.sel = -1
+        self.conn = None
+        self._dirty = True
+
+    def _do_evolve(self):
+        self._bake_from_quick()
+        self._evolving_flag = False
+        self.evolve_prog = 0.0
+        self._undo = []
+        self._redo = []
+        self._rebuild()
+
+    # ----------------------------------------------------------------- undo/redo
+    def _snapshot(self):
+        return {
+            'mode': self.mode, 'in_mode': self.in_mode,
+            'nodes': [dict(n, vals=dict(n['vals'])) for n in self.nodes],
+            'gnodes': [dict(n, vals=dict(n['vals'])) for n in self.gnodes],
+            'gwires': [dict(w) for w in self.gwires],
+        }
+
+    def _push_hist(self):
+        self._undo.append(self._snapshot())
+        self._undo = self._undo[-30:]
+        self._redo = []
+        self._touch()
+
+    def _restore(self, snap):
+        self.mode = snap['mode']
+        self.in_mode = snap['in_mode']
+        self.nodes = [dict(n, vals=dict(n['vals'])) for n in snap['nodes']]
+        self.gnodes = [dict(n, vals=dict(n['vals'])) for n in snap['gnodes']]
+        self.gwires = [dict(w) for w in snap['gwires']]
+        self.sel = -1
+        self.gwire_sel = None
+        self.conn = None
+
+    # ============================================================ inspector
     def _build_inspector(self):
         self._knobs = []
         if self.sel < 0:
@@ -372,7 +608,7 @@ class EditorBridge(QObject):
         if not n:
             return
         p = self.by_uri[n['uri']]
-        for c in [c for c in p.get('ctl', []) if c['w'] != 'bypass'][:8]:
+        for c in [c for c in p.get('ctl', []) if c['w'] != 'bypass']:   # all params (scrollable)
             v = n['vals'].get(c['sym'], c['def'])
             kind = 'toggle' if c['w'] == 'toggle' else ('enum' if c['w'] in ('enum', 'button') else 'dial')
             norm = (v - c['min']) / (c['max'] - c['min']) if c['max'] > c['min'] else 0
@@ -381,17 +617,184 @@ class EditorBridge(QObject):
                 'norm': max(0.0, min(1.0, norm)), 'on': v >= 0.5, 'sym': c['sym'],
             })
 
+    # ============================================================ view rebuild
     def _rebuild_wires(self):
-        if self.mode != 'quick':
-            return
-        self._wires, self._chips, self._roles = self._route(self.nodes)
+        if self.mode == 'quick':
+            self._wires, self._chips, self._roles = self._route(self.nodes)
+        else:
+            self._rebuild_adv_geometry()
         self.wiresChanged.emit()
 
+    def _rebuild_adv_geometry(self):
+        """Compute ports/wires/merges/feedback/radial for advanced mode. Cheap enough to
+        recompute on every node-drag move (ports/wires must follow the node)."""
+        gw, gh, g_mid = CANVAS_W, CANVAS_H, CANVAS_H / 2
+        pos = {}
+        ports = []
+
+        def port_dot(x, y, col, ch, dim):
+            return {'x': x, 'y': y, 'color': '#3a4252' if dim else col, 'ch': ch}
+
+        for node in self.gnodes:
+            ins, outs = self._ports_of(node)
+
+            def place(arr, side):
+                for li, pt in enumerate(arr):
+                    x = node['x'] if side == 'in' else node['x'] + NODEW
+                    y = node['y'] + HH + PTOP + li * PR + PH / 2
+                    pos['%s:%s:%s:%d' % (node['id'], side, pt['type'], pt['ti'])] = (x, y, pt['type'])
+                    ports.append(port_dot(x, y, PORTCOL[pt['type']], pt['ch'], node['bypass']))
+            place(ins, 'in')
+            place(outs, 'out')
+
+        # HW IN / OUT port columns
+        in_p = ([{'type': 'audio', 'ti': 0, 'ch': 'L'}, {'type': 'audio', 'ti': 1, 'ch': 'R'}]
+                if self.in_mode == 'stereo' else [{'type': 'audio', 'ti': 0, 'ch': ''}])
+        in_p.append({'type': 'midi', 'ti': 0, 'ch': ''})
+        out_p = [{'type': 'audio', 'ti': 0, 'ch': 'L'}, {'type': 'audio', 'ti': 1, 'ch': 'R'},
+                 {'type': 'midi', 'ti': 0, 'ch': ''}]
+
+        def stack(arr, x, node):
+            total = len(arr) * PR
+            start_y = g_mid - total / 2 + PH / 2
+            for li, pt in enumerate(arr):
+                y = start_y + li * PR
+                pos['%s:%s:%s:%d' % (node, 'out' if node == 'IN' else 'in', pt['type'], pt['ti'])] = (x, y, pt['type'])
+                ports.append(port_dot(x, y, PORTCOL[pt['type']], pt['ch'], False))
+        stack(in_p, IN_PX, 'IN')
+        stack(out_p, OUT_PX, 'OUT')
+        in_tot, out_tot = len(in_p) * PR, len(out_p) * PR
+        self._g_hw = [
+            {'x': 18, 'y': g_mid - in_tot / 2 - 6, 'w': 30, 'h': in_tot + 12,
+             'label': 'IN', 'sub': 'ST' if self.in_mode == 'stereo' else 'M', 'color': '#5fd0a0'},
+            {'x': gw - 48, 'y': g_mid - out_tot / 2 - 6, 'w': 30, 'h': out_tot + 12,
+             'label': 'OUT', 'sub': 'ST', 'color': '#d99a4e'},
+        ]
+
+        # candidate-edge highlighting while choosing a target
+        cn = self.conn
+        need_side = (cn['srcSide'] == 'out' and 'in' or 'out') if (cn and cn.get('stage') == 'target') else None
+        cand_type = cn['srcType'] if (cn and cn.get('stage') == 'target') else None
+
+        def edge_glow(nid, side):
+            if need_side != side:
+                return False
+            if str(nid) == str(cn.get('srcNode')):
+                return False
+            return any(o['type'] == cand_type for o in self._opts_for(nid, side))
+
+        self._hw_edges = [
+            {'node': 'IN', 'side': 'out', 'x': 46, 'y': g_mid - in_tot / 2 - 8, 'w': 18, 'h': in_tot + 16,
+             'glow': edge_glow('IN', 'out')},
+            {'node': 'OUT', 'side': 'in', 'x': gw - 66, 'y': g_mid - out_tot / 2 - 8, 'w': 18, 'h': out_tot + 16,
+             'glow': edge_glow('OUT', 'in')},
+        ]
+
+        # feedback detection: DFS back-edge among fx nodes (HW excluded)
+        adj = {n['id']: [] for n in self.gnodes}
+        for w in self.gwires:
+            f, t = w['frm'].split(':')[0], w['to'].split(':')[0]
+            if f not in ('IN', 'OUT') and t not in ('IN', 'OUT') and int(f) in adj:
+                adj[int(f)].append(int(t))
+        fb_pairs, col = set(), {}
+
+        def dfs(u):
+            col[u] = 1
+            for v in adj.get(u, []):
+                if col.get(v) == 1:
+                    fb_pairs.add('%d>%d' % (u, v))
+                elif not col.get(v):
+                    dfs(v)
+            col[u] = 2
+        for n in self.gnodes:
+            if not col.get(n['id']):
+                dfs(n['id'])
+
+        wires, merges, fbtags = [], [], set()
+        mid_of, in_count = {}, {}
+        out_fbtags = []
+        for w in self.gwires:
+            a, b = pos.get(w['frm']), pos.get(w['to'])
+            if not a or not b:
+                continue
+            in_count[w['to']] = in_count.get(w['to'], 0) + 1
+            from_id, to_id = w['frm'].split(':')[0], w['to'].split(':')[0]
+            fb = ('%s>%s' % (from_id, to_id)) in fb_pairs
+            fn = self._gnode(from_id)
+            dim = fn['bypass'] if fn else False
+            is_sel = self.gwire_sel == w['id']
+            if fb:
+                d = 'M %g %g C %g %g, %g %g, %g %g' % (a[0], a[1], a[0] + 70, a[1] + 90, b[0] - 70, b[1] + 90, b[0], b[1])
+            else:
+                dx = max(40, (b[0] - a[0]) / 2)
+                d = 'M %g %g C %g %g, %g %g, %g %g' % (a[0], a[1], a[0] + dx, a[1], b[0] - dx, b[1], b[0], b[1])
+            mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + (64 if fb else 0)
+            mid_of[w['id']] = (mx, my)
+            dash = '7 5' if fb else ('2 4' if a[2] == 'midi' else ('1 5' if a[2] == 'cv' else ''))
+            color = '#eaf2ff' if is_sel else ('#2c3648' if dim else ('#e0a458' if fb else PORTCOL[a[2]]))
+            wires.append({'id': w['id'], 'd': d, 'w': (2.6 if a[2] == 'audio' else 2.0) + (2.2 if is_sel else 0),
+                          'dash': dash, 'color': color, 'mx': mx, 'my': my})
+            if fb and ('%s>%s' % (from_id, to_id)) not in fbtags:
+                fbtags.add('%s>%s' % (from_id, to_id))
+                out_fbtags.append({'x': (a[0] + b[0]) / 2, 'y': (a[1] + b[1]) / 2 + 72, 'label': 'z⁻¹'})
+        for k, cnt in in_count.items():
+            if cnt >= 2 and k in pos:
+                pp = pos[k]
+                merges.append({'x': pp[0], 'y': pp[1]})
+
+        self._g_pos = pos
+        self._g_ports = ports
+        self._g_wires = wires
+        self._g_merges = merges
+        self._g_fbtags = out_fbtags
+        self._mid_of = mid_of
+
+        # radial menu items
+        rad = []
+        if cn and cn.get('stage') in ('srcPick', 'dstPick'):
+            cx, cy = cn['cx'], cn['cy']
+            for i, o in enumerate(cn['opts']):
+                ang = self._opt_angle(cn['side'], i, len(cn['opts']))
+                rad.append({'label': o['label'], 'idx': i,
+                            'x': cx + RR * math.cos(ang), 'y': cy + RR * math.sin(ang),
+                            'color': PORTCOL[o['type']]})
+        self._rad_items = rad
+
+    def _build_g_nodes(self):
+        cn = self.conn
+        need_side = (cn['srcSide'] == 'out' and 'in' or 'out') if (cn and cn.get('stage') == 'target') else None
+        cand_type = cn['srcType'] if (cn and cn.get('stage') == 'target') else None
+        out = []
+        for node in self.gnodes:
+            p = self.by_uri[node['uri']]
+            b = p['bucket']
+            sel = self.sel == node['id']
+            bord = '#3b6fe0' if sel else ('#2c3648' if node['bypass'] else bcol(b))
+            ci = self._port_counts(node['id'], 'in')
+            co = self._port_counts(node['id'], 'out')
+            has_in = (ci['a'] + ci['m'] + ci['cv']) > 0
+            has_out = (co['a'] + co['m'] + co['cv']) > 0
+
+            def cand(side, has):
+                if need_side != side or not has:
+                    return False
+                if str(node['id']) == str(cn.get('srcNode')):
+                    return False
+                return any(o['type'] == cand_type for o in self._opts_for(node['id'], side))
+            out.append({
+                'id': node['id'], 'x': node['x'], 'y': node['y'], 'h': self._card_h(node),
+                'name': p['name'], 'bucket': abbr(b), 'bypass': node['bypass'], 'sel': sel,
+                'border': bord, 'dot': '#5a6270' if node['bypass'] else bcol(b),
+                'glow': 'transparent' if node['bypass'] else bcol(b),
+                'hasIn': has_in, 'hasOut': has_out,
+                'edgeInGlow': cand('in', has_in), 'edgeOutGlow': cand('out', has_out),
+                'flying': node['id'] == self._fly_id,
+            })
+        return out
+
     def _rebuild(self):
-        # rail (categories)
         self._rail = [{'key': b['key'], 'abbr': abbr(b['key']), 'color': bcol(b['key']),
                        'count': b['count'], 'sel': self.fly_bucket == b['key']} for b in self.cat['buckets']]
-        # flyout effects of the chosen category
         self._fly = []
         if self.fly_bucket:
             for p in [p for p in self.cat['plugins'] if p['bucket'] == self.fly_bucket]:
@@ -400,11 +803,19 @@ class EditorBridge(QObject):
         if self.mode == 'quick':
             self._wires, self._chips, self._roles = self._route(self.nodes)
             self._nodes_view = self._build_nodes_view(self._roles)
-            self._build_inspector()
             chain = [abbr(self.by_uri[n['uri']]['bucket']) for n in sorted(self.nodes, key=lambda n: n['x'])
                      if self.by_uri[n['uri']]['ai'] > 0 and self.by_uri[n['uri']]['ao'] > 0]
             self._status = 'IN %s  ▸  %s  ▸  OUT STEREO' % (
                 'STEREO' if self.in_mode == 'stereo' else 'L-MONO', '▸'.join(chain) if chain else '—')
+        else:
+            self._rebuild_adv_geometry()
+            self._g_nodes = self._build_g_nodes()
+            cn = self.conn
+            if cn:
+                self._status = '연결 대상 선택 중…' if cn.get('stage') == 'target' else '포트 선택 중…'
+            else:
+                self._status = '%d nodes · %d cables · MANUAL · type-matched' % (len(self.gnodes), len(self.gwires))
+        self._build_inspector()
         self.changed.emit()
         self.wiresChanged.emit()
 
@@ -412,18 +823,6 @@ class EditorBridge(QObject):
     @Property(bool, notify=changed)
     def advanced(self):
         return self.mode == 'advanced'
-
-    @Property(str, notify=changed)
-    def advBadge(self):
-        return self.adv_badge
-
-    @Property('QVariantList', notify=changed)
-    def advNodes(self):
-        return self.adv_nodes
-
-    @Property('QVariantList', notify=changed)
-    def advWires(self):
-        return self.adv_wires
 
     @Property(int, notify=changed)
     def effectCount(self):
@@ -463,7 +862,7 @@ class EditorBridge(QObject):
 
     @Property(bool, notify=changed)
     def empty(self):
-        return len(self.nodes) == 0
+        return len(self.nodes) == 0 if self.mode == 'quick' else len(self.gnodes) == 0
 
     @Property(str, notify=changed)
     def status(self):
@@ -475,7 +874,134 @@ class EditorBridge(QObject):
 
     @Property(bool, notify=changed)
     def roundTripOK(self):
-        return self.round_trip_ok(self.nodes)
+        return self.round_trip_ok(self.nodes) if self.mode == 'quick' else True
+
+    # advanced
+    @Property('QVariantList', notify=changed)
+    def gNodes(self):
+        return self._g_nodes
+
+    @Property('QVariantList', notify=wiresChanged)
+    def gPorts(self):
+        return self._g_ports
+
+    @Property('QVariantList', notify=wiresChanged)
+    def gWires(self):
+        return self._g_wires
+
+    @Property('QVariantList', notify=wiresChanged)
+    def gMerges(self):
+        return self._g_merges
+
+    @Property('QVariantList', notify=wiresChanged)
+    def gFbTags(self):
+        return self._g_fbtags
+
+    @Property('QVariantList', notify=wiresChanged)
+    def gHw(self):
+        return self._g_hw
+
+    @Property('QVariantList', notify=wiresChanged)
+    def hwEdges(self):
+        return self._hw_edges
+
+    @Property('QVariantList', notify=changed)
+    def radItems(self):
+        return self._rad_items
+
+    @Property(bool, notify=changed)
+    def radActive(self):
+        return bool(self.conn and self.conn.get('stage') in ('srcPick', 'dstPick'))
+
+    @Property(float, notify=changed)
+    def radCx(self):
+        return float(self.conn['cx']) if self.radActive else 0.0
+
+    @Property(float, notify=changed)
+    def radCy(self):
+        return float(self.conn['cy']) if self.radActive else 0.0
+
+    @Property(str, notify=changed)
+    def radTitle(self):
+        if not self.radActive:
+            return ''
+        return '보낼 포트' if self.conn.get('stage') == 'srcPick' else '받을 포트'
+
+    @Property(bool, notify=changed)
+    def targeting(self):
+        return bool(self.conn and self.conn.get('stage') == 'target')
+
+    @Property(str, notify=changed)
+    def targetHint(self):
+        if not self.targeting:
+            return ''
+        return ('▸ 신호를 받을 노드의 입력(좌변)을 터치' if self.conn['srcSide'] == 'out'
+                else '◂ 신호를 보낼 노드의 출력(우변)을 터치')
+
+    @Property(bool, notify=wiresChanged)
+    def gWireDel(self):
+        return bool(self.gwire_sel and self.gwire_sel in getattr(self, '_mid_of', {}))
+
+    @Property(float, notify=wiresChanged)
+    def gWireDelX(self):
+        return float(self._mid_of[self.gwire_sel][0]) if self.gWireDel else 0.0
+
+    @Property(float, notify=wiresChanged)
+    def gWireDelY(self):
+        return float(self._mid_of[self.gwire_sel][1]) if self.gWireDel else 0.0
+
+    # evolve + history
+    @Property(float, notify=changed)
+    def evolveProg(self):
+        return self.evolve_prog
+
+    @Property(bool, notify=changed)
+    def evolveReady(self):
+        return self.evolve_prog >= 0.92
+
+    @Property(bool, notify=changed)
+    def evolving(self):
+        return self._evolving_flag
+
+    @Property(bool, notify=changed)
+    def canUndo(self):
+        return len(self._undo) > 0
+
+    @Property(bool, notify=changed)
+    def canRedo(self):
+        return len(self._redo) > 0
+
+    # board lifecycle
+    @Property(str, notify=boardsChanged)
+    def boardName(self):
+        return self.board_name
+
+    @Property(bool, notify=boardsChanged)
+    def dirty(self):
+        return self._dirty
+
+    @Property(bool, notify=boardsChanged)
+    def boardSaved(self):
+        return self.board_path is not None
+
+    @Property('QVariantList', notify=boardsChanged)
+    def boardList(self):
+        return self._boards
+
+    @Property('QVariantList', constant=True)
+    def boardTerms(self):
+        return _BOARD_TERMS
+
+    @Slot(str, result=str)
+    def suggestName(self, term):
+        """A stage term + random quirky suffix, avoiding existing board names."""
+        existing = {b['name'] for b in self._boards} | {self.board_name}
+        words = _load_words()
+        for _ in range(12):
+            name = '%s-%s' % (term, random.choice(words))
+            if name not in existing:
+                return name
+        return '%s-%s' % (term, random.choice(words))
 
     # inspector
     @Property(bool, notify=changed)
@@ -508,6 +1034,16 @@ class EditorBridge(QObject):
         n = self._node(self.sel)
         return bool(n and n['bypass'])
 
+    @Property(bool, notify=changed)
+    def inspCanConnect(self):
+        if self.mode != 'advanced':
+            return False
+        n = self._gnode(self.sel)
+        if not n:
+            return False
+        c = self._port_counts(n['id'], 'out')
+        return (c['a'] + c['m'] + c['cv']) > 0
+
     @Property('QVariantList', notify=changed)
     def knobs(self):
         return self._knobs
@@ -527,17 +1063,28 @@ class EditorBridge(QObject):
     def addEffect(self, uri):
         if uri not in self.by_uri:
             return
+        self._push_hist()
         p = self.by_uri[uri]
-        # place at the end of the trunk (or off-line for pure source/sink)
-        maxx = max([n['x'] for n in self.nodes], default=IN_X)
-        x = min(OUT_X - NODEW - 10, maxx + 150)
-        is_branch = p['ai'] == 0 or p['ao'] == 0
-        y = (MID_Y + HALF) if (is_branch and p['ao'] == 0) else (MID_Y - 3 * HALF if is_branch else MID_Y - HALF)
-        node = self._add(uri, x, y)
+        tx, ty = self._free_spot(self.mode, uri)
+        if self.mode == 'advanced':
+            node = {'id': self._new_id(), 'uri': uri, 'x': tx, 'y': ty,
+                    'bypass': False, 'vals': {c['sym']: c['def'] for c in p.get('ctl', []) if c['w'] != 'bypass'}}
+            self.gnodes.append(node)
+        else:
+            node = self._add(uri, tx, ty)
         self.sel = node['id']
+        self._fly_id = node['id']
         self.fly_bucket = None
         self._rebuild()
+        # fly in from off-screen (palette side) to the chosen slot
+        self.spawnFly.emit(p['name'], bcol(p['bucket']), -NODEW - 16.0, ty, tx, ty)
 
+    @Slot()
+    def clearFly(self):
+        self._fly_id = -1
+        self._rebuild()
+
+    # ---- quick node drag
     @Slot(int, float, float)
     def nodeDragMove(self, nid, x, y):
         n = self._node(nid)
@@ -545,7 +1092,7 @@ class EditorBridge(QObject):
             return
         n['x'] = max(40, min(CANVAS_W - NODEW - 4, x))
         n['y'] = max(4, min(CANVAS_H - 58, y))
-        self._rebuild_wires()   # live wires; do NOT rebuild nodes (keep the dragged delegate)
+        self._rebuild_wires()
 
     @Slot(int, float, float, bool)
     def nodeDragEnd(self, nid, x, y, over_trash):
@@ -553,18 +1100,87 @@ class EditorBridge(QObject):
         if not n:
             return
         if over_trash:
+            self._push_hist()
             self.nodes = [m for m in self.nodes if m['id'] != nid]
             if self.sel == nid:
                 self.sel = -1
         else:
             n['x'] = max(40, min(CANVAS_W - NODEW - 4, x))
             n['y'] = max(4, min(CANVAS_H - 58, y))
+        self._touch()
+        self._rebuild()
+
+    # ---- advanced node drag
+    @Slot(int, float, float)
+    def gNodeDragMove(self, nid, x, y):
+        n = self._gnode(nid)
+        if not n:
+            return
+        n['x'] = max(2, min(CANVAS_W - NODEW - 4, x))
+        n['y'] = max(2, min(CANVAS_H - 58, y))
+        self._rebuild_wires()
+
+    @Slot(int, float, float, bool)
+    def gNodeDragEnd(self, nid, x, y, over_trash):
+        n = self._gnode(nid)
+        if not n:
+            return
+        if over_trash:
+            self._push_hist()
+            sid = str(nid)
+            self.gnodes = [m for m in self.gnodes if str(m['id']) != sid]
+            self.gwires = [w for w in self.gwires
+                           if w['frm'].split(':')[0] != sid and w['to'].split(':')[0] != sid]
+            if self.sel == nid:
+                self.sel = -1
+        else:
+            n['x'] = max(2, min(CANVAS_W - NODEW - 4, x))
+            n['y'] = max(2, min(CANVAS_H - 58, y))
+        self._touch()
         self._rebuild()
 
     @Slot(int)
     def selectNode(self, nid):
         self.sel = nid
+        self.gwire_sel = None
+        self.conn = None
         self._rebuild()
+
+    @Slot()
+    def resetParams(self):
+        """Reset every parameter of the selected node to its default."""
+        n = self._node(self.sel)
+        if not n:
+            return
+        p = self.by_uri[n['uri']]
+        n['vals'] = {c['sym']: c['def'] for c in p.get('ctl', []) if c['w'] != 'bypass'}
+        self._touch()
+        self._build_inspector()
+        self.changed.emit()
+
+    @Slot(str)
+    def resetKnob(self, sym):
+        """Reset a single parameter to its default (double-tap)."""
+        n = self._node(self.sel)
+        if not n:
+            return
+        c = next((c for c in self.by_uri[n['uri']].get('ctl', []) if c['sym'] == sym), None)
+        if not c:
+            return
+        n['vals'][sym] = c['def']
+        self._touch()
+        self._build_inspector()
+        self.changed.emit()
+
+    @Slot()
+    def connectFromSelected(self):
+        """ADVANCED: start a radial connection from the selected node's output edge."""
+        if self.mode != 'advanced':
+            return
+        n = self._gnode(self.sel)
+        if not n:
+            return
+        self._begin_source(str(n['id']), 'out', n['x'] + NODEW, n['y'] + self._card_h(n) / 2)
 
     @Slot()
     def closeInspector(self):
@@ -576,23 +1192,33 @@ class EditorBridge(QObject):
         n = self._node(nid)
         if n:
             n['bypass'] = not n['bypass']
+            self._touch()
             self._rebuild()
 
-    @Slot(str, float)
+    @Slot(str, float, result=str)
     def setKnobNorm(self, sym, norm):
+        """Live during a dial drag — update the value and return its formatted text.
+        Does NOT emit changed (that would recreate the knob delegate mid-gesture and
+        make rotation stutter). QML rotates locally; syncInspector() finalizes on release."""
         n = self._node(self.sel)
         if not n:
-            return
+            return ''
         p = self.by_uri[n['uri']]
         c = next((c for c in p['ctl'] if c['sym'] == sym), None)
         if not c:
-            return
+            return ''
         v = c['min'] + max(0.0, min(1.0, norm)) * (c['max'] - c['min'])
         if c['w'] in ('step', 'enum'):
             v = round(v)
         n['vals'][sym] = v
+        self._touch()
+        return fmt(c, v)
+
+    @Slot()
+    def syncInspector(self):
+        """Rebuild the inspector model once (e.g. when a dial drag ends)."""
         self._build_inspector()
-        self.changed.emit()      # inspector only; nodes/wires unaffected by a param change
+        self.changed.emit()
 
     @Slot(str)
     def toggleSwitch(self, sym):
@@ -601,6 +1227,7 @@ class EditorBridge(QObject):
             return
         cur = n['vals'].get(sym, 0)
         n['vals'][sym] = 0 if cur >= 0.5 else 1
+        self._touch()
         self._build_inspector()
         self.changed.emit()
 
@@ -617,12 +1244,14 @@ class EditorBridge(QObject):
         i = int(round(n['vals'].get(sym, c['def']) - (c['min'] or 0)))
         i = (i + 1) % cnt
         n['vals'][sym] = (c['min'] or 0) + i
+        self._touch()
         self._build_inspector()
         self.changed.emit()
 
     @Slot()
     def toggleInMode(self):
         self.in_mode = 'stereo' if self.in_mode == 'mono' else 'mono'
+        self._touch()
         self._rebuild()
 
     @Slot(int)
@@ -630,6 +1259,7 @@ class EditorBridge(QObject):
         n = self._node(nid)
         if n:
             self._cycle_adapt(n, 'inAdapt', '1to2')
+            self._touch()
             self._rebuild()
 
     @Slot(int)
@@ -637,101 +1267,299 @@ class EditorBridge(QObject):
         n = self._node(nid)
         if n:
             self._cycle_adapt(n, 'mergeAdapt', '2to1')
+            self._touch()
             self._rebuild()
 
     @Slot()
     def cycleOutAdapter(self):
         order = ['auto', 'dup', 'L', 'R', 'sum']
         self.out_adapt = order[(order.index(self.out_adapt) + 1) % len(order)] if self.out_adapt in order else 'dup'
+        self._touch()
         self._rebuild()
 
     def _cycle_adapt(self, n, key, default_kind):
-        # cycle among the relevant adapter modes; kind inferred at route time
         o = ['dup', 'L', 'R'] if default_kind == '1to2' else ['sum', 'L', 'R']
         cur = n.get(key, 'auto')
         n[key] = o[(o.index(cur) + 1) % len(o)] if cur in o else o[0]
 
-    # ---------------------------------------------------- mode + demo scenarios
-    @Slot(str)
-    def switchMode(self, m):
-        if m == 'quick':
-            self.mode = 'quick'
-            self._relayout_quick()   # re-derive canonical layout from the graph on (re)open
-            self._rebuild()
-        elif m == 'advanced':
-            self._enter_advanced(self._board_from_quick(), 'QUICK 호환 — 수동 편집 모드')
-            self._rebuild()
+    # ---------------------------------------------------- advanced radial connect
+    @Slot(str, str, float, float)
+    def edgeTap(self, node, side, cx, cy):
+        """Touch a node/HW edge. Routes to source-pick or dest-pick by current state."""
+        if self.conn and self.conn.get('stage') == 'target':
+            self._begin_dest(node, side, cx, cy)
+        elif not self.conn:
+            self._begin_source(node, side, cx, cy)
+        else:
+            # mid radial-pick: ignore stray edge taps
+            return
 
+    def _begin_source(self, node, side, cx, cy):
+        opts = self._opts_for(node, side)
+        if not opts:
+            return
+        cx, cy = self._clamp_c(cx, cy)
+        self.conn = {'stage': 'srcPick', 'node': node, 'side': side, 'cx': cx, 'cy': cy,
+                     'opts': opts, 'hover': None}
+        self.sel = -1
+        self.gwire_sel = None
+        self._rebuild()
+
+    def _begin_dest(self, node, side, cx, cy):
+        c = self.conn
+        need = 'in' if c['srcSide'] == 'out' else 'out'
+        if side != need or str(node) == str(c['srcNode']):
+            return
+        opts = [o for o in self._opts_for(node, side) if o['type'] == c['srcType']]
+        if not opts:
+            return
+        cx, cy = self._clamp_c(cx, cy)
+        self.conn = dict(c, stage='dstPick', node=node, side=side, cx=cx, cy=cy, opts=opts, hover=None)
+        self._rebuild()
+
+    @Slot(int)
+    def commitRadialOpt(self, i):
+        c = self.conn
+        if not c or i < 0 or i >= len(c['opts']):
+            return
+        opt = c['opts'][i]
+        if c['stage'] == 'srcPick':
+            self.conn = {'stage': 'target', 'srcNode': c['node'], 'srcSide': c['side'],
+                         'srcType': opt['type'], 'srcIdx': opt['idx']}
+        elif c['stage'] == 'dstPick':
+            self._create_cables({'node': c['srcNode'], 'side': c['srcSide'], 'type': c['srcType'], 'idx': c['srcIdx']},
+                                 {'node': c['node'], 'side': c['side'], 'type': opt['type'], 'idx': opt['idx']})
+            self.conn = None
+        self._rebuild()
+
+    @Slot()
+    def cancelConn(self):
+        self.conn = None
+        self._rebuild()
+
+    def _create_cables(self, src_sel, dst_sel):
+        out_sel = src_sel if src_sel['side'] == 'out' else dst_sel
+        in_sel = dst_sel if src_sel['side'] == 'out' else src_sel
+        O, I = out_sel['idx'], in_sel['idx']
+        if len(O) == len(I):
+            pairs = list(zip(O, I))
+        elif len(O) == 1:
+            pairs = [(O[0], i) for i in I]
+        elif len(I) == 1:
+            pairs = [(o, I[0]) for o in O]
+        else:
+            pairs = list(zip(O, I))
+        fid, tid, typ = str(out_sel['node']), str(in_sel['node']), src_sel['type']
+        self._push_hist()
+        have = {(w['frm'], w['to']) for w in self.gwires}
+        for o, i in pairs:
+            frm = '%s:out:%s:%d' % (fid, typ, o)
+            to = '%s:in:%s:%d' % (tid, typ, i)
+            if (frm, to) not in have:
+                self.gwires.append({'id': self._new_wid(), 'frm': frm, 'to': to})
+
+    @Slot(str)
+    def selectWire(self, wid):
+        self.gwire_sel = None if self.gwire_sel == wid else wid
+        self.sel = -1
+        self._rebuild()
+
+    @Slot()
+    def removeSelectedWire(self):
+        if not self.gwire_sel:
+            return
+        self._push_hist()
+        self.gwires = [w for w in self.gwires if w['id'] != self.gwire_sel]
+        self.gwire_sel = None
+        self._rebuild()
+
+    # ----------------------------------------------------------- evolve / history
+    @Slot(float)
+    def evolveSet(self, prog):
+        self.evolve_prog = max(0.0, min(1.0, prog))
+        self.changed.emit()
+
+    @Slot()
+    def evolveRelease(self):
+        if self.mode != 'quick':
+            self.evolve_prog = 0.0
+            self.changed.emit()
+            return
+        if self.evolve_prog >= 0.92:
+            self._evolving_flag = True
+            self.evolveFlash.emit()
+            self.changed.emit()
+            QTimer.singleShot(780, self._do_evolve)
+        else:
+            self.evolve_prog = 0.0
+            self.changed.emit()
+
+    @Slot()
+    def undo(self):
+        if not self._undo:
+            return
+        self._redo.append(self._snapshot())
+        self._restore(self._undo.pop())
+        self._rebuild()
+
+    @Slot()
+    def redo(self):
+        if not self._redo:
+            return
+        self._undo.append(self._snapshot())
+        self._restore(self._redo.pop())
+        self._rebuild()
+
+    # ---------------------------------------------------- board lifecycle (Phase 2)
+    def _touch(self):
+        if not self._dirty:
+            self._dirty = True
+            self.boardsChanged.emit()
+
+    def _serialize(self):
+        return {
+            'name': self.board_name, 'mode': self.mode, 'in_mode': self.in_mode,
+            'out_adapt': self.out_adapt, 'uid': self._uid, 'wid': self._wid,
+            'nodes': [dict(n, vals=dict(n['vals'])) for n in self.nodes],
+            'gnodes': [dict(n, vals=dict(n['vals'])) for n in self.gnodes],
+            'gwires': [dict(w) for w in self.gwires],
+        }
+
+    def _load_state(self, data):
+        self.board_name = data.get('name', 'Untitled')
+        self.mode = data.get('mode', 'quick')
+        self.in_mode = data.get('in_mode', 'mono')
+        self.out_adapt = data.get('out_adapt', 'auto')
+        self.nodes = [dict(n, vals=dict(n.get('vals', {}))) for n in data.get('nodes', [])]
+        self.gnodes = [dict(n, vals=dict(n.get('vals', {}))) for n in data.get('gnodes', [])]
+        self.gwires = [dict(w) for w in data.get('gwires', [])]
+        # keep id counters ahead of anything loaded
+        ids = [n['id'] for n in self.nodes] + [n['id'] for n in self.gnodes]
+        self._uid = max([data.get('uid', 0)] + ids + [0])
+        wids = [int(w['id'][1:]) for w in self.gwires if str(w['id']).startswith('w') and w['id'][1:].isdigit()]
+        self._wid = max([data.get('wid', 0)] + wids + [0])
+        self.sel = -1
+        self.gwire_sel = None
+        self.conn = None
+        self._fly_id = -1
+        self._undo = []
+        self._redo = []
+
+    def _safe_name(self, name):
+        keep = ''.join(c if (c.isalnum() or c in ' -_().가-힣') else '_' for c in name).strip()
+        return keep or 'Untitled'
+
+    def _refresh_boards(self):
+        out = []
+        try:
+            names = sorted(os.listdir(MOCK_DIR))
+        except OSError:
+            names = []
+        for fn in names:
+            if not fn.endswith('.json'):
+                continue
+            path = os.path.join(MOCK_DIR, fn)
+            try:
+                with open(path, encoding='utf-8') as fh:
+                    d = json.load(fh)
+                nm = d.get('name', fn[:-5])
+                nodes = len(d.get('nodes', [])) if d.get('mode', 'quick') == 'quick' else len(d.get('gnodes', []))
+                sub = '%s · %s · %d개' % (d.get('mode', 'quick').upper(),
+                                          time.strftime('%m-%d %H:%M', time.localtime(os.path.getmtime(path))), nodes)
+            except (OSError, ValueError):
+                nm, sub = fn[:-5], '(손상)'
+            out.append({'name': nm, 'path': path, 'sub': sub, 'current': path == self.board_path})
+        self._boards = out
+        self.boardsChanged.emit()
+
+    @Slot(str)
+    def newBoard(self, kind):
+        self.mode = 'advanced' if kind == 'advanced' else 'quick'
+        self.in_mode = 'mono'
+        self.out_adapt = 'auto'
+        self.nodes = []
+        self.gnodes = []
+        self.gwires = []
+        self.sel = -1
+        self.gwire_sel = None
+        self.conn = None
+        self._fly_id = -1
+        self._undo = []
+        self._redo = []
+        self.board_name = 'Untitled'
+        self.board_path = None
+        self._dirty = False
+        self._rebuild()
+        self.boardsChanged.emit()
+        self.toast.emit('새 %s 보드' % ('ADVANCED' if kind == 'advanced' else 'QUICK'))
+
+    def _write(self, path):
+        os.makedirs(MOCK_DIR, exist_ok=True)
+        with open(path, 'w', encoding='utf-8') as fh:
+            json.dump(self._serialize(), fh, ensure_ascii=False, indent=2)
+        self.board_path = path
+        self._dirty = False
+        self._refresh_boards()
+        self.boardsChanged.emit()
+
+    @Slot()
+    def saveBoard(self):
+        """Overwrite the current board's file (only meaningful once it has one)."""
+        if self.board_path:
+            self._write(self.board_path)
+            self.toast.emit('저장됨 · %s' % self.board_name)
+        # unnamed boards are saved via saveBoardNamed() (QML opens the naming panel)
+
+    @Slot(str)
+    def saveBoardNamed(self, name):
+        """Save current state under a (uniquely-suffixed) name — first save or 'save as'."""
+        base = self._safe_name(name)
+        final, i = base, 2
+        os.makedirs(MOCK_DIR, exist_ok=True)
+        while os.path.exists(os.path.join(MOCK_DIR, final + '.json')):
+            final = '%s %d' % (base, i)
+            i += 1
+        self.board_name = final
+        self._write(os.path.join(MOCK_DIR, final + '.json'))
+        self.toast.emit('저장 · %s' % final)
+
+    @Slot(str)
+    def loadBoard(self, path):
+        try:
+            with open(path, encoding='utf-8') as fh:
+                data = json.load(fh)
+        except (OSError, ValueError):
+            self.toast.emit('불러오기 실패')
+            return
+        self._load_state(data)
+        self.board_path = path
+        self._dirty = False
+        self._rebuild()
+        self._refresh_boards()
+        self.toast.emit('불러옴 · %s' % self.board_name)
+
+    @Slot(str)
+    def deleteBoard(self, path):
+        try:
+            os.remove(path)
+        except OSError:
+            return
+        if path == self.board_path:
+            self.board_path = None
+        self._refresh_boards()
+        self.toast.emit('삭제됨')
+
+    # ------------------------------------------------------------- demo (dev)
     @Slot()
     def demoScramble(self):
-        """ADDITION 4a: simulate the web UI rearranging x,y (different plugin sizes), then reopen.
-        Routing must survive: the re-derived chain is identical because arcs are the truth."""
-        saved = self.arcs_from_layout(self.nodes)  # SAVE: persist the graph (the source of truth)
-        for n in self.nodes:                       # web UI rearranges coords (different plugin sizes)
+        if self.mode != 'quick':
+            return
+        saved = self.arcs_from_layout(self.nodes)
+        for n in self.nodes:
             n['x'] = random.randint(60, CANVAS_W - NODEW - 20)
             n['y'] = random.randint(10, CANVAS_H - 70)
-        self._relayout_quick(saved)                # REOPEN: re-derive layout from the SAVED graph, not coords
+        self._relayout_quick(saved)
         after = self.arcs_from_layout(self.nodes)
-        before = saved
         self._rebuild()
         self.toast.emit('웹UI 좌표 흩뜨림 → 퀵 재오픈: 라우팅 %s' %
-                        ('보존됨 ✓ (체인 동일)' if before == after else '깨짐 ✗'))
-
-    @Slot()
-    def demoParallel(self):
-        """ADDITION 4b/5: load a board edited into a parallel split-merge topology in the web UI.
-        Not quick-expressible -> jump straight to the ADVANCED viewer."""
-        board = self._parallel_board()
-        if self._is_quick_expressible(board):
-            self.toast.emit('이 보드는 퀵 표현 가능 — 퀵 유지')
-            return
-        self._enter_advanced(board, 'QUICK 표현 불가 (병렬 분기-재결합) → ADVANCED 직행')
-        self.toast.emit('병렬 라우팅 감지 → 자동 라우팅 없는 ADVANCED 모드로 전환')
-        self._rebuild()
-
-    # --------------------------------------------------- general-graph helpers
-    def _board_from_quick(self):
-        """Lift the current quick nodes into a general arc-board (for the advanced viewer)."""
-        sorted_n = sorted(self.nodes, key=lambda n: n['x'])
-        inline = [n for n in sorted_n if self.by_uri[n['uri']]['ai'] > 0 and self.by_uri[n['uri']]['ao'] > 0]
-        nodes = [{'id': n['id'], 'uri': n['uri'], 'x': n['x'], 'y': n['y'],
-                  'ai': self.by_uri[n['uri']]['ai'], 'ao': self.by_uri[n['uri']]['ao']} for n in self.nodes]
-        arcs = []
-        prev = 'IN'
-        for n in inline:
-            arcs.append((prev, n['id']))
-            prev = n['id']
-        arcs.append((prev, 'OUT'))
-        return {'nodes': nodes, 'arcs': arcs}
-
-    def _parallel_board(self):
-        """A hand-authored parallel board: IN -> drive -> {delay, reverb} -> OUT (split + merge)."""
-        def mk(name, x, y):
-            uri = self.by_name.get(name.lower())
-            p = self.by_uri[uri]
-            return {'id': self._new_id(), 'uri': uri, 'x': x, 'y': y, 'ai': p['ai'], 'ao': p['ao']}
-        drive = mk('bluesbreaker', 150, 196)
-        delay = mk('Bollie Delay', 380, 96)
-        reverb = mk('Dragonfly Hall Reverb', 380, 300)
-        nodes = [drive, delay, reverb]
-        arcs = [('IN', drive['id']), (drive['id'], delay['id']), (drive['id'], reverb['id']),
-                (delay['id'], 'OUT'), (reverb['id'], 'OUT')]
-        return {'nodes': nodes, 'arcs': arcs}
-
-    def _enter_advanced(self, board, badge):
-        self.mode = 'advanced'
-        self.adv_badge = badge
-        idx = {n['id']: n for n in board['nodes']}
-        term = {'IN': (IN_X, MID_Y), 'OUT': (OUT_X, MID_Y)}
-        self.adv_nodes = []
-        for n in board['nodes']:
-            p = self.by_uri[n['uri']]
-            self.adv_nodes.append({'id': n['id'], 'x': n['x'], 'y': n['y'], 'name': p['name'],
-                                   'border': bcol(p['bucket']), 'dot': bcol(p['bucket'])})
-        self.adv_wires = []
-        for a, b in board['arcs']:
-            x1, y1 = term['IN'] if a == 'IN' else (idx[a]['x'] + NODEW, idx[a]['y'] + HALF)
-            x2, y2 = term['OUT'] if b == 'OUT' else (idx[b]['x'], idx[b]['y'] + HALF)
-            dx = max(28, abs(x2 - x1) / 2)
-            self.adv_wires.append({'d': 'M %g %g C %g %g, %g %g, %g %g' % (
-                x1, y1, x1 + dx, y1, x2 - dx, y2, x2, y2), 'color': '#3b6fe0', 'w': 2.6})
+                        ('보존됨 ✓ (체인 동일)' if saved == after else '깨짐 ✗'))

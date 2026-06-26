@@ -66,6 +66,11 @@ def main():
                 app.quit()
 
         QTimer.singleShot(800, grab)
+    else:
+        # On the Pi the title bar + taskbar steal ~40px and clip the bottom of the
+        # 800x480 layout — go true fullscreen so the device area maps 1:1 to the screen.
+        win = engine.rootObjects()[0]
+        win.showFullScreen()
 
     return app.exec()
 
