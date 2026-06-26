@@ -9,7 +9,7 @@
 |---|---|---|
 | 실제 mod-ui 라이브 소스 | `/usr/lib/python3/dist-packages/mod/` | modep-mod-ui 1.13.0, root 소유 |
 | mod-host 바이너리 | `/usr/bin/mod-host` (`-p 5555 -f 5556`) | modep-mod-host 1.13.0 |
-| 앱 venv | `/home/miza/gcamp6s-venv/` | repo 밖 |
+| 앱 venv | `/home/miza/synapse-venv/` | repo 밖, `--system-site-packages`. 옛 `gcamp6s-venv`(Kivy)는 롤백 보존 |
 | 앱 실행 스크립트(원본) | `/home/miza/run_synapsepy.sh` | repo의 `run_synapsepy.sh`는 그 사본 |
 
 ## 패치 적용 상태
@@ -17,6 +17,14 @@
 `mod-tweaks/{host,session,webserver}.py` 가 패치 적용된 **완본**이며, 라이브
 `/usr/lib/python3/dist-packages/mod/` 와 byte-identical 로 유지된다.
 `mod-tweaks/org/` 는 upstream 원본 + `.diff`.
+
+**적용된 핵심 거동 패치(패키지 업데이트 시 덮어써짐 → 재배포 필요):**
+- `host.py` 페달보드 저장 (`save()` asNew=0 분기, ~L3964): ttl 파일 심볼을 클라이언트가 보낸 `title` 이 아니라
+  **현재 번들 디렉토리명**에서 도출(`titlesym = basename(bundlepath)[:-len('.pedalboard')]`). stale 제목(예: 앱 풋스위치
+  내비 중 웹UI에 남은 이전 보드명)으로 저장해도 `dir==ttl==manifest` 가 깨지지 않아 **ttl 부패/고아 불가**. 표시명(`doap:name`)은
+  별도 `title` 인자라 이름변경은 그대로 동작. 경위·포렌식 = `docs/save-corruption-postmortem.md`.
+- `host.py` Gap D (~L3679): 모든 PB 로드에서 `pedalboard_name` 방송(앱/REST/MIDI 발 로드도 웹UI 타이틀 갱신).
+- `webserver.py`/`host.py`/`session.py` 역방향 `notify_synapsin` + `syn_*` 엔드포인트 (아래 커스텀 엔드포인트 참조).
 
 ## mod 코드 배포 (mod-tweaks/deploy.sh)
 
@@ -34,10 +42,14 @@ mod 코드(host/session/webserver) 수정 시 **파일 통째 cp** 전략을 쓴
 ## 자동 실행 체인
 
 ```
-~/.config/labwc/autostart  →  ~/run_synapsepy.sh  →  venv activate  →  python app.py
+~/.config/labwc/autostart  →  ~/run_synapsepy.sh  →  venv activate  →  python qt_main.py
 ```
-- 컴포지터: **labwc (Wayland)**, 세션 `LXDE-pi-labwc`
+- 컴포지터(현재): **labwc (Wayland)**, 세션 `LXDE-pi-labwc`
+- **컴포지터 우회 예정**: labwc를 걷어내고 Qt **eglfs로 KMS/DRM 직행**(단일앱 풀스크린).
+  데스크톱 컴포지터 없이 부팅→앱 직행이 **실물 Pi 5 실전테스트로 동작 검증됨**(가능 확인).
+  배경/작업: `docs/qt-roadmap.md`, `docs/qt-migration-FINISHED.md`.
 - 웹UI: 온디맨드 `chromium-browser --start-fullscreen http://localhost/` (presenter.py)
+  — **온디바이스 폐기 방향**(웹UI는 폰/옆 데스크톱에서 mod-ui 서버 접속)
 
 ## 환경
 
@@ -53,9 +65,3 @@ mod 코드(host/session/webserver) 수정 시 **파일 통째 cp** 전략을 쓴
 - `POST /effect/parameter/syn_patch_set/<instance>` , `GET /effect/parameter/syn_patch_get/...`
 - `POST /general/` (transport-bpm / transport-bpb)
 - 역방향 알림: `notify_synapsin()` → unix dgram socket `/tmp/synapsin.sock` (앱이 bind)
-
-## 알려진 이슈 (세션 0 정찰)
-
-- `app.py:60 notify_presenter()` 가 `pass` → 역방향 채널 수신 후 폐기 (배선 끊김)
-- `syn_parameter_set` 가 broadcast 경로(`host_and_web_parameter_set`) 우회 → 웹UI/HMI desync
-- `presenter.py close_webui()` 가 `xdotool`(X11) 사용 → Wayland(labwc)에서 미동작 위험

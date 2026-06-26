@@ -1,0 +1,20 @@
+# Off-device development deps for the Windows PyQt6 + QML mock (qt_app.py).
+# These are NOT the Pi runtime deps (PyQt6, smbus2, mido, ...) — those live in
+# the box's synapse-venv (see REFERENCES.md). This file is just enough to run
+# the mock with fake backend + fake hardware on a dev machine.
+#
+# Binding/Qt are pinned to 6.4.2 to MATCH the deployment Pi 5 (Raspberry Pi OS
+# Bookworm apt python3-pyqt6 = 6.4.2 / Qt 6.4.2). Do NOT bump past what the Pi
+# ships, or the mock may rely on Qt/QML APIs that don't exist on device.
+# PyQt6-Qt6 must be pinned too: PyQt6's dep is `>=`, so an unpinned install
+# pulls the latest Qt runtime (6.11+) even with the binding held at 6.4.2.
+#
+# Setup (Windows; `py` = the real launcher, see notes):
+#   py -m venv .venv
+#   .venv\Scripts\python -m pip install -r requirements-dev.txt
+# Run the mock:
+#   .venv\Scripts\python qt_main.py
+
+PyQt6==6.4.2      # Qt Quick (QML) + PyQt6 GUI toolkit binding
+PyQt6-Qt6==6.4.2  # Qt runtime; pin to match the Pi (binding's dep is unpinned >=)
+requests==2.34.2  # core dep imported at modepctrl top (unused at runtime in fake mode)

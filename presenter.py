@@ -1,7 +1,8 @@
 from collections import defaultdict
 import utils
-from hardwares import fsledctrl
-from modepctrl import ModepController, initialize_modep_pedalboard
+from modepctrl import get_backend
+from model import initialize_modep_pedalboard, Connection
+from taptempo import TapTempoEngine
 import subprocess
 import threading
 import time
@@ -10,19 +11,35 @@ import json
 import os
 from configs import LOCAL_STORAGE
 
+# Footswitch mode ids. 0-2 are the press-driven modes cycled by modechange();
+# 3 (WebUI) and 4 (tap tempo) are transient modes entered out-of-band (button /
+# chord) and kept out of that cycle.
+TAP_TEMPO_MODE = 4
+
 class Presenter:
-    def __init__(self, view, scheduler):
+    def __init__(self, view, scheduler, backend=None, hardware=None):
         self.view = view
         # scheduler: event-loop timer abstraction (see scheduler.Scheduler).
         # Keeps the presenter and hardware layer free of any GUI-framework import.
         self.scheduler = scheduler
-        self.hwi = fsledctrl.Controller(scheduler)
+        # backend: MODEP host seam (see modepctrl.get_backend). Defaults to the
+        # real ModepController; an off-device entry point injects a fake.
+        self.backend = backend if backend is not None else get_backend()
+        # hardware: footswitch/LED seam (see hardware.HardwareController).
+        # Defaults to the real I2C controller, built lazily so an off-device
+        # entry point can inject a fake without importing the Pi-only I2C stack.
+        self.hwi = hardware if hardware is not None else self._build_default_hardware(scheduler)
 
         # 0: pedalboard nav, 1: parameter assign, 2: pb snapshot assign
         self.footswitch_mode = 0
-        self.footswitch_assigns = {0: None, 1: None, 2: None, 3: None}
+        self.footswitch_assigns = [None, None, None, None]
         self.footswitch_combo_assigns = {}
         self.footswitch_input_que = [0] * 4
+        # Tap-tempo engine (the C+D chord enters it; see handle_multiple_footswitches).
+        # Framework-agnostic: it only needs the scheduler + the two callbacks below.
+        self._mode_before_tap = 0
+        self.tap_tempo = TapTempoEngine(
+            self.scheduler, on_bpm=self._tap_on_bpm, on_beat=self._tap_on_beat)
         self._poll_thread = None
         self._poll_stop = None
         self.start_footswitch_polling(100)  # background thread @100Hz
@@ -31,21 +48,42 @@ class Presenter:
         self.pedalboard = initialize_modep_pedalboard()
         # pb별 마지막 활성 스냅샷 기억 (세션 한정 인메모리). key=current_pb_path, value=snapshot idx
         self.pb_snapshot_memory = {}
-        # Load stored assignments from disk
-        # self.fs_mode2_assigns = load_footswitch_assignments()
-
-        # Build or refresh the pedalboard/snapshot assignment dictionary as needed
-        # e.g. ensures we have keys 0..3 present
-        self.fs_mode2_assigns = defaultdict(dict)
+        # Footswitch-mode-2 (RECALL) pedalboard+snapshot assignments, keyed "0".."3".
+        # Loaded from disk so they persist across runs; defaults guarantee all four
+        # keys exist. Key names ("pedalboard"/"snapshot_idx") match the writer
+        # (assign_pb_ss_to_footswitch) and reader (recall_pb_ss) below.
+        self.fs_assignment_data = utils.load_footswitch_assignments() or {}
         for i in range(4):
-            if str(i) not in self.fs_mode2_assigns:
-                self.fs_mode2_assigns[str(i)] = {
-                    "pedalboard_path": None,
-                    "snapshot_idx": None
-                }
+            self.fs_assignment_data.setdefault(str(i), {
+                "pedalboard": None,
+                "snapshot_idx": None,
+            })
+
+        # Mode-2 BANK selector: the active bank's first 4 boards map to FS0-3.
+        # current_bank is the seam a future touch UI (bank switch/edit) drives;
+        # for now it stays 0. bank_boards is the live [{bundle,title}] for the strip.
+        self.current_bank = 0
+        self.bank_boards = []
+
+        # Mode-1 STOMP: the 4 category-filtered effects bound to FS0-3. Exposed so
+        # the QtView strip captions mirror exactly what a press toggles (kept in
+        # sync by assign_footswitches, same lifecycle as bank_boards).
+        self.stomp_effects = []
 
         self.assign_footswitches()
         self.boot_lightshow()
+
+    @staticmethod
+    def _build_default_hardware(scheduler):
+        """Construct the real I2C footswitch/LED controller.
+
+        Imported lazily (not at module load) so off-device entry points that
+        inject a fake never import the Pi-only I2C stack (hardwares.* -> smbus2,
+        which needs fcntl + a real /dev/i2c). On the Pi this still fails loud if
+        the hardware is absent/faulty -- selection is explicit, never silent.
+        """
+        from hardwares import fsledctrl
+        return fsledctrl.Controller(scheduler)
 
     def initiate_view(self):
         self.view_update_effect()
@@ -53,13 +91,13 @@ class Presenter:
 
     def set_beat(self, bpb=None, bpm=None):
         if bpb:
-            error_msg = ModepController.set_bpb(bpb)
+            error_msg = self.backend.set_bpb(bpb)
             if error_msg is None:
                 self.pedalboard.bpb = bpb
             else:
                 print(error_msg)
         if bpm:
-            error_msg = ModepController.set_bpm(bpm)
+            error_msg = self.backend.set_bpm(bpm)
             if error_msg is None:
                 self.pedalboard.bpm = bpm
             else:
@@ -75,7 +113,7 @@ class Presenter:
         self.pedalboard.current_snapshot_idx 는 마지막 refresh 시점 값이라
         HMI/웹 변경이 아직 안 들어와 있을 수 있으므로 host에 직접 물어본다."""
         pb = self.pedalboard.current_pb_path
-        idx = ModepController.snapshot_current_idx()   # host = ground truth, 못 맞추면 -1
+        idx = self.backend.snapshot_current_idx()   # host = ground truth, 못 맞추면 -1
         if pb and idx is not None and idx >= 0:
             self.pb_snapshot_memory[pb] = idx
 
@@ -95,7 +133,7 @@ class Presenter:
             return
         if idx == self.pedalboard.current_snapshot_idx:
             return
-        ModepController.load_snapshot(idx)
+        self.backend.load_snapshot(idx)
         self.refresh_pedalboard()   # current_snapshot_idx 를 host 기준으로 재확정
 
     def view_update_effect(self, clear_ports=False):
@@ -128,7 +166,7 @@ class Presenter:
 
     def parameter_changed(self, effect_instance, port_symbol, port_value):
         if port_symbol == ":bypass":
-            error_msg = ModepController.bypass_effect(effect_instance, port_value)
+            error_msg = self.backend.bypass_effect(effect_instance, port_value)
             if error_msg is None:
                 self.pedalboard.get_effect_by_instance(effect_instance).bypassed = port_value
                 self.view_update_effect()
@@ -186,10 +224,22 @@ class Presenter:
                     pb = self.pedalboard.current_pb_path
                     if pb and str(idx) in self.pedalboard.list_of_snapshots:
                         self.pb_snapshot_memory[pb] = idx
+            elif cmd in ("EffectConnect", "EffectDisconnect"):
+                # 배선 변경은 라이브 호스트 그래프에서만 일어남 — /pedalboard/info(=refresh_
+                # pedalboard 의 소스)는 디스크 번들 .ttl 을 읽으므로 저장 전엔 새 케이블을 모름.
+                # → 디스크 재조회 대신 메시지의 두 포트로 모델 connections 에 델타를 직접 적용
+                #   (파라미터/패치의 apply_external_* 와 같은 패턴). 포트는 /graph/ 접두를 떼면
+                #   디스크 connection 포맷(예: "Click/out", "playback_2")과 일치한다.
+                a, _, b = rest.partition(",")
+                src = a.strip().split("/graph/", 1)[-1].lstrip("/")
+                tgt = b.strip().split("/graph/", 1)[-1].lstrip("/")
+                self.apply_external_connection(cmd == "EffectConnect", src, tgt)
             elif cmd in ("EffectAdd", "EffectRemove", "PedalboardLoadBundle",
                          "SnapshotName", "SnapshotRemove", "BankLoad"):
                 # 구조 변경 → 안전하게 전체 재동기화
                 # (웹발 PedalboardLoadBundle 은 복원 안 함: mod-ui 번들 저장 스냅샷 기본동작 유지)
+                # ★한계: EffectAdd/Remove 도 저장 전엔 디스크에 없어 refresh 가 stale 일 수 있음
+                #   (connect/disconnect 처럼 델타 적용하려면 플러그인 메타 조회 필요 — 추후).
                 self.refresh_pedalboard()
             else:
                 print(f"[reverse] unhandled: {message}")
@@ -211,6 +261,21 @@ class Presenter:
             port.value = value  # 캐시만 갱신
             self.view.update_parameter_display(instance, symbol, value)
 
+    def update_monitor(self, instance, symbol, value):
+        """Live monitor (output port) value from the feed — GUI thread only.
+        Updates the cached EffectPort + pushes to the view (no host call)."""
+        pb = self.pedalboard
+        if pb is None:
+            return
+        effect = pb.get_effect_by_instance(instance)
+        if not effect:
+            return
+        mon = effect.monitors.get(symbol)
+        if mon is None:
+            return
+        mon.value = value
+        self.view.update_monitor_display(instance, symbol, value)
+
     def apply_external_patch(self, instance, patch_uri, patch_file):
         """외부에서 바뀐 패치파일(IR/NAM/cabsim 등)을 모델 캐시 + 화면에 반영(host 되쏨 없음)."""
         effect = self.pedalboard.get_effect_by_instance(instance)
@@ -221,28 +286,81 @@ class Presenter:
             patch.value = patch_file  # 캐시만 갱신 (set_patch는 host로 쓰므로 호출 안 함)
         self.view.update_patch_display(instance, patch_uri, patch_file)
 
-    def prev_pedalboard(self):
-        self._remember_current_snapshot()   # /reset 으로 날아가기 전에 떠나는 보드 기록
-        ModepController.set_prev_pedalboard()
+    def apply_external_connection(self, connected, source, target):
+        """외부(웹/HMI)에서 바뀐 배선을 모델 connections 에 직접 반영(디스크/host 미조회).
+        /pedalboard/info 는 디스크 번들을 읽어 저장 전 라이브 배선을 모르므로, 메시지의 두
+        포트로 그래프만 갱신한다. source/target 은 /graph/ 를 뗀 디스크 포맷."""
+        conns = self.pedalboard.connections
+        existing = next((c for c in conns if c.source == source and c.target == target), None)
+        if connected:
+            if existing is None:
+                conns.append(Connection(source, target))
+        elif existing is not None:
+            conns.remove(existing)
+        self.view_update_effect()   # _rebuild_graph 가 connections 로 케이블 다시 그림
+
+    def _return_to_overview(self):
+        """Leave any stale FOCUS card after a footswitch pedalboard change.
+
+        The focused effect may not exist in the new board, and even a same-named
+        plugin is a different instance with severed connections -- so the FOCUS
+        card would dangle. Guarded (getattr) so a view without goOverview (the
+        Kivy rollback) is a no-op rather than a crash."""
+        go = getattr(self.view, "goOverview", None)
+        if callable(go):
+            go()
+
+    def _notify(self, text):
+        """Transient on-screen message (toast). Guarded so a view without
+        show_toast (the Kivy rollback) just logs instead of crashing."""
+        print(text)
+        toast = getattr(self.view, "show_toast", None)
+        if callable(toast):
+            toast(text)
+
+    def _go_to_pedalboard(self, bundle):
+        """Load a specific pedalboard via the footswitch path (same remember /
+        restore-snapshot / return-to-overview discipline as prev/next)."""
+        self._remember_current_snapshot()
+        self.backend.set_pedalboard(bundle)
         self.refresh_pedalboard()
         self._restore_snapshot_for_current_pb()
+        self._return_to_overview()
+
+    def load_bank_pedalboard(self, slot):
+        """Mode-2: load the bank board mapped to footswitch ``slot`` (0-3)."""
+        if slot >= len(self.bank_boards):
+            return
+        bundle = self.bank_boards[slot]["bundle"]
+        if bundle == self.pedalboard.current_pb_path:
+            self._return_to_overview()      # already here -> just leave any FOCUS card
+            return
+        self._go_to_pedalboard(bundle)
+
+    def prev_pedalboard(self):
+        self._remember_current_snapshot()   # /reset 으로 날아가기 전에 떠나는 보드 기록
+        self.backend.set_prev_pedalboard()
+        self.refresh_pedalboard()
+        self._restore_snapshot_for_current_pb()
+        self._return_to_overview()
 
     def next_pedalboard(self):
         self._remember_current_snapshot()
-        ModepController.set_next_pedalboard()
+        self.backend.set_next_pedalboard()
         self.refresh_pedalboard()
         self._restore_snapshot_for_current_pb()
+        self._return_to_overview()
 
     def prev_snapshot(self):
         if self.pedalboard.current_snapshot_idx > 0:
             self.pedalboard.current_snapshot_idx -= 1
-            ModepController.load_snapshot(self.pedalboard.current_snapshot_idx)
+            self.backend.load_snapshot(self.pedalboard.current_snapshot_idx)
             self.refresh_pedalboard()
 
     def next_snapshot(self):
         if self.pedalboard.current_snapshot_idx < len(self.pedalboard.list_of_snapshots) - 1:
             self.pedalboard.current_snapshot_idx += 1
-            ModepController.load_snapshot(self.pedalboard.current_snapshot_idx)
+            self.backend.load_snapshot(self.pedalboard.current_snapshot_idx)
             self.refresh_pedalboard()
 
     def assign_pb_ss_to_footswitch(self, fs_idx_to_assign):
@@ -262,7 +380,7 @@ class Presenter:
         # Persist to JSON
         utils.save_footswitch_assignments(self.fs_assignment_data)
 
-        print(f"Footswitch {fs_idx} assigned to PB {pedalboard_id}, snapshot {snapshot_idx}")
+        print(f"Footswitch {fs_idx_to_assign} assigned to PB {pedalboard}, snapshot {snapshot_idx}")
 
     def recall_pb_ss(self, fs_idx):
         """Load pedalboard and snapshot as stored in footswitch_assignments.json"""
@@ -277,13 +395,13 @@ class Presenter:
 
         # Implementation detail: you might have a function that sets pedalboard by ID
         # or you have a different approach for indexing
-        error = ModepController.set_pedalboard(pb_path)
+        error = self.backend.set_pedalboard(pb_path)
         if error is None:
             # Re-initialize your pedalboard object
             self.refresh_pedalboard()
             # Then set the snapshot
             self.pedalboard.current_snapshot_idx = ss_idx
-            ModepController.set_snapshot(ss_idx)
+            self.backend.load_snapshot(ss_idx)
             self.view_update_effect()
             print(f"Recalled PB {pb_path}, snapshot {ss_idx}.")
         else:
@@ -349,7 +467,9 @@ class Presenter:
         print(f'Footswitch event: {status}')
         # For each pressed (or released) footswitch, trigger a blink on its corresponding LED.
         for i, s in enumerate(status):
-            if s == 1:
+            # In tap-tempo mode the metronome owns the LEDs; skip the per-press
+            # blink so it doesn't fight the beat flashes.
+            if s == 1 and self.footswitch_mode != TAP_TEMPO_MODE:
                 # Blink the red LED on the corresponding LED object. Here, one blink cycle.
                 self.hwi.LED.get_led(i).blink(color='red', times=1, interval=0.1)
         if sum(status) == 1:
@@ -364,17 +484,21 @@ class Presenter:
             self.handle_multiple_footswitches(status)
 
     def handle_multiple_footswitches(self, status):
-        if status == [1, 1, 0, 0]:
+        # While in tap-tempo mode, ANY chord exits back to the previous mode.
+        if self.footswitch_mode == TAP_TEMPO_MODE:
+            self.exit_tap_tempo()
+            return
+        # Adjacent-pair chords select a mode (footswitch-combo convention):
+        if status == [1, 1, 0, 0]:        # A+B -> cycle footswitch mode
+            self.modechange()
+        elif status == [0, 1, 1, 0]:      # B+C -> tuner (not implemented yet)
             pass
-        elif status == [0, 1, 1, 0]:
-            pass
-        elif status == [0, 0, 1, 1]:
-            pass
+        elif status == [0, 0, 1, 1]:      # C+D -> tap tempo
+            self.enter_tap_tempo()
         elif status == [0, 0, 0, 0]:
             print("How is this possible?")
         else:
             print("Invalid footswitch combination")
-        pass
 
 
     def assign_footswitches(self):
@@ -388,7 +512,6 @@ class Presenter:
             ]
 
         elif self.footswitch_mode == 1:
-            print("꺄홀르")
             # Mode 1: parameter assign mode (bypass toggles)
             # 1) Filter out any effects that are in “simulator” categories
             #    (or keep them, depending on your actual “excluded” vs. “included” logic).
@@ -406,12 +529,16 @@ class Presenter:
                 # you can just skip or implement partial assignment here.
                 print("Warning: Not enough non-simulator effects to assign all four footswitches.")
                 self.footswitch_assigns = [None, None, None, None]
+                self.stomp_effects = []
                 return
 
             e0 = valid_effects[0]  # first effect
             e1 = valid_effects[1]  # second effect
             e2 = valid_effects[-2]  # second-last effect
             e3 = valid_effects[-1]  # last effect
+
+            # Expose the chosen 4 so the QtView strip captions match the toggles.
+            self.stomp_effects = [e0, e1, e2, e3]
 
             # 3) Define a small helper to toggle bypass:
             def toggle_bypass(effect):
@@ -420,23 +547,37 @@ class Presenter:
 
             # 4) Assign footswitch 0–3 to lambda toggles of the chosen effects
             self.footswitch_assigns = [
-                lambda idx, st: toggle_bypass(e0),
-                lambda idx, st: toggle_bypass(e1),
-                lambda idx, st: toggle_bypass(e2),
-                lambda idx, st: toggle_bypass(e3),
+                lambda: toggle_bypass(e0),
+                lambda: toggle_bypass(e1),
+                lambda: toggle_bypass(e2),
+                lambda: toggle_bypass(e3),
             ]
 
         elif self.footswitch_mode == 2:
-            # Mode 2: recall pedalboard/snapshot from JSON
+            # Mode 2: BANK board selector. The active bank's first 4 boards map to
+            # FS0-3 (extra boards ignored); a press loads that board. Future: a
+            # touch UI switches self.current_bank / edits banks. No bank -> message
+            # + fall back to STOMP (mode 1).
+            entries = self.backend.get_bank_pedalboard_entries(self.current_bank)
+            if not entries:
+                self._notify("뱅크 없음 — STOMP 모드로")
+                self.bank_boards = []
+                self.footswitch_mode = 1
+                self.assign_footswitches()
+                self.view.update_mode_display(self.footswitch_mode)
+                return
+            self.bank_boards = entries[:4]
             self.footswitch_assigns = [
-                lambda idx, st: self.recall_pb_ss(0),
-                lambda idx, st: self.recall_pb_ss(1),
-                lambda idx, st: self.recall_pb_ss(2),
-                lambda idx, st: self.recall_pb_ss(3),
+                (lambda s=i: self.load_bank_pedalboard(s)) if i < len(self.bank_boards) else None
+                for i in range(4)
             ]
 
         elif self.footswitch_mode == 3: # WebUI mode
             self.footswitch_assigns = [None, None, None, self.close_webui]
+
+        elif self.footswitch_mode == TAP_TEMPO_MODE:
+            # Any single press is a beat tap; chords exit (handle_multiple_footswitches).
+            self.footswitch_assigns = [self.tap_input] * 4
 
     def toggle_keyboard(self, *args):
         utils.toggle_wvkbd()
@@ -498,6 +639,51 @@ class Presenter:
     def view_update_bpm(self):
         self.view.update_bpm_display(self.pedalboard.bpm)
 
+    # ── Tap tempo (entered via the C+D footswitch chord) ─────────────────
+    def enter_tap_tempo(self):
+        """Switch into tap-tempo: every footswitch press becomes a beat tap and
+        the physical LEDs run a metronome at the current tempo."""
+        if self.footswitch_mode == TAP_TEMPO_MODE:
+            return
+        self._mode_before_tap = self.footswitch_mode
+        self.footswitch_mode = TAP_TEMPO_MODE
+        self.assign_footswitches()
+        self.hwi.LED.stop_all_blinking()   # clear before the metronome owns the LEDs
+        self.view.update_mode_display(TAP_TEMPO_MODE)
+        self.view.show_tap_tempo(self.pedalboard.bpm, self.pedalboard.bpb)
+        self.tap_tempo.start(self.pedalboard.bpm, self.pedalboard.bpb)
+
+    def exit_tap_tempo(self):
+        """Leave tap-tempo (any chord) -> stop the metronome, restore the prior mode."""
+        self.tap_tempo.stop()
+        self.hwi.LED.stop_all_blinking()
+        self.footswitch_mode = self._mode_before_tap
+        self.assign_footswitches()
+        self.view.hide_tap_tempo()
+        self.view.update_mode_display(self.footswitch_mode)
+
+    def tap_input(self, *args):
+        """A single footswitch press while in tap-tempo mode = one beat tap."""
+        self.tap_tempo.tap()
+
+    def _tap_on_bpm(self, bpm):
+        """Engine produced a refined BPM -> tell MODEP + update the on-screen widget."""
+        error_msg = self.backend.set_bpm(bpm)
+        if error_msg is None:
+            self.pedalboard.bpm = bpm
+        else:
+            print(error_msg)
+        self.view.update_bpm_display(bpm)
+
+    def _tap_on_beat(self, led_index, is_downbeat, duration):
+        """Metronome beat -> flash one LED (red downbeat / blue off-beat)."""
+        self.hwi.LED[led_index] = 0b10 if is_downbeat else 0b01
+        self.scheduler.schedule_once(
+            lambda dt, i=led_index: self._tap_beat_off(i), duration)
+
+    def _tap_beat_off(self, led_index):
+        self.hwi.LED[led_index] = 0
+
     def boot_lightshow(self, i=None):
         # for i in range(4):
         #     self.scheduler.schedule_once(lambda dt, i=i: self.hwi.LED.get_led(i).blink(color='red', times=2, interval=0.1),
@@ -505,28 +691,30 @@ class Presenter:
         pass
 
     def save_snapshot(self):
-        ModepController.snapshot_save()
+        self.backend.snapshot_save()
         self.refresh_pedalboard()
     def  save_snapshot_as(self, name):
-        ModepController.snapshot_save_as(new_name=name)
+        self.backend.snapshot_save_as(new_name=name)
         self.refresh_pedalboard()
 
     def modechange(self, mode=None):
         if mode is None:
             mode = (self.footswitch_mode + 1) % 3
         self.footswitch_mode = mode
-        self.view.update_mode_display(self.footswitch_mode)
         if self.footswitch_mode == 0:
             self.abcd_availability(False)
         else:
             self.abcd_availability(True)
+        # Assign FIRST (mode 2 fills self.bank_boards and may fall back to mode 1),
+        # THEN refresh the mode label + strip so it reflects the final state.
         self.assign_footswitches()
+        self.view.update_mode_display(self.footswitch_mode)
 
     def abcd_button_state(self,prev,current):
         print(f"prev:{prev},current:{current}") #-1 is released. 0,1,2,3 is pressed for each button
 
     def _build_view_effect(self, effect):
-        bypassed = ModepController.parameter_get(effect.instance, ":bypass")  # Fetch bypass state correctly
+        bypassed = self.backend.parameter_get(effect.instance, ":bypass")  # Fetch bypass state correctly
         return {
             "effect_instance": effect.instance,
             "effect_name": effect.name,
@@ -546,10 +734,29 @@ class Presenter:
                     },
                     "port_properties": port.port_properties,
                     "port_rangesteps": port.range_steps,
-                    "port_scalepoints": port.scale_points
+                    "port_scalepoints": port.scale_points,
+                    "port_kind": port.widget_kind
                 }
                 for port in effect.ports.values()
                 if (port_value := port.get_value()) is not None  # Exclude ports with None value
+            ],
+            # Monitor (output) ports: cached/seeded value -- NOT get_value() (output
+            # ports aren't readable via parameter_get), and never None-excluded.
+            "effect_monitors": [
+                {
+                    "port_name": mon.name,
+                    "effect_instance": effect.instance,
+                    "port_symbol": mon.symbol,
+                    "port_value": mon.value,
+                    "port_unit": mon.units,
+                    "port_range": {
+                        "min": mon.min_value,
+                        "max": mon.max_value,
+                        "default": mon.default_value,
+                    },
+                    "port_kind": mon.widget_kind
+                }
+                for mon in effect.monitors.values()
             ],
             "patches": [
                 {

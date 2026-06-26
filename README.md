@@ -7,10 +7,10 @@ multi-effects guitar processor. It runs on top of [blokas](https://blokas.io/) *
 controller — no laptop or phone needed to play.
 
 - **GCaMP6s** — the whole finished multi-effects box (the product).
-- **Synapse** — this repo: the Kivy app that drives MODEP from the box's touchscreen.
+- **Synapse** — this repo: the PyQt6 + QML app that drives MODEP from the box's touchscreen.
 
-> Naming note: the codebase still carries the old name in places (the Kivy window title /
-> `GCaMP6sApp` class in [`app.py`](app.py), the `gcamp6s-venv` virtualenv). The intended
+> Naming note: the codebase still carries the old name in places (the legacy Kivy entry —
+> `GCaMP6sApp` class in [`app.py`](app.py), kept for rollback). The intended
 > end state is **Synapse = app**, **GCaMP6s = box**; a rename refactor is on the roadmap.
 
 ---
@@ -124,21 +124,23 @@ synapse/
 On the device (Patchbox OS), the app is launched via:
 
 ```bash
-./run_synapsepy.sh          # source the venv, then: python app.py
+./run_synapsepy.sh          # source the venv, then: python qt_main.py
 ```
 
 Auto-start chain on boot:
 
 ```
-~/.config/labwc/autostart  →  ~/run_synapsepy.sh  →  venv activate  →  python app.py
+~/.config/labwc/autostart  →  ~/run_synapsepy.sh  →  venv activate  →  python qt_main.py
 ```
 
 The repo's [`run_synapsepy.sh`](run_synapsepy.sh) is a copy of the device's original launch
-script; paths (`/home/miza/...`, the `gcamp6s-venv` virtualenv) are device-specific.
+script; paths (`/home/miza/...`, the `synapse-venv` virtualenv) are device-specific. (The old
+Kivy entry [`app.py`](app.py) + `gcamp6s-venv` are kept for rollback.)
 
-**Off-device development:** set `ModepController.TESTMODE = True` in
-[`modepctrl.py`](modepctrl.py) to aim the HTTP client at a remote MODEP instead of `localhost`.
-Hardware-dependent paths (the I²C devices, the unix socket) still expect the real box.
+**Off-device development:** the Qt mock [`qt_app.py`](qt_app.py) runs headless on a PC with a
+fake backend + fake hardware injected at the seams — see [`requirements-dev.txt`](requirements-dev.txt).
+(Alternatively, `ModepController.TESTMODE = True` in [`modepctrl.py`](modepctrl.py) aims the HTTP
+client at a remote MODEP.) Hardware-dependent paths (the I²C devices, the unix socket) expect the real box.
 
 ---
 
@@ -166,14 +168,14 @@ Custom endpoints added by the patches (see [`REFERENCES.md`](REFERENCES.md) for 
 ## Documentation
 
 - [`REFERENCES.md`](REFERENCES.md) — external dependencies, the live Pi as ground truth,
-  patch/deploy details, and known issues.
-- [`docs/snapshot-sync-diagnosis.md`](docs/snapshot-sync-diagnosis.md) — snapshot sync investigation.
-- [`docs/ui-migration-review.md`](docs/ui-migration-review.md) — new-UI migration review (Claude Design ↔ current bitmap UI gaps).
+  and patch/deploy details.
+- [`docs/qt-roadmap.md`](docs/qt-roadmap.md) — Qt app roadmap (remaining features / reliability / cleanup / boot).
+- [`docs/qt-migration-FINISHED.md`](docs/qt-migration-FINISHED.md) — Qt migration archive (completed stack work: PyQt6+QML+eglfs).
 
 ---
 
 ## Roadmap / known rough edges
 
 - **Naming refactor** — converge the code on *Synapse* (app) vs *GCaMP6s* (box).
-- Reverse-channel and web/HMI desync issues, plus a Wayland-incompatible `xdotool` call in
-  the web-UI close path, are tracked in [`REFERENCES.md`](REFERENCES.md#알려진-이슈-세션-0-정찰).
+- Dead web-UI path (`open_webui`/`close_webui` + the X11 `xdotool` call) is slated for removal in
+  [`docs/qt-roadmap.md`](docs/qt-roadmap.md) Tier 3 (unused on the Qt path; obsoleted by the compositor bypass).

@@ -1,0 +1,116 @@
+"""MODEP backend abstraction (the host seam).
+
+Decouples the logic layers (presenter, the model classes, the pedalboard
+builder) from *how* the MODEP host is reached. Those layers depend only on the
+``Backend`` surface below; the on-device implementation is ``modepctrl``'s
+``ModepController`` (HTTP to mod-host/mod-ui), wired in by default. Running off
+device (e.g. the Windows PySide6 mock) means injecting a different ``Backend``
+that serves fixtures -- see ``modepctrl.set_backend`` and ``fakemodep``.
+
+The fake is injected at this *object seam*; the mod-host/mod-ui wire protocol
+(HTTP/socket) is deliberately **not** re-implemented. Method names and return
+contracts mirror ``ModepController`` exactly, so ``ModepController`` itself is a
+structural ``Backend`` (it does not subclass this) and the swap is name/wiring
+only -- the same approach as ``scheduler.Scheduler``.
+
+Return contracts worth noting:
+- Write calls (``parameter_set``, ``patch_set``, ``bypass_effect``,
+  ``set_bpm``, ``set_bpb``) return ``None`` on success or an error string;
+  callers branch on ``error_msg is None``.
+- ``snapshot_current_idx`` returns an ``int`` (``-1`` when it can't be
+  resolved). ``get_snapshot_list`` returns a dict ``{"0": name, ...}`` (or an
+  empty list on host failure); callers use ``len(...)`` and ``str(idx) in ...``.
+
+NOTE: ``presenter.recall_pb_ss`` (footswitch mode 2) calls ``set_snapshot``,
+which the real ``ModepController`` does **not** define -- a pre-existing latent
+bug, left as-is. A fake may add a working ``set_snapshot`` stub; it is not part
+of the faithful surface below.
+"""
+
+
+class Backend:
+    """Reach the MODEP host. Default implementation is
+    ``modepctrl.ModepController``; grouped here by concern. See the module
+    docstring for the return contracts shared across methods.
+    """
+
+    # -- Pedalboard / bank -----------------------------------------------------
+    def get_current_pedalboard(self):
+        """Return the current pedalboard's bundle path (str)."""
+        raise NotImplementedError
+
+    def get_pedalboard_info(self, pbpath):
+        """Return the full pedalboard description (mod-ui JSON dict)."""
+        raise NotImplementedError
+
+    def set_pedalboard(self, board):
+        """Load the pedalboard at bundle path ``board``."""
+        raise NotImplementedError
+
+    def set_next_pedalboard(self):
+        """Switch to the next pedalboard in the current bank."""
+        raise NotImplementedError
+
+    def set_prev_pedalboard(self):
+        """Switch to the previous pedalboard in the current bank."""
+        raise NotImplementedError
+
+    # -- Effect / parameter ----------------------------------------------------
+    def effect_get_information(self, uri):
+        """Return plugin metadata for ``uri`` (mod-ui JSON dict)."""
+        raise NotImplementedError
+
+    def parameter_get(self, instance_id, symbol):
+        """Return the current value of ``symbol`` on ``instance_id`` -- bool for
+        ``:bypass``, else float; ``None`` on failure."""
+        raise NotImplementedError
+
+    def parameter_set(self, instance_id, symbol, value):
+        """Set ``symbol`` on ``instance_id`` to ``value``. Return ``None`` on
+        success, else an error string."""
+        raise NotImplementedError
+
+    def bypass_effect(self, instance, value):
+        """Set the bypass state of ``instance``. Return ``None`` on success,
+        else an error string."""
+        raise NotImplementedError
+
+    def patch_get(self, instance, uri):
+        """Return the current patch value for ``uri`` on ``instance`` (``None``
+        on failure)."""
+        raise NotImplementedError
+
+    def patch_set(self, instance, uri, value):
+        """Load patch ``value`` for ``uri`` on ``instance``. Return ``None`` on
+        success, else an error string."""
+        raise NotImplementedError
+
+    # -- Snapshot --------------------------------------------------------------
+    def snapshot_current_idx(self):
+        """Return the current snapshot index (int; ``-1`` if unknown)."""
+        raise NotImplementedError
+
+    def get_snapshot_list(self):
+        """Return the snapshot map ``{"0": name, ...}`` (or ``[]`` on failure)."""
+        raise NotImplementedError
+
+    def load_snapshot(self, idx):
+        """Load snapshot ``idx``."""
+        raise NotImplementedError
+
+    def snapshot_save(self, save_pb_also=True):
+        """Save over the current snapshot. Return ``True`` on success."""
+        raise NotImplementedError
+
+    def snapshot_save_as(self, new_name="New Snapshot", save_pb_also=True):
+        """Save the current state as a new snapshot named ``new_name``."""
+        raise NotImplementedError
+
+    # -- Transport -------------------------------------------------------------
+    def set_bpm(self, value):
+        """Set transport BPM. Return ``None`` on success, else an error string."""
+        raise NotImplementedError
+
+    def set_bpb(self, value):
+        """Set transport beats-per-bar. Return ``None`` on success, else error."""
+        raise NotImplementedError

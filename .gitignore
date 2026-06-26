@@ -3,6 +3,9 @@ __pycache__/
 *.pyc
 *.pyo
 
+# off-device dev venv (Windows Qt mock; deps in requirements-dev.txt)
+.venv/
+
 # macOS / IDE
 .DS_Store
 .idea/

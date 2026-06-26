@@ -1,0 +1,156 @@
+{
+  "current_pedalboard": "/var/modep/pedalboards/GCaMP6s Demo.pedalboard",
+  "snapshots": {"0": "Default", "1": "Lead Boost"},
+  "snapshot_current_idx": 0,
+  "pedalboard_info": {
+    "title": "GCaMP6s Demo",
+    "width": 3000,
+    "height": 1600,
+    "midi_separated_mode": false,
+    "midi_loopback": false,
+    "timeInfo": {
+      "bpm": 120.0,
+      "bpb": 4,
+      "bpmCC": {"channel": -1, "control": -1},
+      "rollingCC": {"channel": -1, "control": -1}
+    },
+    "hardware": {"audio_ins": 2, "audio_outs": 2, "cv_ins": 0, "cv_outs": 0},
+    "connections": [
+      {"source": "capture_1", "target": "Noisegate/In"},
+      {"source": "Noisegate/Out", "target": "Drive/In"},
+      {"source": "Drive/Out", "target": "Cabinet/In"},
+      {"source": "Cabinet/Out", "target": "playback_1"},
+      {"source": "Cabinet/Out", "target": "playback_2"}
+    ],
+    "plugins": [
+      {
+        "instance": "Noisegate",
+        "uri": "http://example.org/synapse/noisegate",
+        "bypassed": false,
+        "x": 200.0,
+        "y": 400.0,
+        "ports": [
+          {"symbol": "threshold", "value": -60.0},
+          {"symbol": "decay", "value": 50.0}
+        ]
+      },
+      {
+        "instance": "Drive",
+        "uri": "http://example.org/synapse/drive",
+        "bypassed": false,
+        "x": 900.0,
+        "y": 400.0,
+        "ports": [
+          {"symbol": "gain", "value": 0.6},
+          {"symbol": "tone", "value": 0.5},
+          {"symbol": "level", "value": 0.7}
+        ]
+      },
+      {
+        "instance": "Cabinet",
+        "uri": "http://moddevices.com/plugins/mod-devel/cabsim",
+        "bypassed": true,
+        "x": 1600.0,
+        "y": 400.0,
+        "ports": [
+          {"symbol": "gain", "value": 0.5}
+        ]
+      }
+    ]
+  },
+  "effects": {
+    "http://example.org/synapse/noisegate": {
+      "name": "Noise Gate",
+      "brand": "Synapse",
+      "category": ["Dynamics"],
+      "parameters": [],
+      "ports": {
+        "control": {
+          "input": [
+            {
+              "symbol": "threshold",
+              "name": "Threshold",
+              "ranges": {"minimum": -70.0, "maximum": 0.0, "default": -60.0},
+              "units": {"symbol": "dB"},
+              "properties": []
+            },
+            {
+              "symbol": "decay",
+              "name": "Decay",
+              "ranges": {"minimum": 1.0, "maximum": 500.0, "default": 50.0},
+              "units": {"symbol": "ms"},
+              "properties": []
+            }
+          ]
+        }
+      }
+    },
+    "http://example.org/synapse/drive": {
+      "name": "Overdrive",
+      "brand": "Synapse",
+      "category": ["Distortion"],
+      "parameters": [],
+      "ports": {
+        "control": {
+          "input": [
+            {
+              "symbol": "gain",
+              "name": "Gain",
+              "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.5},
+              "units": {"symbol": ""},
+              "properties": []
+            },
+            {
+              "symbol": "tone",
+              "name": "Tone",
+              "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.5},
+              "units": {"symbol": ""},
+              "properties": []
+            },
+            {
+              "symbol": "level",
+              "name": "Level",
+              "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.7},
+              "units": {"symbol": ""},
+              "properties": []
+            }
+          ]
+        }
+      }
+    },
+    "http://moddevices.com/plugins/mod-devel/cabsim": {
+      "name": "Cabinet Sim",
+      "brand": "MOD",
+      "category": ["Simulator"],
+      "parameters": [
+        {
+          "valid": true,
+          "uri": "http://moddevices.com/plugins/mod-devel/cabsim-IR-loader#ir",
+          "label": "IR File",
+          "fileTypes": ["cabsim", "audio"]
+        }
+      ],
+      "ports": {
+        "control": {
+          "input": [
+            {
+              "symbol": "gain",
+              "name": "Gain",
+              "ranges": {"minimum": 0.0, "maximum": 2.0, "default": 1.0},
+              "units": {"symbol": ""},
+              "properties": []
+            }
+          ]
+        }
+      }
+    }
+  },
+  "patches": {
+    "Cabinet": {
+      "http://moddevices.com/plugins/mod-devel/cabsim-IR-loader#ir": [
+        "/var/modep/user-files/Speaker Cabinets IRs/Marshall 1960.wav",
+        "path"
+      ]
+    }
+  }
+}

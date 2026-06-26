@@ -1,0 +1,149 @@
+{
+  "current_pedalboard": "/var/modep/pedalboards/Widget Lab.pedalboard",
+  "snapshots": {"0": "Default"},
+  "snapshot_current_idx": 0,
+  "pedalboard_info": {
+    "title": "Widget Lab",
+    "width": 3000,
+    "height": 1600,
+    "midi_separated_mode": false,
+    "midi_loopback": false,
+    "timeInfo": {
+      "bpm": 128.0,
+      "bpb": 4,
+      "bpmCC": {"channel": -1, "control": -1},
+      "rollingCC": {"channel": -1, "control": -1}
+    },
+    "hardware": {"audio_ins": 2, "audio_outs": 2, "cv_ins": 0, "cv_outs": 0},
+    "connections": [
+      {"source": "capture_1", "target": "Tuner/In"},
+      {"source": "capture_1", "target": "Drive/In"},
+      {"source": "Drive/Out", "target": "Comp/In"},
+      {"source": "Comp/Out", "target": "Gate/In"},
+      {"source": "Gate/Out", "target": "Recorder/In"},
+      {"source": "Recorder/Out", "target": "Meter/In"},
+      {"source": "Meter/Out", "target": "WidgetLab/In"},
+      {"source": "WidgetLab/Out", "target": "playback_1"},
+      {"source": "WidgetLab/Out", "target": "playback_2"}
+    ],
+    "plugins": [
+      {"instance": "Tuner", "uri": "http://example.org/synapse/tuner", "bypassed": false, "x": 200.0, "y": 250.0,
+       "ports": [{"symbol": "ref", "value": 440.0}]},
+      {"instance": "Drive", "uri": "http://example.org/synapse/drive", "bypassed": false, "x": 200.0, "y": 800.0,
+       "ports": [{"symbol": "gain", "value": 0.62}, {"symbol": "tone", "value": 0.45}, {"symbol": "level", "value": 0.7}]},
+      {"instance": "Comp", "uri": "http://example.org/synapse/comp", "bypassed": false, "x": 700.0, "y": 800.0,
+       "ports": [{"symbol": "thresh", "value": -18.0}, {"symbol": "ratio", "value": 4.0}, {"symbol": "attack", "value": 12.0}, {"symbol": "makeup", "value": 6.0}]},
+      {"instance": "Gate", "uri": "http://example.org/synapse/gate", "bypassed": true, "x": 1200.0, "y": 800.0,
+       "ports": [{"symbol": "thresh", "value": -55.0}, {"symbol": "range", "value": 40.0}]},
+      {"instance": "Recorder", "uri": "http://example.org/synapse/recorder", "bypassed": false, "x": 1700.0, "y": 800.0,
+       "ports": [{"symbol": "format", "value": 1}, {"symbol": "rec", "value": 1}, {"symbol": "thru", "value": 1}]},
+      {"instance": "Meter", "uri": "http://example.org/synapse/meter", "bypassed": false, "x": 2200.0, "y": 800.0,
+       "ports": [{"symbol": "reset", "value": 1}]},
+      {"instance": "WidgetLab", "uri": "http://example.org/synapse/widgetlab", "bypassed": false, "x": 2700.0, "y": 800.0,
+       "ports": [{"symbol": "gain", "value": 6.0}, {"symbol": "freq", "value": 1000.0}, {"symbol": "taps", "value": 3}, {"symbol": "active", "value": 1}, {"symbol": "reset", "value": 1}, {"symbol": "mode", "value": 2}]}
+    ]
+  },
+  "effects": {
+    "http://example.org/synapse/widgetlab": {
+      "name": "Widget Lab", "brand": "Synapse", "category": ["Utility"], "parameters": [],
+      "gui": {"monitoredOutputs": ["level", "clip", "bpm", "cent"]},
+      "ports": {"control": {
+        "input": [
+          {"symbol": "gain", "name": "Gain", "ranges": {"minimum": -20.0, "maximum": 20.0, "default": 0.0}, "units": {"symbol": "dB"}, "properties": []},
+          {"symbol": "freq", "name": "Freq", "ranges": {"minimum": 20.0, "maximum": 20000.0, "default": 1000.0}, "units": {"symbol": "Hz"}, "properties": ["logarithmic"]},
+          {"symbol": "taps", "name": "Taps", "ranges": {"minimum": 1.0, "maximum": 8.0, "default": 1.0}, "units": {"symbol": ""}, "properties": ["integer"], "rangeSteps": 7},
+          {"symbol": "active", "name": "Active", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.0}, "units": {"symbol": ""}, "properties": ["toggled"]},
+          {"symbol": "reset", "name": "Reset", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.0}, "units": {"symbol": ""}, "properties": ["integer", "toggled", "trigger"]},
+          {"symbol": "mode", "name": "Mode", "ranges": {"minimum": 0.0, "maximum": 2.0, "default": 0.0}, "units": {"symbol": ""}, "properties": ["enumeration", "integer"], "scalePoints": [[0.0, "Soft"], [1.0, "Hard"], [2.0, "Crush"]]}
+        ],
+        "output": [
+          {"symbol": "level", "name": "Level", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.6}, "units": {"symbol": ""}, "properties": []},
+          {"symbol": "clip", "name": "Clip", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 1.0}, "units": {"symbol": ""}, "properties": ["integer", "toggled"]},
+          {"symbol": "bpm", "name": "Tempo", "ranges": {"minimum": 1.0, "maximum": 300.0, "default": 128.0}, "units": {"symbol": "bpm"}, "properties": []},
+          {"symbol": "cent", "name": "Cent", "ranges": {"minimum": -50.0, "maximum": 50.0, "default": 12.0}, "units": {"symbol": ""}, "properties": []}
+        ]
+      }}
+    },
+    "http://example.org/synapse/meter": {
+      "name": "Level Meter", "brand": "x42", "category": ["Utility"], "parameters": [],
+      "gui": {"monitoredOutputs": ["level", "peak", "rms"]},
+      "ports": {"control": {
+        "input": [
+          {"symbol": "reset", "name": "Reset Peak", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.0}, "units": {"symbol": ""}, "properties": ["integer", "toggled", "trigger"]}
+        ],
+        "output": [
+          {"symbol": "level", "name": "Level", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.72}, "units": {"symbol": ""}, "properties": []},
+          {"symbol": "peak", "name": "Peak", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.88}, "units": {"symbol": ""}, "properties": []},
+          {"symbol": "rms", "name": "RMS", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.54}, "units": {"symbol": ""}, "properties": []}
+        ]
+      }}
+    },
+    "http://example.org/synapse/recorder": {
+      "name": "Recorder", "brand": "Synapse", "category": ["Utility"], "parameters": [],
+      "gui": {"monitoredOutputs": ["lmeter", "clip"]},
+      "ports": {"control": {
+        "input": [
+          {"symbol": "format", "name": "Format", "ranges": {"minimum": 0.0, "maximum": 2.0, "default": 0.0}, "units": {"symbol": ""}, "properties": ["enumeration", "integer"], "scalePoints": [[0.0, "WAV"], [1.0, "FLAC"], [2.0, "MP3"]]},
+          {"symbol": "rec", "name": "Record", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.0}, "units": {"symbol": ""}, "properties": ["toggled"]},
+          {"symbol": "thru", "name": "Monitor", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.0}, "units": {"symbol": ""}, "properties": ["toggled"]}
+        ],
+        "output": [
+          {"symbol": "lmeter", "name": "Level", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.66}, "units": {"symbol": ""}, "properties": []},
+          {"symbol": "clip", "name": "Clip", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.0}, "units": {"symbol": ""}, "properties": ["integer", "toggled"]}
+        ]
+      }}
+    },
+    "http://example.org/synapse/tuner": {
+      "name": "Instrument Tuner", "brand": "x42", "category": ["Utility"], "parameters": [],
+      "gui": {"monitoredOutputs": ["note", "cent", "freq"]},
+      "ports": {"control": {
+        "input": [
+          {"symbol": "ref", "name": "Ref A", "ranges": {"minimum": 400.0, "maximum": 480.0, "default": 440.0}, "units": {"symbol": "Hz"}, "properties": []}
+        ],
+        "output": [
+          {"symbol": "note", "name": "Note", "ranges": {"minimum": 0.0, "maximum": 11.0, "default": 9.0}, "units": {"symbol": ""}, "properties": ["integer"]},
+          {"symbol": "cent", "name": "Cent", "ranges": {"minimum": -50.0, "maximum": 50.0, "default": -8.0}, "units": {"symbol": ""}, "properties": []},
+          {"symbol": "freq", "name": "Freq", "ranges": {"minimum": 20.0, "maximum": 4000.0, "default": 437.0}, "units": {"symbol": "Hz"}, "properties": []}
+        ]
+      }}
+    },
+    "http://example.org/synapse/drive": {
+      "name": "Overdrive", "brand": "Synapse", "category": ["Distortion"], "parameters": [],
+      "ports": {"control": {
+        "input": [
+          {"symbol": "gain", "name": "Gain", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.5}, "units": {"symbol": ""}, "properties": []},
+          {"symbol": "tone", "name": "Tone", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.5}, "units": {"symbol": ""}, "properties": []},
+          {"symbol": "level", "name": "Level", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.7}, "units": {"symbol": ""}, "properties": []}
+        ]
+      }}
+    },
+    "http://example.org/synapse/comp": {
+      "name": "Compressor", "brand": "Synapse", "category": ["Dynamics"], "parameters": [],
+      "gui": {"monitoredOutputs": ["gr"]},
+      "ports": {"control": {
+        "input": [
+          {"symbol": "thresh", "name": "Threshold", "ranges": {"minimum": -60.0, "maximum": 0.0, "default": -20.0}, "units": {"symbol": "dB"}, "properties": []},
+          {"symbol": "ratio", "name": "Ratio", "ranges": {"minimum": 1.0, "maximum": 20.0, "default": 4.0}, "units": {"symbol": ""}, "properties": ["logarithmic"]},
+          {"symbol": "attack", "name": "Attack", "ranges": {"minimum": 1.0, "maximum": 100.0, "default": 12.0}, "units": {"symbol": "ms"}, "properties": []},
+          {"symbol": "makeup", "name": "Makeup", "ranges": {"minimum": 0.0, "maximum": 24.0, "default": 6.0}, "units": {"symbol": "dB"}, "properties": []}
+        ],
+        "output": [
+          {"symbol": "gr", "name": "Gain Red.", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.4}, "units": {"symbol": ""}, "properties": []}
+        ]
+      }}
+    },
+    "http://example.org/synapse/gate": {
+      "name": "Noise Gate", "brand": "Synapse", "category": ["Dynamics"], "parameters": [],
+      "gui": {"monitoredOutputs": ["open"]},
+      "ports": {"control": {
+        "input": [
+          {"symbol": "thresh", "name": "Threshold", "ranges": {"minimum": -80.0, "maximum": 0.0, "default": -60.0}, "units": {"symbol": "dB"}, "properties": []},
+          {"symbol": "range", "name": "Range", "ranges": {"minimum": 0.0, "maximum": 90.0, "default": 40.0}, "units": {"symbol": "dB"}, "properties": []}
+        ],
+        "output": [
+          {"symbol": "open", "name": "Gate Open", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 1.0}, "units": {"symbol": ""}, "properties": ["integer", "toggled"]}
+        ]
+      }}
+    }
+  }
+}

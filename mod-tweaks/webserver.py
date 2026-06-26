@@ -1123,6 +1123,8 @@ class EffectConnect(JsonRequestHandler):
     def get(self, port_from, port_to):
         ok = yield gen.Task(SESSION.web_connect, port_from, port_to)
         self.write(ok)
+        if ok:
+            notify_synapsin(message=f"EffectConnect {port_from}, {port_to}")
 
 class EffectDisconnect(JsonRequestHandler):
     @web.asynchronous
@@ -1130,6 +1132,8 @@ class EffectDisconnect(JsonRequestHandler):
     def get(self, port_from, port_to):
         ok = yield gen.Task(SESSION.web_disconnect, port_from, port_to)
         self.write(ok)
+        if ok:
+            notify_synapsin(message=f"EffectDisconnect {port_from}, {port_to}")
 
 class EffectParameterAddress(JsonRequestHandler):
     @web.asynchronous
