@@ -1,0 +1,6787 @@
+{
+ "count": 72,
+ "buckets": [
+  {
+   "key": "Drive",
+   "count": 5
+  },
+  {
+   "key": "Comp",
+   "count": 3
+  },
+  {
+   "key": "Gate",
+   "count": 2
+  },
+  {
+   "key": "Dynamics",
+   "count": 2
+  },
+  {
+   "key": "EQ",
+   "count": 1
+  },
+  {
+   "key": "Filter",
+   "count": 6
+  },
+  {
+   "key": "Mod",
+   "count": 5
+  },
+  {
+   "key": "Delay",
+   "count": 2
+  },
+  {
+   "key": "Reverb",
+   "count": 10
+  },
+  {
+   "key": "Pitch",
+   "count": 6
+  },
+  {
+   "key": "Amp·Cab",
+   "count": 5
+  },
+  {
+   "key": "Synth",
+   "count": 7
+  },
+  {
+   "key": "Spatial",
+   "count": 2
+  },
+  {
+   "key": "Utility",
+   "count": 13
+  },
+  {
+   "key": "CV",
+   "count": 2
+  },
+  {
+   "key": "MIDI",
+   "count": 1
+  }
+ ],
+ "plugins": [
+  {
+   "uri": "http://aidadsp.cc/plugins/aidadsp-bundle/rt-neural-generic",
+   "name": "AIDA-X",
+   "label": "AIDA-X",
+   "brand": "Aida DSP",
+   "cat": [
+    "Simulator"
+   ],
+   "bucket": "Amp·Cab",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": true,
+   "ctlTotal": 18,
+   "ctl": [
+    {
+     "name": "ANTIALIASING",
+     "short": "ANTIALIASING",
+     "sym": "ANTIALIASING",
+     "min": 0,
+     "max": 100,
+     "def": 66.21600341796875,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "INPUT",
+     "short": "INPUT",
+     "sym": "PREGAIN",
+     "min": -12,
+     "max": 12,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "NETBYPASS",
+     "short": "NETBYPASS",
+     "sym": "NETBYPASS",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "PARAM1",
+     "short": "PARAM1",
+     "sym": "PARAM1",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "PARAM2",
+     "short": "PARAM2",
+     "sym": "PARAM2",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "EQBYPASS",
+     "short": "EQBYPASS",
+     "sym": "EQBYPASS",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "EQPOS",
+     "short": "EQPOS",
+     "sym": "EQPOS",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "POST",
+      "PRE"
+     ]
+    },
+    {
+     "name": "BASS",
+     "short": "BASS",
+     "sym": "BASS",
+     "min": -8,
+     "max": 8,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "BFREQ",
+     "short": "BFREQ",
+     "sym": "BFREQ",
+     "min": 75,
+     "max": 600,
+     "def": 305,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "MID",
+     "short": "MID",
+     "sym": "MID",
+     "min": -8,
+     "max": 8,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "MFREQ",
+     "short": "MFREQ",
+     "sym": "MFREQ",
+     "min": 150,
+     "max": 5000,
+     "def": 750,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "MIDQ",
+     "short": "MIDQ",
+     "sym": "MIDQ",
+     "min": 0.20000000298023224,
+     "max": 5,
+     "def": 0.7070000171661377,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "MTYPE",
+     "short": "MTYPE",
+     "sym": "MTYPE",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "PEAK",
+      "BANDPASS"
+     ]
+    },
+    {
+     "name": "TREBLE",
+     "short": "TREBLE",
+     "sym": "TREBLE",
+     "min": -8,
+     "max": 8,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "TFREQ",
+     "short": "TFREQ",
+     "sym": "TFREQ",
+     "min": 1000,
+     "max": 4000,
+     "def": 2000,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "DEPTH",
+     "short": "DEPTH",
+     "sym": "DEPTH",
+     "min": -8,
+     "max": 8,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "AIDA-X is an Amp Model Player, allowing it to load models of AI trained music gear, which you can then play through!"
+  },
+  {
+   "uri": "http://code.google.com/p/amsynth/amsynth",
+   "name": "amsynth",
+   "label": "amsynth",
+   "brand": "Dowell",
+   "cat": [
+    "Generator",
+    "Instrument"
+   ],
+   "bucket": "Synth",
+   "sub": "Instrument",
+   "ai": 0,
+   "ao": 2,
+   "mi": 1,
+   "mo": 0,
+   "cv": 0,
+   "presets": 27,
+   "hasBypass": false,
+   "ctlTotal": 41,
+   "ctl": [
+    {
+     "name": "Amp Attack",
+     "short": "Amp Attack",
+     "sym": "amp_attack",
+     "min": 0,
+     "max": 2.5,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Amp Decay",
+     "short": "Amp Decay",
+     "sym": "amp_decay",
+     "min": 0,
+     "max": 2.5,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Amp Sustain",
+     "short": "Amp Sustain",
+     "sym": "amp_sustain",
+     "min": 0,
+     "max": 1,
+     "def": 0.4099999964237213,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Amp Release",
+     "short": "Amp Release",
+     "sym": "amp_release",
+     "min": 0,
+     "max": 2.5,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Osc1 Waveform",
+     "short": "Osc1 Waveform",
+     "sym": "osc1_waveform",
+     "min": 0,
+     "max": 4,
+     "def": 2,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "sine",
+      "square / pulse",
+      "saw / triangle",
+      "white noise",
+      "noise + sample & hold"
+     ]
+    },
+    {
+     "name": "Filter Attack",
+     "short": "Filter Attack",
+     "sym": "filter_attack",
+     "min": 0,
+     "max": 2.5,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Filter Decay",
+     "short": "Filter Decay",
+     "sym": "filter_decay",
+     "min": 0,
+     "max": 2.5,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Filter Sustain",
+     "short": "Filter Sustain",
+     "sym": "filter_sustain",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Filter Release",
+     "short": "Filter Release",
+     "sym": "filter_release",
+     "min": 0,
+     "max": 2.5,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Filter Resonance",
+     "short": "Filter Resonance",
+     "sym": "filter_resonance",
+     "min": 0,
+     "max": 0.9700000286102295,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Filter Env Amount",
+     "short": "Filter Env Amoun",
+     "sym": "filter_env_amount",
+     "min": -16,
+     "max": 16,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Filter Cutoff",
+     "short": "Filter Cutoff",
+     "sym": "filter_cutoff",
+     "min": -0.5,
+     "max": 1.5,
+     "def": 1.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Osc2 Detune",
+     "short": "Osc2 Detune",
+     "sym": "osc2_detune",
+     "min": -1,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Osc2 Waveform",
+     "short": "Osc2 Waveform",
+     "sym": "osc2_waveform",
+     "min": 0,
+     "max": 4,
+     "def": 2,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "sine",
+      "square / pulse",
+      "saw / triangle",
+      "white noise",
+      "noise + sample & hold"
+     ]
+    },
+    {
+     "name": "Master Vol",
+     "short": "Master Vol",
+     "sym": "master_vol",
+     "min": 0,
+     "max": 1,
+     "def": 0.6700000166893005,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "LFO Freq",
+     "short": "LFO Freq",
+     "sym": "lfo_freq",
+     "min": 0,
+     "max": 7.5,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "The AmSynth is a synth with a classic subtractive synthesizer topology. It features Dual oscillators, a resonant filter, a dual ADSR and a L"
+  },
+  {
+   "uri": "http://devcurmudgeon.com/alo",
+   "name": "ALO",
+   "label": "ALO",
+   "brand": "",
+   "cat": [
+    "Utility"
+   ],
+   "bucket": "Utility",
+   "sub": "",
+   "ai": 2,
+   "ao": 2,
+   "mi": 1,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": true,
+   "ctlTotal": 13,
+   "ctl": [
+    {
+     "name": "Loop1",
+     "short": "Loop1",
+     "sym": "loop1",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Loop2",
+     "short": "Loop2",
+     "sym": "loop2",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Loop3",
+     "short": "Loop3",
+     "sym": "loop3",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Loop4",
+     "short": "Loop4",
+     "sym": "loop4",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Loop5",
+     "short": "Loop5",
+     "sym": "loop5",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Loop6",
+     "short": "Loop6",
+     "sym": "loop6",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Threshold",
+     "short": "Threshold",
+     "sym": "threshold",
+     "min": -90,
+     "max": 24,
+     "def": -40,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "MIDI Base",
+     "short": "MIDI Base",
+     "sym": "midi_base",
+     "min": 1,
+     "max": 120,
+     "def": 60,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Instant Loops",
+     "short": "Instant Loops",
+     "sym": "instant_loops",
+     "min": 0,
+     "max": 6,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Click",
+     "short": "Click",
+     "sym": "click",
+     "min": 0,
+     "max": 10,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Bars",
+     "short": "Bars",
+     "sym": "bars",
+     "min": 1,
+     "max": 32,
+     "def": 2,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Mix",
+     "short": "Mix",
+     "sym": "mix",
+     "min": 0,
+     "max": 100,
+     "def": 50,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Reset Mode",
+     "short": "Reset Mode",
+     "sym": "reset_mode",
+     "min": 0,
+     "max": 3,
+     "def": 3,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    }
+   ],
+   "comment": "ALO is a multi-track looper designed for live audio looping. It works in sync mode, with Global BPM, or in free-running mode."
+  },
+  {
+   "uri": "http://distrho.sf.net/plugins/3BandEQ",
+   "name": "3 Band EQ",
+   "label": "3 Band EQ",
+   "brand": "DISTRHO",
+   "cat": [
+    "Filter",
+    "Equaliser"
+   ],
+   "bucket": "EQ",
+   "sub": "Equaliser",
+   "ai": 2,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 2,
+   "hasBypass": false,
+   "ctlTotal": 6,
+   "ctl": [
+    {
+     "name": "Low",
+     "short": "Low",
+     "sym": "low",
+     "min": -24,
+     "max": 24,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Mid",
+     "short": "Mid",
+     "sym": "mid",
+     "min": -24,
+     "max": 24,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "High",
+     "short": "High",
+     "sym": "high",
+     "min": -24,
+     "max": 24,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Master",
+     "short": "Master",
+     "sym": "master",
+     "min": -24,
+     "max": 24,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Low-Mid Freq",
+     "short": "Low-Mid Freq",
+     "sym": "low_mid",
+     "min": 0,
+     "max": 1000,
+     "def": 220,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Mid-High Freq",
+     "short": "Mid-High Freq",
+     "sym": "mid_high",
+     "min": 1000,
+     "max": 20000,
+     "def": 2000,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "3 Band Equalizer, stereo version."
+  },
+  {
+   "uri": "http://distrho.sf.net/plugins/Kars",
+   "name": "Kars",
+   "label": "Kars",
+   "brand": "DISTRHO",
+   "cat": [
+    "Generator",
+    "Instrument"
+   ],
+   "bucket": "Synth",
+   "sub": "Instrument",
+   "ai": 0,
+   "ao": 1,
+   "mi": 1,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 3,
+   "ctl": [
+    {
+     "name": "Sustain",
+     "short": "Sustain",
+     "sym": "sustain",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Release",
+     "short": "Release",
+     "sym": "release",
+     "min": 0,
+     "max": 5,
+     "def": 0.009999999776482582,
+     "unit": "s",
+     "render": "%f s",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Volume",
+     "short": "Volume",
+     "sym": "volume",
+     "min": 0,
+     "max": 100,
+     "def": 100,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "Simple karplus-strong plucked string synth."
+  },
+  {
+   "uri": "http://distrho.sf.net/plugins/Nekobi",
+   "name": "Nekobi",
+   "label": "Nekobi",
+   "brand": "DISTRHO",
+   "cat": [
+    "Generator",
+    "Instrument"
+   ],
+   "bucket": "Synth",
+   "sub": "Instrument",
+   "ai": 0,
+   "ao": 1,
+   "mi": 1,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": true,
+   "ctlTotal": 8,
+   "ctl": [
+    {
+     "name": "Waveform",
+     "short": "Waveform",
+     "sym": "waveform",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Triangle",
+      "Square"
+     ]
+    },
+    {
+     "name": "Tuning",
+     "short": "Tuning",
+     "sym": "tuning",
+     "min": -12,
+     "max": 12,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Cutoff",
+     "short": "Cutoff",
+     "sym": "cutoff",
+     "min": 0,
+     "max": 100,
+     "def": 25,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "VCF Resonance",
+     "short": "VCF Resonance",
+     "sym": "resonance",
+     "min": 0,
+     "max": 95,
+     "def": 25,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Env Mod",
+     "short": "Env Mod",
+     "sym": "env_mod",
+     "min": 0,
+     "max": 100,
+     "def": 50,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Decay",
+     "short": "Decay",
+     "sym": "decay",
+     "min": 0,
+     "max": 100,
+     "def": 75,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Accent",
+     "short": "Accent",
+     "sym": "accent",
+     "min": 0,
+     "max": 100,
+     "def": 25,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Volume",
+     "short": "Volume",
+     "sym": "volume",
+     "min": 0,
+     "max": 100,
+     "def": 75,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "The Nekobi generator is based on the legendary Roland TB-303© (*)."
+  },
+  {
+   "uri": "http://gareus.org/oss/lv2/fat1",
+   "name": "Autotune",
+   "label": "Autotune",
+   "brand": "x42",
+   "cat": [
+    "Spectral",
+    "Pitch Shifter"
+   ],
+   "bucket": "Pitch",
+   "sub": "Pitch Shifter",
+   "ai": 1,
+   "ao": 1,
+   "mi": 1,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 20,
+   "ctl": [
+    {
+     "name": "Mode",
+     "short": "Mode",
+     "sym": "mode",
+     "min": 0,
+     "max": 2,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Auto",
+      "MIDI",
+      "Manual"
+     ]
+    },
+    {
+     "name": "Filter Channel",
+     "short": "Filter Channel",
+     "sym": "channelf",
+     "min": 0,
+     "max": 16,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Any",
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16"
+     ]
+    },
+    {
+     "name": "Tuning",
+     "short": "Tuning",
+     "sym": "tuning",
+     "min": 400,
+     "max": 480,
+     "def": 440,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Bias",
+     "short": "Bias",
+     "sym": "bias",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Filter",
+     "short": "Filter",
+     "sym": "filter",
+     "min": 0.019999999552965164,
+     "max": 0.5,
+     "def": 0.10000000149011612,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Fast",
+      "Med",
+      "Slow"
+     ]
+    },
+    {
+     "name": "Correction",
+     "short": "Correction",
+     "sym": "corr",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Offset",
+     "short": "Offset",
+     "sym": "offset",
+     "min": -2,
+     "max": 2,
+     "def": 0,
+     "unit": "semi",
+     "render": "%f semi",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "C",
+     "short": "C",
+     "sym": "m00",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "C#",
+     "short": "C#",
+     "sym": "m01",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "D",
+     "short": "D",
+     "sym": "m02",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "D#",
+     "short": "D#",
+     "sym": "m03",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "E",
+     "short": "E",
+     "sym": "m04",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "F",
+     "short": "F",
+     "sym": "m05",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "F#",
+     "short": "F#",
+     "sym": "m06",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "G",
+     "short": "G",
+     "sym": "m07",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "G#",
+     "short": "G#",
+     "sym": "m08",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    }
+   ],
+   "comment": "The AT1 is used to correct pitch within the vocal range and features a few different modes. The first one is the Auto mode - with this mode,"
+  },
+  {
+   "uri": "http://gareus.org/oss/lv2/modmeter",
+   "name": "Level Meter",
+   "label": "Level Meter",
+   "brand": "x42",
+   "cat": [
+    "Utility"
+   ],
+   "bucket": "Utility",
+   "sub": "",
+   "ai": 1,
+   "ao": 0,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": false,
+   "ctlTotal": 1,
+   "ctl": [
+    {
+     "name": "Reset Peak Hold",
+     "short": "Reset Peak Hold",
+     "sym": "reset",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    }
+   ],
+   "comment": "The x42 Level Meter is a numeric audio signal level meter with a 15dB/sec falloff rate."
+  },
+  {
+   "uri": "http://gareus.org/oss/lv2/modspectre",
+   "name": "Spectrum Analyzer",
+   "label": "SpectrumAnalyzer",
+   "brand": "x42",
+   "cat": [
+    "Utility"
+   ],
+   "bucket": "Utility",
+   "sub": "",
+   "ai": 1,
+   "ao": 0,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": false,
+   "ctlTotal": 1,
+   "ctl": [
+    {
+     "name": "Response Time",
+     "short": "Response Time",
+     "sym": "response",
+     "min": 0.009999999776482582,
+     "max": 10,
+     "def": 1,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "log",
+     "scale": []
+    }
+   ],
+   "comment": "The x42 Spectrum Analyzer is a crude spectrum analyzer plugin with a configurable response time."
+  },
+  {
+   "uri": "http://gareus.org/oss/lv2/stepseq#s8n8",
+   "name": "MIDI Step Sequencer8x8",
+   "label": "Step Seq. 8x8",
+   "brand": "x42",
+   "cat": [
+    "MIDI"
+   ],
+   "bucket": "MIDI",
+   "sub": "",
+   "ai": 0,
+   "ao": 0,
+   "mi": 0,
+   "mo": 1,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 79,
+   "ctl": [
+    {
+     "name": "Sync",
+     "short": "Sync",
+     "sym": "sync",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Free Running",
+      "Host Sync (if available)"
+     ]
+    },
+    {
+     "name": "BPM",
+     "short": "BPM",
+     "sym": "bpm",
+     "min": 40,
+     "max": 208,
+     "def": 120,
+     "unit": "BPM",
+     "render": "%f BPM",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Step Duration (4/4)",
+     "short": "Step Duration (4",
+     "sym": "div",
+     "min": 0,
+     "max": 9,
+     "def": 3,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "32th",
+      "16th",
+      "8th",
+      "Quarter",
+      "Half Note",
+      "One Bar",
+      "3/2 Bars",
+      "2 Bars",
+      "3 Bars",
+      "4 Bars"
+     ]
+    },
+    {
+     "name": "Swing",
+     "short": "Swing",
+     "sym": "swing",
+     "min": 0,
+     "max": 0.5,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "No",
+      "Light 3:2",
+      "Medium 2:1",
+      "Hard 3:1"
+     ]
+    },
+    {
+     "name": "Drum Mode",
+     "short": "Drum Mode",
+     "sym": "drummode",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Midi Channel",
+     "short": "Midi Channel",
+     "sym": "chn",
+     "min": 0,
+     "max": 15,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "MIDI Panic",
+     "short": "MIDI Panic",
+     "sym": "panic",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Note 1",
+     "short": "Note 1",
+     "sym": "note1",
+     "min": 0,
+     "max": 127,
+     "def": 69,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Note 2",
+     "short": "Note 2",
+     "sym": "note2",
+     "min": 0,
+     "max": 127,
+     "def": 67,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Note 3",
+     "short": "Note 3",
+     "sym": "note3",
+     "min": 0,
+     "max": 127,
+     "def": 65,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Note 4",
+     "short": "Note 4",
+     "sym": "note4",
+     "min": 0,
+     "max": 127,
+     "def": 64,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Note 5",
+     "short": "Note 5",
+     "sym": "note5",
+     "min": 0,
+     "max": 127,
+     "def": 62,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Note 6",
+     "short": "Note 6",
+     "sym": "note6",
+     "min": 0,
+     "max": 127,
+     "def": 60,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Note 7",
+     "short": "Note 7",
+     "sym": "note7",
+     "min": 0,
+     "max": 127,
+     "def": 59,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Note 8",
+     "short": "Note 8",
+     "sym": "note8",
+     "min": 0,
+     "max": 127,
+     "def": 57,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Grid S: 1 N: 1",
+     "short": "Grid S: 1 N: 1",
+     "sym": "grid_1_1",
+     "min": 0,
+     "max": 127,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    }
+   ],
+   "comment": "A simple step sequencer. It allows to trigger MIDI note events placed on a time/note grid."
+  },
+  {
+   "uri": "http://gareus.org/oss/lv2/tuna#mod",
+   "name": "Instrument Tuner",
+   "label": "Tuna Tuner",
+   "brand": "x42",
+   "cat": [
+    "Utility",
+    "Analyser"
+   ],
+   "bucket": "Utility",
+   "sub": "Analyser",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": false,
+   "ctlTotal": 2,
+   "ctl": [
+    {
+     "name": "Mode",
+     "short": "Mode",
+     "sym": "mode",
+     "min": 0,
+     "max": 8000,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "auto",
+      "A2",
+      "A4",
+      "A5",
+      "8KHz"
+     ]
+    },
+    {
+     "name": "Tuning A440",
+     "short": "Tuning A440",
+     "sym": "tuning",
+     "min": 220,
+     "max": 880,
+     "def": 440,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "enum",
+     "scale": [
+      "standard"
+     ]
+    }
+   ],
+   "comment": "Musical instrument tuner with strobe characteristics"
+  },
+  {
+   "uri": "http://gareus.org/oss/lv2/zeroconvolv#CfgMono",
+   "name": "x42 - IR Convolver Mono",
+   "label": "IR Convolver",
+   "brand": "x42",
+   "cat": [
+    "Reverb"
+   ],
+   "bucket": "Reverb",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": true,
+   "ctlTotal": 2,
+   "ctl": [
+    {
+     "name": "Dry Signal Level",
+     "short": "Dry Signal Level",
+     "sym": "dry",
+     "min": -60,
+     "max": 6,
+     "def": -60,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "enum",
+     "scale": [
+      "off"
+     ]
+    },
+    {
+     "name": "Wet Signal Level",
+     "short": "Wet Signal Level",
+     "sym": "wet",
+     "min": -60,
+     "max": 6,
+     "def": -30,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "enum",
+     "scale": [
+      "off"
+     ]
+    }
+   ],
+   "comment": "Plugin to convolve audio signals, allowing you to load so-called Reverb Impulse Responses."
+  },
+  {
+   "uri": "http://gareus.org/oss/lv2/zeroconvolv#CfgStereo",
+   "name": "x42 - IR Convolver Stereo",
+   "label": "IR Convolver ST",
+   "brand": "x42",
+   "cat": [
+    "Reverb"
+   ],
+   "bucket": "Reverb",
+   "sub": "",
+   "ai": 2,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": true,
+   "ctlTotal": 2,
+   "ctl": [
+    {
+     "name": "Dry Signal Level",
+     "short": "Dry Signal Level",
+     "sym": "dry",
+     "min": -60,
+     "max": 6,
+     "def": -60,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "enum",
+     "scale": [
+      "off"
+     ]
+    },
+    {
+     "name": "Wet Signal Level",
+     "short": "Wet Signal Level",
+     "sym": "wet",
+     "min": -60,
+     "max": 6,
+     "def": -30,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "enum",
+     "scale": [
+      "off"
+     ]
+    }
+   ],
+   "comment": "Plugin to convolve audio signals, allowing you to load so-called Reverb Impulse Responses."
+  },
+  {
+   "uri": "http://github.com/Dougal-s/Aether",
+   "name": "Aether",
+   "label": "Aether",
+   "brand": "Dougal Stewart",
+   "cat": [
+    "Reverb"
+   ],
+   "bucket": "Reverb",
+   "sub": "",
+   "ai": 2,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": false,
+   "ctlTotal": 47,
+   "ctl": [
+    {
+     "name": "Mix",
+     "short": "Mix",
+     "sym": "mix",
+     "min": 0,
+     "max": 100,
+     "def": 100,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Dry Level",
+     "short": "Dry Level",
+     "sym": "dry_level",
+     "min": 0,
+     "max": 100,
+     "def": 80,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Predelay Level",
+     "short": "Predelay Level",
+     "sym": "predelay_level",
+     "min": 0,
+     "max": 100,
+     "def": 20,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Early Level",
+     "short": "Early Level",
+     "sym": "early_level",
+     "min": 0,
+     "max": 100,
+     "def": 10,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Late Level",
+     "short": "Late Level",
+     "sym": "late_level",
+     "min": 0,
+     "max": 100,
+     "def": 20,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Interpolate",
+     "short": "Interpolate",
+     "sym": "interpolate",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Width",
+     "short": "Width",
+     "sym": "width",
+     "min": 0,
+     "max": 100,
+     "def": 100,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Predelay",
+     "short": "Predelay",
+     "sym": "predelay",
+     "min": 0,
+     "max": 400,
+     "def": 20,
+     "unit": "ms",
+     "render": "%f ms",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Early Low Cut Enabled",
+     "short": "Early Low Cut En",
+     "sym": "early_low_cut_enabled",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Early Low Cut Cutoff",
+     "short": "Early Low Cut Cu",
+     "sym": "early_low_cut_cutoff",
+     "min": 15,
+     "max": 22000,
+     "def": 15,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "log",
+     "scale": []
+    },
+    {
+     "name": "Early High Cut Enabled",
+     "short": "Early High Cut E",
+     "sym": "early_high_cut_enabled",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Early High Cut Cutoff",
+     "short": "Early High Cut C",
+     "sym": "early_high_cut_cutoff",
+     "min": 15,
+     "max": 22000,
+     "def": 20000,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "log",
+     "scale": []
+    },
+    {
+     "name": "Delay Taps",
+     "short": "Delay Taps",
+     "sym": "early_taps",
+     "min": 1,
+     "max": 50,
+     "def": 12,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Early Delay Length",
+     "short": "Early Delay Leng",
+     "sym": "early_tap_length",
+     "min": 0,
+     "max": 500,
+     "def": 200,
+     "unit": "ms",
+     "render": "%f ms",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Early Tap Mix",
+     "short": "Early Tap Mix",
+     "sym": "early_tap_mix",
+     "min": 0,
+     "max": 100,
+     "def": 100,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Early Tap Decay",
+     "short": "Early Tap Decay",
+     "sym": "early_tap_decay",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "A stereo algorithmic reverb based on Cloudseed"
+  },
+  {
+   "uri": "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+   "name": "Neural Amp Modeler",
+   "label": "Neural Amp Modeler",
+   "brand": "Mike Oliphant",
+   "cat": [
+    "Simulator"
+   ],
+   "bucket": "Amp·Cab",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": false,
+   "ctlTotal": 3,
+   "ctl": [
+    {
+     "name": "Input Lvl",
+     "short": "Input Lvl",
+     "sym": "input_level",
+     "min": -20,
+     "max": 20,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Output Lvl",
+     "short": "Output Lvl",
+     "sym": "output_level",
+     "min": -20,
+     "max": 20,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Buffered",
+     "short": "Buffered",
+     "sym": "buffered",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    }
+   ],
+   "comment": "The Neural Amp Modeler (NAM) is an open-source guitar software plugin that creates realistic simulations of analog gear, especially guitar a"
+  },
+  {
+   "uri": "http://guitarix.sourceforge.net/plugins/gx_compressor#_compressor",
+   "name": "GxCompressor",
+   "label": "GxCompressor",
+   "brand": "Guitarix team",
+   "cat": [
+    "Dynamics",
+    "Compressor"
+   ],
+   "bucket": "Comp",
+   "sub": "Compressor",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 5,
+   "ctl": [
+    {
+     "name": "RATIO",
+     "short": "RATIO",
+     "sym": "RATIO",
+     "min": 1,
+     "max": 20,
+     "def": 2,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "KNEE",
+     "short": "KNEE",
+     "sym": "KNEE",
+     "min": 0,
+     "max": 20,
+     "def": 3,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "THRESHOLD",
+     "short": "THRESHOLD",
+     "sym": "THRESHOLD",
+     "min": -96,
+     "max": 10,
+     "def": -20,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "RELEASE",
+     "short": "RELEASE",
+     "sym": "RELEASE",
+     "min": 0,
+     "max": 10,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "ATTACK",
+     "short": "ATTACK",
+     "sym": "ATTACK",
+     "min": 0,
+     "max": 1,
+     "def": 0.0020000000949949026,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "\"Compression (or more technically Dynamic range compression) is a subtle effect primarily for electric guitar where the highest and lowest p"
+  },
+  {
+   "uri": "http://guitarix.sourceforge.net/plugins/gx_cstb_#_cstb_",
+   "name": "GxColorSoundTonebender",
+   "label": "GxCsTonebender",
+   "brand": "Guitarix",
+   "cat": [
+    "Distortion"
+   ],
+   "bucket": "Drive",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 3,
+   "ctl": [
+    {
+     "name": "ATTACK",
+     "short": "ATTACK",
+     "sym": "ATTACK",
+     "min": 0,
+     "max": 0.949999988079071,
+     "def": 0.949999988079071,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "LEVEL",
+     "short": "VOLUME",
+     "sym": "LEVEL",
+     "min": 0,
+     "max": 1,
+     "def": 0.75,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "WET_DRY",
+     "short": "MIX",
+     "sym": "WET_DRY",
+     "min": 0,
+     "max": 100,
+     "def": 75,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "The ToneBender is modeled after the Colorsound ToneBender© (*)."
+  },
+  {
+   "uri": "http://guitarix.sourceforge.net/plugins/gx_expander#_expander",
+   "name": "GxExpander",
+   "label": "GxExpander",
+   "brand": "Guitarix team",
+   "cat": [
+    "Dynamics",
+    "Expander"
+   ],
+   "bucket": "Dynamics",
+   "sub": "Expander",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 5,
+   "ctl": [
+    {
+     "name": "RATIO",
+     "short": "RATIO",
+     "sym": "RATIO",
+     "min": 1,
+     "max": 20,
+     "def": 2,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "KNEE",
+     "short": "KNEE",
+     "sym": "KNEE",
+     "min": 0,
+     "max": 20,
+     "def": 3,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "THRESHOLD",
+     "short": "THRESHOLD",
+     "sym": "THRESHOLD",
+     "min": -96,
+     "max": 10,
+     "def": -40,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "RELEASE",
+     "short": "RELEASE",
+     "sym": "RELEASE",
+     "min": 0,
+     "max": 10,
+     "def": 0.10000000149011612,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "ATTACK",
+     "short": "ATTACK",
+     "sym": "ATTACK",
+     "min": 0,
+     "max": 1,
+     "def": 0.0010000000474974513,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "\"The expander is a compressor in reverse. There are two types of expander. In some, signals above the threshold remain at unity gain whereas"
+  },
+  {
+   "uri": "http://guitarix.sourceforge.net/plugins/gx_flanger#_flanger",
+   "name": "GxFlanger",
+   "label": "GxFlanger",
+   "brand": "Guitarix team",
+   "cat": [
+    "Modulator",
+    "Flanger"
+   ],
+   "bucket": "Mod",
+   "sub": "Flanger",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 6,
+   "ctl": [
+    {
+     "name": "DEPTH",
+     "short": "DEPTH",
+     "sym": "depth",
+     "min": 0,
+     "max": 5,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "WIDTH",
+     "short": "WIDTH",
+     "sym": "width",
+     "min": 0,
+     "max": 10,
+     "def": 5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "FREQ",
+     "short": "FREQ",
+     "sym": "freq",
+     "min": 0.05000000074505806,
+     "max": 10,
+     "def": 0.20000000298023224,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "FEEDBACK",
+     "short": "FEEDBACK",
+     "sym": "feedback",
+     "min": -0.9900000095367432,
+     "max": 0.9900000095367432,
+     "def": -0.7070000171661377,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "WET",
+     "short": "WET",
+     "sym": "dry_wet",
+     "min": 0,
+     "max": 100,
+     "def": 100,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "MIX",
+     "short": "MIX",
+     "sym": "mix",
+     "min": -1,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "\"Flanging /ˈflændʒɪŋ/ is an audio effect produced by mixing two identical signals together, one signal delayed by a small and gradually chan"
+  },
+  {
+   "uri": "http://guitarix.sourceforge.net/plugins/gx_mbcompressor_#_mbcompressor_",
+   "name": "GxMultiBandCompressor",
+   "label": "GxMultiBandCompressor",
+   "brand": "Guitarix team",
+   "cat": [
+    "Dynamics",
+    "Compressor"
+   ],
+   "bucket": "Comp",
+   "sub": "Compressor",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 34,
+   "ctl": [
+    {
+     "name": "MODE1",
+     "short": "MODE1",
+     "sym": "MODE1",
+     "min": 1,
+     "max": 3,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Compress",
+      "Bypass",
+      "Mute"
+     ]
+    },
+    {
+     "name": "MODE2",
+     "short": "MODE2",
+     "sym": "MODE2",
+     "min": 1,
+     "max": 3,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Compress",
+      "Bypass",
+      "Mute"
+     ]
+    },
+    {
+     "name": "MODE3",
+     "short": "MODE3",
+     "sym": "MODE3",
+     "min": 1,
+     "max": 3,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Compress",
+      "Bypass",
+      "Mute"
+     ]
+    },
+    {
+     "name": "MODE4",
+     "short": "MODE4",
+     "sym": "MODE4",
+     "min": 1,
+     "max": 3,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Compress",
+      "Bypass",
+      "Mute"
+     ]
+    },
+    {
+     "name": "MODE5",
+     "short": "MODE5",
+     "sym": "MODE5",
+     "min": 1,
+     "max": 3,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Compress",
+      "Bypass",
+      "Mute"
+     ]
+    },
+    {
+     "name": "MAKEUP1",
+     "short": "MAKEUP1",
+     "sym": "MAKEUP1",
+     "min": -50,
+     "max": 50,
+     "def": 13,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "MAKEUP2",
+     "short": "MAKEUP2",
+     "sym": "MAKEUP2",
+     "min": -50,
+     "max": 50,
+     "def": 13,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "MAKEUP3",
+     "short": "MAKEUP3",
+     "sym": "MAKEUP3",
+     "min": -50,
+     "max": 50,
+     "def": 13,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "MAKEUP4",
+     "short": "MAKEUP4",
+     "sym": "MAKEUP4",
+     "min": -50,
+     "max": 50,
+     "def": 13,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "MAKEUP5",
+     "short": "MAKEUP5",
+     "sym": "MAKEUP5",
+     "min": -50,
+     "max": 50,
+     "def": 13,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "MAKEUPTHRESHOLD1",
+     "short": "MAKEUPTHRESHOLD1",
+     "sym": "MAKEUPTHRESHOLD1",
+     "min": 0,
+     "max": 10,
+     "def": 2,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "MAKEUPTHRESHOLD2",
+     "short": "MAKEUPTHRESHOLD2",
+     "sym": "MAKEUPTHRESHOLD2",
+     "min": 0,
+     "max": 10,
+     "def": 2,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "MAKEUPTHRESHOLD3",
+     "short": "MAKEUPTHRESHOLD3",
+     "sym": "MAKEUPTHRESHOLD3",
+     "min": 0,
+     "max": 10,
+     "def": 2,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "MAKEUPTHRESHOLD4",
+     "short": "MAKEUPTHRESHOLD4",
+     "sym": "MAKEUPTHRESHOLD4",
+     "min": 0,
+     "max": 10,
+     "def": 2,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "MAKEUPTHRESHOLD5",
+     "short": "MAKEUPTHRESHOLD5",
+     "sym": "MAKEUPTHRESHOLD5",
+     "min": 0,
+     "max": 10,
+     "def": 2,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "RATIO1",
+     "short": "RATIO1",
+     "sym": "RATIO1",
+     "min": 1,
+     "max": 100,
+     "def": 13,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "\"Multiband (also spelled multi-band) compressors can act differently on different frequency bands. The advantage of multiband compression ov"
+  },
+  {
+   "uri": "http://guitarix.sourceforge.net/plugins/gx_quack_#_quack_",
+   "name": "GxQuack",
+   "label": "GxQuack",
+   "brand": "Guitarix",
+   "cat": [
+    "Filter"
+   ],
+   "bucket": "Filter",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": true,
+   "ctlTotal": 7,
+   "ctl": [
+    {
+     "name": "DEPTH",
+     "short": "DEPTH",
+     "sym": "DEPTH",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "DRIVE",
+     "short": "DRIVE",
+     "sym": "DRIVE",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Off",
+      "On"
+     ]
+    },
+    {
+     "name": "GAIN",
+     "short": "GAIN",
+     "sym": "GAIN",
+     "min": -12,
+     "max": 6,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "MODE",
+     "short": "MODE",
+     "sym": "MODE",
+     "min": 0,
+     "max": 2,
+     "def": 2,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Low",
+      "High",
+      "Orig"
+     ]
+    },
+    {
+     "name": "PEAK",
+     "short": "PEAK",
+     "sym": "PEAK",
+     "min": -6,
+     "max": 20,
+     "def": 5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "RANGE",
+     "short": "RANGE",
+     "sym": "RANGE",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Low",
+      "High"
+     ]
+    },
+    {
+     "name": "TONE",
+     "short": "TONE",
+     "sym": "TONE",
+     "min": 0,
+     "max": 2,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Off",
+      "Low",
+      "High"
+     ]
+    }
+   ],
+   "comment": "Envelope controlled wah pedal with some extra features"
+  },
+  {
+   "uri": "http://guitarix.sourceforge.net/plugins/gx_redeye#vibrochump",
+   "name": "GxRedeye Vibro Chump",
+   "label": "Redeye Vibro",
+   "brand": "Guitarix",
+   "cat": [
+    "Simulator"
+   ],
+   "bucket": "Amp·Cab",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 8,
+   "ctl": [
+    {
+     "name": "Gain",
+     "short": "Gain",
+     "sym": "Gain",
+     "min": -20,
+     "max": 20,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Tone",
+     "short": "Tone",
+     "sym": "Tone",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Volume",
+     "short": "Volume",
+     "sym": "Volume",
+     "min": -20,
+     "max": 10,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Feedback",
+     "short": "Feedback",
+     "sym": "Feedback",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Vibe",
+     "short": "Vibe",
+     "sym": "Vibe",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Speed",
+     "short": "Speed",
+     "sym": "Speed",
+     "min": 0.10000000149011612,
+     "max": 10,
+     "def": 5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Intensity",
+     "short": "Intensity",
+     "sym": "Intensity",
+     "min": 0,
+     "max": 10,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Sinewave",
+     "short": "Sinewave",
+     "sym": "Sinewave",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    }
+   ],
+   "comment": "The Vibro Chump is a guitar-amp simulator, inspired by vintage Fender amplifiers. In similar fashion to the original amplifiers from that br"
+  },
+  {
+   "uri": "http://guitarix.sourceforge.net/plugins/gx_slowgear_#_slowgear_",
+   "name": "GxSlowGear",
+   "label": "GxSlowGear",
+   "brand": "Guitarix",
+   "cat": [
+    "Dynamics",
+    "Gate"
+   ],
+   "bucket": "Gate",
+   "sub": "Gate",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 3,
+   "ctl": [
+    {
+     "name": "DOWNTIME",
+     "short": "DOWNTIME",
+     "sym": "DOWNTIME",
+     "min": 0,
+     "max": 1000,
+     "def": 5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "TRESHOLD",
+     "short": "TRESHOLD",
+     "sym": "TRESHOLD",
+     "min": 0,
+     "max": 10,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "UPTIME",
+     "short": "UPTIME",
+     "sym": "UPTIME",
+     "min": 0,
+     "max": 1000,
+     "def": 100,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "GxSlowGear is inspired by the classic Boss Slow Gear guitar pedal© (*), which provides you with volume swells, based on your playing dynamic"
+  },
+  {
+   "uri": "http://guitarix.sourceforge.net/plugins/gx_tremolo#_tremolo",
+   "name": "GxTremolo",
+   "label": "GxTremolo",
+   "brand": "Guitarix team",
+   "cat": [
+    "Modulator"
+   ],
+   "bucket": "Mod",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 4,
+   "ctl": [
+    {
+     "name": "Dry/Wet",
+     "short": "Dry/Wet",
+     "sym": "dry_wet",
+     "min": 0,
+     "max": 100,
+     "def": 50,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Mode",
+     "short": "Mode",
+     "sym": "mode",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "triangle",
+      "sine"
+     ]
+    },
+    {
+     "name": "Depth",
+     "short": "Depth",
+     "sym": "depth",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Freq",
+     "short": "Freq",
+     "sym": "freq",
+     "min": 0.10000000149011612,
+     "max": 50,
+     "def": 5,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "Model of a vactrol tremolo unit by \"transmogrify\""
+  },
+  {
+   "uri": "http://guitarix.sourceforge.net/plugins/gxtubevibrato#tubevibrato",
+   "name": "GxTubeVibrato",
+   "label": "GxTubeVibrato",
+   "brand": "Guitarix team",
+   "cat": [
+    "Modulator"
+   ],
+   "bucket": "Mod",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 4,
+   "ctl": [
+    {
+     "name": "SineWave",
+     "short": "SineWave",
+     "sym": "sinewave",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Depth",
+     "short": "Depth",
+     "sym": "depth",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Speed",
+     "short": "Speed",
+     "sym": "speed",
+     "min": 0.10000000149011612,
+     "max": 14,
+     "def": 0.10000000149011612,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Gain",
+     "short": "Gain",
+     "sym": "gain",
+     "min": -12,
+     "max": 22,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "Attempt at a true vibrato"
+  },
+  {
+   "uri": "http://hippie.lt/lv2/gate",
+   "name": "abGate",
+   "label": "abGate",
+   "brand": "A. Bruzas",
+   "cat": [
+    "Dynamics",
+    "Gate"
+   ],
+   "bucket": "Gate",
+   "sub": "Gate",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": true,
+   "ctlTotal": 5,
+   "ctl": [
+    {
+     "name": "Threshold",
+     "short": "Threshold",
+     "sym": "threshold",
+     "min": -70,
+     "max": 12,
+     "def": -70,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Attack",
+     "short": "Attack",
+     "sym": "attack",
+     "min": 0.10000000149011612,
+     "max": 500,
+     "def": 30,
+     "unit": "ms",
+     "render": "%f ms",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Hold",
+     "short": "Hold",
+     "sym": "hold",
+     "min": 5,
+     "max": 3000,
+     "def": 500,
+     "unit": "ms",
+     "render": "%f ms",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Decay",
+     "short": "Decay",
+     "sym": "decay",
+     "min": 5,
+     "max": 4000,
+     "def": 1000,
+     "unit": "ms",
+     "render": "%f ms",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Range",
+     "short": "Range",
+     "sym": "gaterange",
+     "min": -90,
+     "max": -20,
+     "def": -90,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "The abGate is a simple and straight-forward noise gate plugin. It helps to reduce noise and prevent feedback, this is especially useful when"
+  },
+  {
+   "uri": "http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidGuitars",
+   "name": "Fluid Guitars",
+   "label": "Fluid Guitars",
+   "brand": "FluidGM",
+   "cat": [
+    "Generator",
+    "Instrument"
+   ],
+   "bucket": "Synth",
+   "sub": "Instrument",
+   "ai": 0,
+   "ao": 2,
+   "mi": 1,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 2,
+   "ctl": [
+    {
+     "name": "Level",
+     "short": "Level",
+     "sym": "level",
+     "min": 0,
+     "max": 2,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Program",
+     "short": "Program",
+     "sym": "program",
+     "min": 0,
+     "max": 8,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Nylon String Guitar",
+      "Steel String Guitar",
+      "Jazz Guitar",
+      "Clean Guitar",
+      "Palm Muted Guitar",
+      "Overdrive Guitar",
+      "Distortion Guitar",
+      "Guitar Harmonics"
+     ]
+    }
+   ],
+   "comment": "This plugin contains the 'Guitar' section of the Fluid GM soundfont.\r"
+  },
+  {
+   "uri": "http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidOrgans",
+   "name": "Fluid Organs",
+   "label": "Fluid Organs",
+   "brand": "FluidGM",
+   "cat": [
+    "Generator",
+    "Instrument"
+   ],
+   "bucket": "Synth",
+   "sub": "Instrument",
+   "ai": 0,
+   "ao": 2,
+   "mi": 1,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 2,
+   "ctl": [
+    {
+     "name": "Level",
+     "short": "Level",
+     "sym": "level",
+     "min": 0,
+     "max": 2,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Program",
+     "short": "Program",
+     "sym": "program",
+     "min": 0,
+     "max": 8,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Drawbar Organ",
+      "Percussive Organ",
+      "Rock Organ",
+      "Church Organ",
+      "Reed Organ",
+      "Accordian",
+      "Harmonica",
+      "Bandoneon"
+     ]
+    }
+   ],
+   "comment": "This plugin contains the 'Organ' section of the Fluid GM soundfont.\r"
+  },
+  {
+   "uri": "http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidSynthLeads",
+   "name": "Fluid SynthLeads",
+   "label": "Fluid SynthLeads",
+   "brand": "FluidGM",
+   "cat": [
+    "Generator",
+    "Instrument"
+   ],
+   "bucket": "Synth",
+   "sub": "Instrument",
+   "ai": 0,
+   "ao": 2,
+   "mi": 1,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 2,
+   "ctl": [
+    {
+     "name": "Level",
+     "short": "Level",
+     "sym": "level",
+     "min": 0,
+     "max": 2,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Program",
+     "short": "Program",
+     "sym": "program",
+     "min": 0,
+     "max": 8,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Square Lead",
+      "Saw Wave",
+      "Calliope Lead",
+      "Chiffer Lead",
+      "Charang",
+      "Solo Vox",
+      "Fifth Sawtooth Wave",
+      "Bass & Lead"
+     ]
+    }
+   ],
+   "comment": "Fluid Synthleads is a generator offering a variety of sample based synth sounds. Perfect for exploring and getting familiar with different s"
+  },
+  {
+   "uri": "http://kxstudio.sf.net/carla/plugins/audiofile",
+   "name": "Audio File",
+   "label": "Audio File",
+   "brand": "falkTX",
+   "cat": [
+    "Utility"
+   ],
+   "bucket": "Utility",
+   "sub": "",
+   "ai": 0,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": true,
+   "ctlTotal": 3,
+   "ctl": [
+    {
+     "name": "Loop Mode",
+     "short": "Loop Mode",
+     "sym": "loop_mode",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Host Sync",
+     "short": "Host Sync",
+     "sym": "host_sync",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Volume",
+     "short": "Volume",
+     "sym": "volume",
+     "min": 0,
+     "max": 127,
+     "def": 100,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "This is a simple audio file player plugin."
+  },
+  {
+   "uri": "http://kxstudio.sf.net/carla/plugins/midifile",
+   "name": "MIDI File",
+   "label": "MIDI File",
+   "brand": "falkTX",
+   "cat": [
+    "Utility"
+   ],
+   "bucket": "Utility",
+   "sub": "",
+   "ai": 0,
+   "ao": 0,
+   "mi": 0,
+   "mo": 1,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": true,
+   "ctlTotal": 2,
+   "ctl": [
+    {
+     "name": "Repeat Mode",
+     "short": "Repeat Mode",
+     "sym": "repeat_mode",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Host Sync",
+     "short": "Host Sync",
+     "sym": "host_sync",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    }
+   ],
+   "comment": "This is a simple MIDI file player plugin."
+  },
+  {
+   "uri": "http://moddevices.com/plugins/caps/Click",
+   "name": "C* Click - Metronome",
+   "label": "Click",
+   "brand": "CAPS",
+   "cat": [
+    "Utility"
+   ],
+   "bucket": "Utility",
+   "sub": "",
+   "ai": 0,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 4,
+   "ctl": [
+    {
+     "name": "Model",
+     "short": "Model",
+     "sym": "model",
+     "min": 0,
+     "max": 3,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Box",
+      "Stick",
+      "Beep",
+      "Dirac"
+     ]
+    },
+    {
+     "name": "BPM",
+     "short": "BPM",
+     "sym": "bpm",
+     "min": 20,
+     "max": 280,
+     "def": 120,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Volume",
+     "short": "Volume",
+     "sym": "volume",
+     "min": 0,
+     "max": 1,
+     "def": 0.75,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Damping",
+     "short": "Damping",
+     "sym": "damping",
+     "min": 0,
+     "max": 1,
+     "def": 0.75,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "A sample-accurate metronome featuring a variety of click sounds, ranging from a wooden box struck with a mallet to a synthetic beep. All cli"
+  },
+  {
+   "uri": "http://moddevices.com/plugins/caps/Noisegate",
+   "name": "C* Noisegate - Attenuate noise resident in silence",
+   "label": "Noisegate",
+   "brand": "CAPS",
+   "cat": [
+    "Utility"
+   ],
+   "bucket": "Utility",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 2,
+   "hasBypass": false,
+   "ctlTotal": 4,
+   "ctl": [
+    {
+     "name": "Open",
+     "short": "Open",
+     "sym": "open",
+     "min": -60,
+     "max": 0,
+     "def": -45,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Attack",
+     "short": "Attack",
+     "sym": "attack",
+     "min": 0,
+     "max": 5,
+     "def": 0,
+     "unit": "ms",
+     "render": "%f ms",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Close",
+     "short": "Close",
+     "sym": "close",
+     "min": -80,
+     "max": 0,
+     "def": -67.5,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Mains",
+     "short": "Mains",
+     "sym": "mains",
+     "min": 0,
+     "max": 100,
+     "def": 50,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "enum",
+     "scale": [
+      "Off",
+      "Global",
+      "Imperial"
+     ]
+    }
+   ],
+   "comment": "This plugin aims to reduce undesirable background noise and hum in otherwise silent passages."
+  },
+  {
+   "uri": "http://moddevices.com/plugins/caps/PhaserII",
+   "name": "C* PhaserII - Mono phaser modulated by a Lorenz fractal",
+   "label": "PhaserII",
+   "brand": "CAPS",
+   "cat": [
+    "Modulator",
+    "Phaser"
+   ],
+   "bucket": "Mod",
+   "sub": "Phaser",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 5,
+   "ctl": [
+    {
+     "name": "Rate",
+     "short": "Rate",
+     "sym": "rate",
+     "min": 0,
+     "max": 1,
+     "def": 0.25,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "LFO",
+     "short": "LFO",
+     "sym": "lfo",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Sine",
+      "Fractal"
+     ]
+    },
+    {
+     "name": "Depth",
+     "short": "Depth",
+     "sym": "depth",
+     "min": 0,
+     "max": 1,
+     "def": 0.75,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Spread",
+     "short": "Spread",
+     "sym": "spread",
+     "min": 0,
+     "max": 1,
+     "def": 0.75,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Resonance",
+     "short": "Resonance",
+     "sym": "resonance",
+     "min": 0,
+     "max": 1,
+     "def": 0.25,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "The Phaser II is a modern take on this classic, well-loved effect."
+  },
+  {
+   "uri": "http://moddevices.com/plugins/caps/Plate",
+   "name": "C* Plate - Versatile plate reverb",
+   "label": "Plate",
+   "brand": "CAPS",
+   "cat": [
+    "Reverb"
+   ],
+   "bucket": "Reverb",
+   "sub": "",
+   "ai": 1,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 4,
+   "ctl": [
+    {
+     "name": "Bandwidth",
+     "short": "Lowpass",
+     "sym": "bandwidth",
+     "min": 0,
+     "max": 1,
+     "def": 0.9994999766349792,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Tail",
+     "short": "Decay",
+     "sym": "tail",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Damping",
+     "short": "Damping",
+     "sym": "damping",
+     "min": 0,
+     "max": 1,
+     "def": 0.0005000000237487257,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Blend",
+     "short": "Mix",
+     "sym": "blend",
+     "min": 0,
+     "max": 1,
+     "def": 0.25,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "One of the most breathtaking reverb sounds of them all, a plate of sheet metal hanging in a box. The Plate plugin is based around the sound "
+  },
+  {
+   "uri": "http://moddevices.com/plugins/caps/Wider",
+   "name": "C* Wider - Stereo image Synthesis",
+   "label": "Wider",
+   "brand": "CAPS",
+   "cat": [
+    "Spatial"
+   ],
+   "bucket": "Spatial",
+   "sub": "",
+   "ai": 1,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 2,
+   "ctl": [
+    {
+     "name": "Pan",
+     "short": "Pan",
+     "sym": "pan",
+     "min": -1,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Width",
+     "short": "Width",
+     "sym": "width",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "Wider increases the width of a signal."
+  },
+  {
+   "uri": "http://moddevices.com/plugins/mda/Stereo",
+   "name": "MDA Stereo",
+   "label": "Stereo",
+   "brand": "MDA",
+   "cat": [
+    "Spatial"
+   ],
+   "bucket": "Spatial",
+   "sub": "",
+   "ai": 2,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 5,
+   "ctl": [
+    {
+     "name": "Width",
+     "short": "Width",
+     "sym": "width",
+     "min": -100,
+     "max": 100,
+     "def": 56,
+     "unit": "HAAS<>COMB",
+     "render": "%f HAAS<>COMB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Delay",
+     "short": "Delay",
+     "sym": "delay",
+     "min": 0.44999998807907104,
+     "max": 47.619998931884766,
+     "def": 22.43000030517578,
+     "unit": "ms",
+     "render": "%f ms",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Balance",
+     "short": "Balance",
+     "sym": "balance",
+     "min": -100,
+     "max": 100,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Mod",
+     "short": "Mod",
+     "sym": "mod",
+     "min": 0,
+     "max": 47.619998931884766,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "OFF"
+     ]
+    },
+    {
+     "name": "Rate",
+     "short": "Rate",
+     "sym": "rate",
+     "min": 0.10000000149011612,
+     "max": 100,
+     "def": 50,
+     "unit": "s",
+     "render": "%f s",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "Haas delay and comb filtering"
+  },
+  {
+   "uri": "http://moddevices.com/plugins/mda/VocInput",
+   "name": "MDA VocInput",
+   "label": "VocInput",
+   "brand": "MDA",
+   "cat": [
+    "Spectral"
+   ],
+   "bucket": "Pitch",
+   "sub": "",
+   "ai": 2,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 5,
+   "ctl": [
+    {
+     "name": "Tracking",
+     "short": "Tracking",
+     "sym": "tracking",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Constant pitch",
+      "Track input pitch",
+      "Track quantized input pitch"
+     ]
+    },
+    {
+     "name": "Pitch",
+     "short": "Pitch",
+     "sym": "pitch",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Breath",
+     "short": "Breath",
+     "sym": "breath",
+     "min": 0,
+     "max": 1,
+     "def": 0.20000000298023224,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "S Thresh",
+     "short": "S Thresh",
+     "sym": "s_thresh",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Max Freq",
+     "short": "Max Freq",
+     "sym": "max_freq",
+     "min": 0,
+     "max": 1,
+     "def": 0.3499999940395355,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "This plug-in produces a voice-like signal on the right channel to be used as a carrier signal with vocoder and other vocoder plug-ins. The i"
+  },
+  {
+   "uri": "http://moddevices.com/plugins/mod-devel/2Voices",
+   "name": "2Voices",
+   "label": "2Voices",
+   "brand": "MOD",
+   "cat": [
+    "Spectral"
+   ],
+   "bucket": "Pitch",
+   "sub": "",
+   "ai": 1,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 5,
+   "ctl": [
+    {
+     "name": "Step 1",
+     "short": "Step 1",
+     "sym": "Step1",
+     "min": -12,
+     "max": 24,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Step 2",
+     "short": "Step 2",
+     "sym": "Step2",
+     "min": -12,
+     "max": 24,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Gain 1",
+     "short": "Gain 1",
+     "sym": "Gain_1",
+     "min": -20,
+     "max": 20,
+     "def": 3,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Gain 2",
+     "short": "Gain 2",
+     "sym": "Gain_2",
+     "min": -20,
+     "max": 20,
+     "def": 3,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Fidelity",
+     "short": "Fidelity",
+     "sym": "Fidelity",
+     "min": 0,
+     "max": 3,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Lo-Fi",
+      "Medium",
+      "High",
+      "Hi-Fi"
+     ]
+    }
+   ],
+   "comment": "The MOD 2Voices is a pitch-shifter featuring two outputs with independent pitch-shift controls. The pitch of the input signal can be shifted"
+  },
+  {
+   "uri": "http://moddevices.com/plugins/mod-devel/Advanced-Compressor",
+   "name": "Compressor Advanced",
+   "label": "Compressor Adv",
+   "brand": "MOD",
+   "cat": [
+    "Dynamics"
+   ],
+   "bucket": "Comp",
+   "sub": "",
+   "ai": 2,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": false,
+   "ctlTotal": 6,
+   "ctl": [
+    {
+     "name": "Threshold",
+     "short": "Threshold",
+     "sym": "THRES",
+     "min": -70,
+     "max": 0,
+     "def": -20,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Knee",
+     "short": "Knee",
+     "sym": "KNEE",
+     "min": 0,
+     "max": 40,
+     "def": 20,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Attack",
+     "short": "Attack",
+     "sym": "ATTACK",
+     "min": 0.10000000149011612,
+     "max": 200,
+     "def": 10,
+     "unit": "ms",
+     "render": "%f ms",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Release",
+     "short": "Release",
+     "sym": "RELEASE",
+     "min": 1,
+     "max": 1000,
+     "def": 100,
+     "unit": "ms",
+     "render": "%f ms",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Ratio",
+     "short": "Ratio",
+     "sym": "RATIO",
+     "min": 1,
+     "max": 20,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "log",
+     "scale": []
+    },
+    {
+     "name": "Makeup Gain",
+     "short": "MakeupGain",
+     "sym": "MAKEUP",
+     "min": -30,
+     "max": 24,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "The MOD Compressor Advanced uses the same high quality algorithm as the compressor found in the MOD Dwarf's and Duox's output processing set"
+  },
+  {
+   "uri": "http://moddevices.com/plugins/mod-devel/BandPassFilter",
+   "name": "BandPassFilter",
+   "label": "BandPassFilter",
+   "brand": "MOD",
+   "cat": [
+    "Filter"
+   ],
+   "bucket": "Filter",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 3,
+   "ctl": [
+    {
+     "name": "Freq",
+     "short": "Freq",
+     "sym": "Freq",
+     "min": 200,
+     "max": 2000,
+     "def": 600,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "log",
+     "scale": []
+    },
+    {
+     "name": "Q",
+     "short": "Q",
+     "sym": "Q",
+     "min": 0.7070000171661377,
+     "max": 5,
+     "def": 0.7070000171661377,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Order",
+     "short": "Order",
+     "sym": "Order",
+     "min": 0,
+     "max": 2,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "1",
+      "2",
+      "3"
+     ]
+    }
+   ],
+   "comment": "A band pass filter, \"Freq\" determines its Center frequency, \"Q\" works on the filter bandwith and \"Order\" is the filter's order"
+  },
+  {
+   "uri": "http://moddevices.com/plugins/mod-devel/Capo",
+   "name": "Capo",
+   "label": "Capo",
+   "brand": "MOD",
+   "cat": [
+    "Spectral"
+   ],
+   "bucket": "Pitch",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 3,
+   "ctl": [
+    {
+     "name": "Step",
+     "short": "Step",
+     "sym": "Step",
+     "min": 0,
+     "max": 12,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Gain",
+     "short": "Gain",
+     "sym": "Gain",
+     "min": -20,
+     "max": 20,
+     "def": 3,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Fidelity",
+     "short": "Fidelity",
+     "sym": "Fidelity",
+     "min": 0,
+     "max": 2,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Lo-Fi",
+      "Normal",
+      "Hi-Fi"
+     ]
+    }
+   ],
+   "comment": "The Capo is a pitch-shifter that can raise the pitch with a maximum of +12 semitones (steps). It is more limited than the SuperCapo, but it "
+  },
+  {
+   "uri": "http://moddevices.com/plugins/mod-devel/CrossOver2",
+   "name": "CrossOver 2",
+   "label": "CrossOver",
+   "brand": "MOD",
+   "cat": [
+    "Filter"
+   ],
+   "bucket": "Filter",
+   "sub": "",
+   "ai": 1,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 4,
+   "ctl": [
+    {
+     "name": "Freq",
+     "short": "Freq",
+     "sym": "Freq",
+     "min": 20,
+     "max": 20000,
+     "def": 600,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "log",
+     "scale": []
+    },
+    {
+     "name": "Gain 1",
+     "short": "Gain 1",
+     "sym": "Gain_1",
+     "min": -40,
+     "max": 40,
+     "def": 3,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Gain 2",
+     "short": "Gain 2",
+     "sym": "Gain_2",
+     "min": -40,
+     "max": 40,
+     "def": 3,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Order",
+     "short": "Order",
+     "sym": "Order",
+     "min": 0,
+     "max": 2,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "1",
+      "2",
+      "3"
+     ]
+    }
+   ],
+   "comment": "The Two Way CrossOver is a simple and effective filter for splitting your signal in two different frequency ranges. "
+  },
+  {
+   "uri": "http://moddevices.com/plugins/mod-devel/CrossOver3",
+   "name": "CrossOver 3",
+   "label": "CrossOver3",
+   "brand": "MOD",
+   "cat": [
+    "Filter"
+   ],
+   "bucket": "Filter",
+   "sub": "",
+   "ai": 1,
+   "ao": 3,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 6,
+   "ctl": [
+    {
+     "name": "Freq 1",
+     "short": "Freq 1",
+     "sym": "Freq_1",
+     "min": 20,
+     "max": 20000,
+     "def": 100,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "log",
+     "scale": []
+    },
+    {
+     "name": "Freq 2",
+     "short": "Freq 2",
+     "sym": "Freq_2",
+     "min": 20,
+     "max": 20000,
+     "def": 1000,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "log",
+     "scale": []
+    },
+    {
+     "name": "Gain 1",
+     "short": "Gain 1",
+     "sym": "Gain_1",
+     "min": -40,
+     "max": 40,
+     "def": 3,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Gain 2",
+     "short": "Gain 2",
+     "sym": "Gain_2",
+     "min": -40,
+     "max": 40,
+     "def": 3,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Gain 3",
+     "short": "Gain 3",
+     "sym": "Gain_3",
+     "min": -40,
+     "max": 40,
+     "def": 3,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Order",
+     "short": "Order",
+     "sym": "Order",
+     "min": 0,
+     "max": 2,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "1",
+      "2",
+      "3"
+     ]
+    }
+   ],
+   "comment": "This plugin receives an input signal and outputs 3 filtered signals. First one is filtered with a low pass filter (LPF), the second with a b"
+  },
+  {
+   "uri": "http://moddevices.com/plugins/mod-devel/Gain",
+   "name": "Gain",
+   "label": "Gain",
+   "brand": "MOD",
+   "cat": [
+    "Utility"
+   ],
+   "bucket": "Utility",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 1,
+   "ctl": [
+    {
+     "name": "Level",
+     "short": "Level",
+     "sym": "Gain",
+     "min": -40,
+     "max": 40,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "Simple mono volume gain plugin without \"zipping\" noise when messing around with the gain parameter."
+  },
+  {
+   "uri": "http://moddevices.com/plugins/mod-devel/Gain2x2",
+   "name": "Gain 2x2",
+   "label": "Gain 2x2",
+   "brand": "MOD",
+   "cat": [
+    "Utility"
+   ],
+   "bucket": "Utility",
+   "sub": "",
+   "ai": 2,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 1,
+   "ctl": [
+    {
+     "name": "Level",
+     "short": "Level",
+     "sym": "Gain",
+     "min": -40,
+     "max": 40,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "A simple stereo volume gain plugin without \"zipping\" noise when messing around with the gain parameter."
+  },
+  {
+   "uri": "http://moddevices.com/plugins/mod-devel/Harmonizer",
+   "name": "Harmonizer",
+   "label": "Harmonizer",
+   "brand": "MOD",
+   "cat": [
+    "Spectral"
+   ],
+   "bucket": "Pitch",
+   "sub": "",
+   "ai": 1,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 8,
+   "ctl": [
+    {
+     "name": "Tone",
+     "short": "Tone",
+     "sym": "Tone",
+     "min": 0,
+     "max": 11,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "C",
+      "C#",
+      "D",
+      "D#",
+      "E",
+      "F",
+      "F#",
+      "G",
+      "G#",
+      "A",
+      "A#",
+      "B"
+     ]
+    },
+    {
+     "name": "Scale",
+     "short": "Scale",
+     "sym": "Scale",
+     "min": 0,
+     "max": 2,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Major",
+      "Minor",
+      "Harmonic Minor"
+     ]
+    },
+    {
+     "name": "Interval",
+     "short": "Interval",
+     "sym": "Interval",
+     "min": 0,
+     "max": 9,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "+3th",
+      "+6th",
+      "-3th",
+      "-6th"
+     ]
+    },
+    {
+     "name": "Mode",
+     "short": "Mode",
+     "sym": "Mode",
+     "min": 0,
+     "max": 2,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "I",
+      "II",
+      "Bend"
+     ]
+    },
+    {
+     "name": "Lowest note to change the pitch",
+     "short": "Lowest Wet",
+     "sym": "LowestNoteToChangeThePitch",
+     "min": 0,
+     "max": 14,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "B1",
+      "C2",
+      "C#2",
+      "D2",
+      "D#2",
+      "E2",
+      "F2",
+      "F#2",
+      "G2",
+      "G#2",
+      "A2",
+      "A#2",
+      "B2",
+      "C3",
+      "C#3"
+     ]
+    },
+    {
+     "name": "Gain 1",
+     "short": "Gain 1",
+     "sym": "Gain1",
+     "min": -20,
+     "max": 20,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Gain 2",
+     "short": "Gain 2",
+     "sym": "Gain2",
+     "min": -20,
+     "max": 20,
+     "def": 3,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Fidelity",
+     "short": "Fidelity",
+     "sym": "Fidelity",
+     "min": 0,
+     "max": 2,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Lo-Fi",
+      "Normal",
+      "Hi-Fi"
+     ]
+    }
+   ],
+   "comment": "The Harmonizer is a (relatively) simple harmonizer plugin that allows you to set the scale to either Major, Minor, or Minor Harmonic, and th"
+  },
+  {
+   "uri": "http://moddevices.com/plugins/mod-devel/cabsim-IR-loader",
+   "name": "IR loader cabsim",
+   "label": "IR loader cabsim",
+   "brand": "MOD",
+   "cat": [
+    "Simulator"
+   ],
+   "bucket": "Amp·Cab",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": false,
+   "ctlTotal": 1,
+   "ctl": [
+    {
+     "name": "Gain",
+     "short": "Gain",
+     "sym": "Gain",
+     "min": -90,
+     "max": 0,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "A cabinet simulator plugin that loads impulse response (IR) files."
+  },
+  {
+   "uri": "http://moddevices.com/plugins/mod-devel/mod-audio-to-cv",
+   "name": "Audio to CV",
+   "label": "Audio to CV",
+   "brand": "MOD",
+   "cat": [
+    "ControlVoltage"
+   ],
+   "bucket": "CV",
+   "sub": "",
+   "ai": 1,
+   "ao": 0,
+   "mi": 0,
+   "mo": 0,
+   "cv": 1,
+   "presets": 0,
+   "hasBypass": true,
+   "ctlTotal": 2,
+   "ctl": [
+    {
+     "name": "Level",
+     "short": "Level",
+     "sym": "Level",
+     "min": 0,
+     "max": 10,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Offset",
+     "short": "Offset",
+     "sym": "Offset",
+     "min": -10,
+     "max": 10,
+     "def": 0,
+     "unit": "v",
+     "render": "%f v",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "Audio to CV converts an audio signal to a control voltage signal."
+  },
+  {
+   "uri": "http://moddevices.com/plugins/tap/doubler",
+   "name": "TAP Fractal Doubler",
+   "label": "Fractal Doubler",
+   "brand": "TAP",
+   "cat": [
+    "Spectral"
+   ],
+   "bucket": "Pitch",
+   "sub": "",
+   "ai": 2,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 8,
+   "ctl": [
+    {
+     "name": "Time Tracking",
+     "short": "Time Tracking",
+     "sym": "TimeTracking",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Pitch Tracking",
+     "short": "Pitch Tracking",
+     "sym": "PitchTracking",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Dry Level",
+     "short": "Dry Level",
+     "sym": "DryLevelDb",
+     "min": -90,
+     "max": 20,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Dry Left Position",
+     "short": "Dry Left Positio",
+     "sym": "DryLeftPosition",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Dry Right Position",
+     "short": "Dry Right Positi",
+     "sym": "DryRightPosition",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Wet Level",
+     "short": "Wet Level",
+     "sym": "WetLevelDb",
+     "min": -90,
+     "max": 20,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Wet Left Position",
+     "short": "Wet Left Positio",
+     "sym": "WetLeftPosition",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Wet Right Position",
+     "short": "Wet Right Positi",
+     "sym": "WetRightPosition",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "Fractal Doubler is a vocal doubler which gives you full control over your doubling."
+  },
+  {
+   "uri": "http://remaincalm.org/plugins/floaty",
+   "name": "floaty",
+   "label": "floaty",
+   "brand": "remaincalm.org",
+   "cat": [
+    "Delay"
+   ],
+   "bucket": "Delay",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 6,
+   "hasBypass": false,
+   "ctlTotal": 6,
+   "ctl": [
+    {
+     "name": "Time",
+     "short": "Time",
+     "sym": "delay",
+     "min": 10,
+     "max": 653.0612182617188,
+     "def": 280,
+     "unit": "ms",
+     "render": "%f ms",
+     "w": "button",
+     "scale": []
+    },
+    {
+     "name": "Mix",
+     "short": "Mix",
+     "sym": "mix",
+     "min": 0,
+     "max": 100,
+     "def": 42,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Feedback",
+     "short": "Feedback",
+     "sym": "feedback",
+     "min": 0,
+     "max": 60,
+     "def": 20,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Warp",
+     "short": "Warp",
+     "sym": "warp",
+     "min": 0,
+     "max": 100,
+     "def": 60,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Tone",
+     "short": "Tone",
+     "sym": "filter",
+     "min": 0,
+     "max": 100,
+     "def": 19,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Playback Rate",
+     "short": "Playback Rate",
+     "sym": "rate",
+     "min": -2,
+     "max": 2,
+     "def": 1,
+     "unit": "x",
+     "render": "%f x",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "Floaty is a wild modulation/delay effect that is reminiscent of a tape delay. One of the key features is the variable playback speed, allowi"
+  },
+  {
+   "uri": "http://remaincalm.org/plugins/mud",
+   "name": "mud",
+   "label": "mud",
+   "brand": "remaincalm.org",
+   "cat": [
+    "Filter"
+   ],
+   "bucket": "Filter",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 6,
+   "hasBypass": false,
+   "ctlTotal": 3,
+   "ctl": [
+    {
+     "name": "Mix",
+     "short": "Mix",
+     "sym": "mix",
+     "min": 0,
+     "max": 100,
+     "def": 50,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Filter",
+     "short": "Filter",
+     "sym": "filter",
+     "min": 0,
+     "max": 100,
+     "def": 50,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "LFO",
+     "short": "LFO",
+     "sym": "lfo",
+     "min": -100,
+     "max": 100,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "Mud is a dark and dirty modulation/filter effect. It is particularly useful to fans of grittier, more lo-fi sounds, but it is capable of int"
+  },
+  {
+   "uri": "http://ssj71.github.io/infamousPlugins/plugs.html#powercut",
+   "name": "the infamous power cut",
+   "label": "powercut",
+   "brand": "infamous",
+   "cat": [
+    "Modulator"
+   ],
+   "bucket": "Mod",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": true,
+   "ctlTotal": 2,
+   "ctl": [
+    {
+     "name": "Decay Time",
+     "short": "Decay Time",
+     "sym": "DTIME",
+     "min": 0.009999999776482582,
+     "max": 10,
+     "def": 0.5,
+     "unit": "s",
+     "render": "%f s",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Decay Curve",
+     "short": "Decay Curve",
+     "sym": "DCURVE",
+     "min": -10,
+     "max": 10,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Concave",
+      "Linear",
+      "Convex"
+     ]
+    }
+   ],
+   "comment": "This is a tape stop with up to 10 seconds of decay time. Curvature can be added for full customization of the effect."
+  },
+  {
+   "uri": "http://www.openavproductions.com/artyfx#bitta",
+   "name": "Bitta",
+   "label": "Bitta",
+   "brand": "OpenAV",
+   "cat": [
+    "Distortion"
+   ],
+   "bucket": "Drive",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 2,
+   "ctl": [
+    {
+     "name": "Crush",
+     "short": "Crush",
+     "sym": "crush",
+     "min": 1,
+     "max": 16,
+     "def": 16,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Dry/Wet",
+     "short": "Dry/Wet",
+     "sym": "drywet",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "OpenAV Bitta is a simple bit-crusher plugin with just two basic yet effective controls."
+  },
+  {
+   "uri": "https://ca9.eu/lv2/bolliedelay",
+   "name": "Bollie Delay",
+   "label": "Bollie Delay",
+   "brand": "Bollie",
+   "cat": [
+    "Delay"
+   ],
+   "bucket": "Delay",
+   "sub": "",
+   "ai": 2,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 15,
+   "ctl": [
+    {
+     "name": "Host/MOD-Tempo",
+     "short": "Host/MOD-Tempo",
+     "sym": "tempo_host",
+     "min": 6,
+     "max": 1000,
+     "def": 120,
+     "unit": "BPM",
+     "render": "%f BPM",
+     "w": "button",
+     "scale": []
+    },
+    {
+     "name": "User-Tempo",
+     "short": "User-Tempo",
+     "sym": "tempo_user",
+     "min": 6,
+     "max": 1000,
+     "def": 120,
+     "unit": "BPM",
+     "render": "%f BPM",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Tempo Mode",
+     "short": "Tempo Mode",
+     "sym": "tempo_mode",
+     "min": 0,
+     "max": 2,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "MOD/Host",
+      "User",
+      "Tap"
+     ]
+    },
+    {
+     "name": "Tap",
+     "short": "Tap",
+     "sym": "tap",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Blend",
+     "short": "Blend",
+     "sym": "mix",
+     "min": 0,
+     "max": 100,
+     "def": 30,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Feedback",
+     "short": "Feedback",
+     "sym": "feedback",
+     "min": 0,
+     "max": 100,
+     "def": 40,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Crossfeed",
+     "short": "Crossfeed",
+     "sym": "crossf",
+     "min": 0,
+     "max": 100,
+     "def": 20,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Low on",
+     "short": "Low on",
+     "sym": "low_on",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Low Cut Freq.",
+     "short": "Low Cut Freq.",
+     "sym": "low_f",
+     "min": 20,
+     "max": 2000,
+     "def": 20,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "log",
+     "scale": []
+    },
+    {
+     "name": "Low Q.",
+     "short": "Low Q.",
+     "sym": "low_q",
+     "min": 0.125,
+     "max": 8,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "log",
+     "scale": []
+    },
+    {
+     "name": "High on",
+     "short": "High on",
+     "sym": "high_on",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "High Cut Freq.",
+     "short": "High Cut Freq.",
+     "sym": "high_f",
+     "min": 200,
+     "max": 22000,
+     "def": 7500,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "log",
+     "scale": []
+    },
+    {
+     "name": "High Q.",
+     "short": "High Q.",
+     "sym": "high_q",
+     "min": 0.125,
+     "max": 8,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "log",
+     "scale": []
+    },
+    {
+     "name": "Div. L",
+     "short": "Div. L",
+     "sym": "div_l",
+     "min": 0,
+     "max": 5,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "1/4",
+      "1/4T",
+      "1/8",
+      "1/8.",
+      "1/8T",
+      "1/16"
+     ]
+    },
+    {
+     "name": "Div. R",
+     "short": "Div. R",
+     "sym": "div_r",
+     "min": 0,
+     "max": 5,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "1/4",
+      "1/4T",
+      "1/8",
+      "1/8.",
+      "1/8T",
+      "1/16"
+     ]
+    }
+   ],
+   "comment": "The Bollie Delay is a stereo tempo delay featuring high pass and low pass filter as well as a host tempo function, granting more control ove"
+  },
+  {
+   "uri": "https://distrho.kx.studio/plugins/pitchtracking#cv",
+   "name": "AudioToCV Pitch",
+   "label": "AudioToCV Pitch",
+   "brand": "MOD/DISTRHO",
+   "cat": [
+    "ControlVoltage"
+   ],
+   "bucket": "CV",
+   "sub": "",
+   "ai": 1,
+   "ao": 0,
+   "mi": 0,
+   "mo": 0,
+   "cv": 2,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 5,
+   "ctl": [
+    {
+     "name": "Sensitivity",
+     "short": "Sensitivity",
+     "sym": "Sensitivity",
+     "min": 0.10000000149011612,
+     "max": 100,
+     "def": 50,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Confidence Threshold",
+     "short": "Confidence Thres",
+     "sym": "ConfidenceThreshold",
+     "min": 0,
+     "max": 100,
+     "def": 12.5,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Tolerance",
+     "short": "Tolerance",
+     "sym": "Tolerance",
+     "min": 0,
+     "max": 100,
+     "def": 6.25,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Octave",
+     "short": "Octave",
+     "sym": "Octave",
+     "min": -4,
+     "max": 4,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Hold Pitch",
+     "short": "Hold Pitch",
+     "sym": "HoldPitch",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    }
+   ],
+   "comment": "The Audio To CV Pitch plugin is a tool that turns your audio signal into CV pitch and CV gate signals."
+  },
+  {
+   "uri": "https://github.com/brummer10/HarmonicExciter",
+   "name": "Harmonic Exciter",
+   "label": "Harmonic Exciter",
+   "brand": "brummer",
+   "cat": [
+    "Dynamics"
+   ],
+   "bucket": "Dynamics",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": true,
+   "ctlTotal": 4,
+   "ctl": [
+    {
+     "name": "amp",
+     "short": "amp",
+     "sym": "Knob1",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "bpf",
+     "short": "bpf",
+     "sym": "Knob2",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "direct",
+     "short": "direct",
+     "sym": "Knob3",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "harmonics",
+     "short": "harmonics",
+     "sym": "Knob4",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "..."
+  },
+  {
+   "uri": "https://github.com/brummer10/screcord#mono_record",
+   "name": "Record-Mono",
+   "label": "Record-Mono",
+   "brand": "brummer",
+   "cat": [
+    "Utility"
+   ],
+   "bucket": "Utility",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": false,
+   "ctlTotal": 2,
+   "ctl": [
+    {
+     "name": "FORMAT",
+     "short": "FORMAT",
+     "sym": "FORMAT",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      ".wav",
+      ".ogg"
+     ]
+    },
+    {
+     "name": "REC",
+     "short": "REC",
+     "sym": "REC",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    }
+   ],
+   "comment": "Mono Recorder plugin, save audio stream as wav or ogg files."
+  },
+  {
+   "uri": "https://github.com/brummer10/screcord#quad_record",
+   "name": "Record-Quad",
+   "label": "Record-Quad",
+   "brand": "brummer",
+   "cat": [
+    "Utility"
+   ],
+   "bucket": "Utility",
+   "sub": "",
+   "ai": 4,
+   "ao": 4,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": false,
+   "ctlTotal": 2,
+   "ctl": [
+    {
+     "name": "FORM",
+     "short": "FORM",
+     "sym": "FORM",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      ".wav",
+      ".ogg"
+     ]
+    },
+    {
+     "name": "REC",
+     "short": "REC",
+     "sym": "REC",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    }
+   ],
+   "comment": "Quad Reocrder plugin, save audio stream as 4 channel wav or ogg files."
+  },
+  {
+   "uri": "https://github.com/brummer10/screcord#stereo_record",
+   "name": "Record-Stereo",
+   "label": "Record-Stereo",
+   "brand": "brummer",
+   "cat": [
+    "Utility"
+   ],
+   "bucket": "Utility",
+   "sub": "",
+   "ai": 2,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": false,
+   "ctlTotal": 2,
+   "ctl": [
+    {
+     "name": "FORM",
+     "short": "FORM",
+     "sym": "FORM",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      ".wav",
+      ".ogg"
+     ]
+    },
+    {
+     "name": "REC",
+     "short": "REC",
+     "sym": "REC",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    }
+   ],
+   "comment": "Stereo Reocrder plugin, save audio stream as wav or ogg files."
+  },
+  {
+   "uri": "https://github.com/jatinchowdhury18/KlonCentaur",
+   "name": "ChowCentaur",
+   "label": "ChowCentaur",
+   "brand": "chowdsp",
+   "cat": [
+    "Distortion"
+   ],
+   "bucket": "Drive",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": true,
+   "ctlTotal": 4,
+   "ctl": [
+    {
+     "name": "Gain",
+     "short": "Gain",
+     "sym": "gain",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Treble",
+     "short": "Treble",
+     "sym": "treble",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Level",
+     "short": "Level",
+     "sym": "level",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Mode",
+     "short": "Mode",
+     "sym": "mode",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Traditional",
+      "Neural"
+     ]
+    }
+   ],
+   "comment": "Chow Centaur is a digital emulation of the Klon Centaur guitar pedal (*)"
+  },
+  {
+   "uri": "https://github.com/michaelwillis/dragonfly-reverb",
+   "name": "Dragonfly Hall Reverb",
+   "label": "Hall Reverb",
+   "brand": "Dragonfly",
+   "cat": [
+    "Reverb"
+   ],
+   "bucket": "Reverb",
+   "sub": "",
+   "ai": 2,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 25,
+   "hasBypass": false,
+   "ctlTotal": 18,
+   "ctl": [
+    {
+     "name": "Dry Level",
+     "short": "Dry Level",
+     "sym": "dry_level",
+     "min": 0,
+     "max": 100,
+     "def": 80,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Early Level",
+     "short": "Early Level",
+     "sym": "early_level",
+     "min": 0,
+     "max": 100,
+     "def": 10,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Late Level",
+     "short": "Late Level",
+     "sym": "late_level",
+     "min": 0,
+     "max": 100,
+     "def": 20,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Size",
+     "short": "Size",
+     "sym": "size",
+     "min": 10,
+     "max": 60,
+     "def": 24,
+     "unit": "m",
+     "render": "%f m",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Width",
+     "short": "Width",
+     "sym": "width",
+     "min": 50,
+     "max": 150,
+     "def": 100,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Predelay",
+     "short": "Predelay",
+     "sym": "delay",
+     "min": 0,
+     "max": 100,
+     "def": 4,
+     "unit": "ms",
+     "render": "%f ms",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Diffuse",
+     "short": "Diffuse",
+     "sym": "diffuse",
+     "min": 0,
+     "max": 100,
+     "def": 90,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Low Cut",
+     "short": "Low Cut",
+     "sym": "low_cut",
+     "min": 0,
+     "max": 200,
+     "def": 4,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Low Cross",
+     "short": "Low Cross",
+     "sym": "low_xo",
+     "min": 200,
+     "max": 1200,
+     "def": 500,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Low Mult",
+     "short": "Low Mult",
+     "sym": "low_mult",
+     "min": 0.5,
+     "max": 2.5,
+     "def": 1.2999999523162842,
+     "unit": "X",
+     "render": "%f X",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "High Cut",
+     "short": "High Cut",
+     "sym": "high_cut",
+     "min": 1000,
+     "max": 16000,
+     "def": 7600,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "High Cross",
+     "short": "High Cross",
+     "sym": "high_xo",
+     "min": 1000,
+     "max": 16000,
+     "def": 5500,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "High Mult",
+     "short": "High Mult",
+     "sym": "high_mult",
+     "min": 0.20000000298023224,
+     "max": 1.2000000476837158,
+     "def": 0.5,
+     "unit": "X",
+     "render": "%f X",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Spin",
+     "short": "Spin",
+     "sym": "spin",
+     "min": 0,
+     "max": 10,
+     "def": 3.299999952316284,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Wander",
+     "short": "Wander",
+     "sym": "wander",
+     "min": 0,
+     "max": 40,
+     "def": 15,
+     "unit": "ms",
+     "render": "%f ms",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Decay",
+     "short": "Decay",
+     "sym": "decay",
+     "min": 0.10000000149011612,
+     "max": 10,
+     "def": 1.2999999523162842,
+     "unit": "s",
+     "render": "%f s",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "Dragonfly Hall Reverb is a high fidelity reverb effect."
+  },
+  {
+   "uri": "https://hannesbraun.net/ns/lv2/airwindows/adclip7",
+   "name": "ADClip7",
+   "label": "ADClip7",
+   "brand": "Hannes Braun",
+   "cat": [],
+   "bucket": "Drive",
+   "sub": "",
+   "ai": 2,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": false,
+   "ctlTotal": 4,
+   "ctl": [
+    {
+     "name": "Boost",
+     "short": "Boost",
+     "sym": "boost",
+     "min": 0,
+     "max": 18,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Soften",
+     "short": "Soften",
+     "sym": "soften",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Enhance",
+     "short": "Enhance",
+     "sym": "enhance",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Mode",
+     "short": "Mode",
+     "sym": "mode",
+     "min": 0,
+     "max": 3,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Normal",
+      "Atten",
+      "Clips"
+     ]
+    }
+   ],
+   "comment": "The ultimate Airwindows loudness maximizer/peak control"
+  },
+  {
+   "uri": "https://hannesbraun.net/ns/lv2/airwindows/capacitor2",
+   "name": "Capacitor2",
+   "label": "Capacitor2",
+   "brand": "Hannes Braun",
+   "cat": [
+    "Filter"
+   ],
+   "bucket": "Filter",
+   "sub": "",
+   "ai": 2,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": false,
+   "ctlTotal": 4,
+   "ctl": [
+    {
+     "name": "Lowpass",
+     "short": "Lowpass",
+     "sym": "lowpass",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Highpass",
+     "short": "Highpass",
+     "sym": "highpass",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "NonLin",
+     "short": "NonLin",
+     "sym": "nonlin",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Dry/Wet",
+     "short": "Dry/Wet",
+     "sym": "drywet",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "Capacitor with extra analog modeling and mojo"
+  },
+  {
+   "uri": "https://hannesbraun.net/ns/lv2/airwindows/starchild",
+   "name": "StarChild",
+   "label": "StarChild",
+   "brand": "Airwindows",
+   "cat": [
+    "Reverb"
+   ],
+   "bucket": "Reverb",
+   "sub": "",
+   "ai": 2,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": false,
+   "ctlTotal": 3,
+   "ctl": [
+    {
+     "name": "Sustain",
+     "short": "Sustain",
+     "sym": "sustain",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Grain",
+     "short": "Grain",
+     "sym": "grain",
+     "min": 0,
+     "max": 1,
+     "def": 0.699999988079071,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Dry/Wet",
+     "short": "Dry/Wet",
+     "sym": "drywet",
+     "min": 0,
+     "max": 1,
+     "def": 0.20000000298023224,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "Weird digital ambience/echo plugin."
+  },
+  {
+   "uri": "https://mod.audio/plugins/CabinetLoader",
+   "name": "Cabinet Loader",
+   "label": "Cabinet Loader",
+   "brand": "MOD",
+   "cat": [
+    "Simulator"
+   ],
+   "bucket": "Amp·Cab",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": true,
+   "ctlTotal": 1,
+   "ctl": [
+    {
+     "name": "Output",
+     "short": "Output",
+     "sym": "level",
+     "min": -60,
+     "max": 0,
+     "def": -12,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "enum",
+     "scale": [
+      "Off"
+     ]
+    }
+   ],
+   "comment": "The MOD Cabinet Loader enables you to play through your favorite cabinet impulse responses (IRs)."
+  },
+  {
+   "uri": "https://mod.audio/plugins/ConvolutionLoader",
+   "name": "Convolution Loader",
+   "label": "Convolution Loader",
+   "brand": "MOD",
+   "cat": [
+    "Reverb"
+   ],
+   "bucket": "Reverb",
+   "sub": "",
+   "ai": 2,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": true,
+   "ctlTotal": 5,
+   "ctl": [
+    {
+     "name": "Dry Level",
+     "short": "Dry Level",
+     "sym": "drylevel",
+     "min": -60,
+     "max": 0,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "enum",
+     "scale": [
+      "Off"
+     ]
+    },
+    {
+     "name": "Wet Level",
+     "short": "Wet Level",
+     "sym": "wetlevel",
+     "min": -60,
+     "max": 0,
+     "def": -30,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "enum",
+     "scale": [
+      "Off"
+     ]
+    },
+    {
+     "name": "High Pass Filter",
+     "short": "High Pass Filter",
+     "sym": "hpf",
+     "min": 0,
+     "max": 500,
+     "def": 0,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "enum",
+     "scale": [
+      "Off"
+     ]
+    },
+    {
+     "name": "Trails",
+     "short": "Trails",
+     "sym": "trails",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Buffered",
+     "short": "Buffered",
+     "sym": "buffered",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    }
+   ],
+   "comment": "The MOD Convolution Loader enables you to easily create custom reverb and other effects using impulse responses (IRs)."
+  },
+  {
+   "uri": "urn:brummer:bluesbreaker",
+   "name": "bluesbreaker",
+   "label": "bluesbreaker",
+   "brand": "brummer",
+   "cat": [
+    "Distortion"
+   ],
+   "bucket": "Drive",
+   "sub": "",
+   "ai": 1,
+   "ao": 1,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": true,
+   "ctlTotal": 3,
+   "ctl": [
+    {
+     "name": "gain",
+     "short": "gain",
+     "sym": "GAIN",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "tone",
+     "short": "tone",
+     "sym": "TONE",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "volume",
+     "short": "volume",
+     "sym": "VOLUME",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "The BluesBreaker a low-gain pedal with a moderate overdrive and subtle boost."
+  },
+  {
+   "uri": "urn:distrho:a-fluidsynth",
+   "name": "DIE Fluid Synth",
+   "label": "DIE Fluid Synth",
+   "brand": "DISTRHO",
+   "cat": [
+    "Generator",
+    "Instrument"
+   ],
+   "bucket": "Synth",
+   "sub": "Instrument",
+   "ai": 0,
+   "ao": 2,
+   "mi": 1,
+   "mo": 0,
+   "cv": 0,
+   "presets": 0,
+   "hasBypass": true,
+   "ctlTotal": 12,
+   "ctl": [
+    {
+     "name": "Output Level",
+     "short": "Output Level",
+     "sym": "level",
+     "min": -80,
+     "max": 20,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Reverb Enable",
+     "short": "Reverb Enable",
+     "sym": "rev_enable",
+     "min": 0,
+     "max": 1,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Reverb Roomsize",
+     "short": "Reverb Roomsize",
+     "sym": "rev_roomsize",
+     "min": 0,
+     "max": 1.2000000476837158,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Reverb Damping",
+     "short": "Reverb Damping",
+     "sym": "rev_damp",
+     "min": 0,
+     "max": 1,
+     "def": 0.5,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Reverb Width",
+     "short": "Reverb Width",
+     "sym": "rev_width",
+     "min": 0,
+     "max": 100,
+     "def": 10,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Reverb Dry/Wet",
+     "short": "Reverb Dry/Wet",
+     "sym": "rev_level",
+     "min": 0,
+     "max": 1,
+     "def": 0.10000000149011612,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Chorus Enable",
+     "short": "Chorus Enable",
+     "sym": "chorus_enable",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "toggle",
+     "scale": []
+    },
+    {
+     "name": "Chorus Voice Count",
+     "short": "Chorus Voice Cou",
+     "sym": "chorus_nr",
+     "min": 0,
+     "max": 99,
+     "def": 3,
+     "unit": "",
+     "render": "",
+     "w": "step",
+     "scale": []
+    },
+    {
+     "name": "Chorus Speed",
+     "short": "Chorus Speed",
+     "sym": "chorus_speed",
+     "min": 0.28999999165534973,
+     "max": 5,
+     "def": 1,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "log",
+     "scale": []
+    },
+    {
+     "name": "Chorus Depth",
+     "short": "Chorus Depth",
+     "sym": "chorus_depth",
+     "min": 0,
+     "max": 21,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Chorus Level",
+     "short": "Chorus Level",
+     "sym": "chorus_level",
+     "min": -80,
+     "max": 20,
+     "def": 0,
+     "unit": "dB",
+     "render": "%f dB",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Chorus Type",
+     "short": "Chorus Type",
+     "sym": "chorus_type",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Sine",
+      "Triangle"
+     ]
+    }
+   ],
+   "comment": "The DIE Fluid Synth is a generator plugin that makes use of SF2 Instrument files (with support for the unofficial vorbis/flac-encoded SF3 fo"
+  },
+  {
+   "uri": "urn:dragonfly:early",
+   "name": "Dragonfly Early Reflections",
+   "label": "Early Reflections",
+   "brand": "Dragonfly",
+   "cat": [
+    "Reverb"
+   ],
+   "bucket": "Reverb",
+   "sub": "",
+   "ai": 2,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 1,
+   "hasBypass": false,
+   "ctlTotal": 7,
+   "ctl": [
+    {
+     "name": "Dry Level",
+     "short": "Dry Level",
+     "sym": "dry_level",
+     "min": 0,
+     "max": 100,
+     "def": 80,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Wet Level",
+     "short": "Wet Level",
+     "sym": "early_level",
+     "min": 0,
+     "max": 100,
+     "def": 20,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Program",
+     "short": "Program",
+     "sym": "program",
+     "min": 0,
+     "max": 7,
+     "def": 2,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Abrupt Echo",
+      "Backstage Pass",
+      "Concert Venue",
+      "Damaged Goods",
+      "Elevator Pitch",
+      "Floor Thirteen",
+      "Garage Band",
+      "Home Studio"
+     ]
+    },
+    {
+     "name": "Size",
+     "short": "Size",
+     "sym": "size",
+     "min": 10,
+     "max": 60,
+     "def": 20,
+     "unit": "m",
+     "render": "%f m",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Width",
+     "short": "Width",
+     "sym": "width",
+     "min": 50,
+     "max": 150,
+     "def": 100,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Low Cut",
+     "short": "Low Cut",
+     "sym": "low_cut",
+     "min": 0,
+     "max": 200,
+     "def": 50,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "High Cut",
+     "short": "High Cut",
+     "sym": "high_cut",
+     "min": 1000,
+     "max": 16000,
+     "def": 10000,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "Dragonfly Early Reflections is a reverb effect based on Moorer's early reflection model."
+  },
+  {
+   "uri": "urn:dragonfly:plate",
+   "name": "Dragonfly Plate Reverb",
+   "label": "Plate Reverb",
+   "brand": "Dragonfly",
+   "cat": [
+    "Reverb"
+   ],
+   "bucket": "Reverb",
+   "sub": "",
+   "ai": 2,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 8,
+   "hasBypass": false,
+   "ctlTotal": 9,
+   "ctl": [
+    {
+     "name": "Dry Level",
+     "short": "Dry Level",
+     "sym": "dry_level",
+     "min": 0,
+     "max": 100,
+     "def": 80,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Wet Level",
+     "short": "Wet Level",
+     "sym": "early_level",
+     "min": 0,
+     "max": 100,
+     "def": 20,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Algorithm",
+     "short": "Algorithm",
+     "sym": "algorithm",
+     "min": 0,
+     "max": 2,
+     "def": 1,
+     "unit": "",
+     "render": "",
+     "w": "enum",
+     "scale": [
+      "Simple",
+      "Nested",
+      "Tank"
+     ]
+    },
+    {
+     "name": "Width",
+     "short": "Width",
+     "sym": "width",
+     "min": 50,
+     "max": 150,
+     "def": 100,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Predelay",
+     "short": "Predelay",
+     "sym": "predelay",
+     "min": 0,
+     "max": 100,
+     "def": 0,
+     "unit": "ms",
+     "render": "%f ms",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Decay",
+     "short": "Decay",
+     "sym": "decay",
+     "min": 0.10000000149011612,
+     "max": 10,
+     "def": 0.4000000059604645,
+     "unit": "s",
+     "render": "%f s",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Low Cut",
+     "short": "Low Cut",
+     "sym": "low_cut",
+     "min": 0,
+     "max": 200,
+     "def": 200,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "High Cut",
+     "short": "High Cut",
+     "sym": "high_cut",
+     "min": 1000,
+     "max": 16000,
+     "def": 16000,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Dampen",
+     "short": "Dampen",
+     "sym": "early_damp",
+     "min": 1000,
+     "max": 16000,
+     "def": 13000,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "Dragonfly Plate is an easy to use, high fidelity plate reverb plugin."
+  },
+  {
+   "uri": "urn:dragonfly:room",
+   "name": "Dragonfly Room Reverb",
+   "label": "Room Reverb",
+   "brand": "Dragonfly",
+   "cat": [
+    "Reverb"
+   ],
+   "bucket": "Reverb",
+   "sub": "",
+   "ai": 2,
+   "ao": 2,
+   "mi": 0,
+   "mo": 0,
+   "cv": 0,
+   "presets": 25,
+   "hasBypass": false,
+   "ctlTotal": 17,
+   "ctl": [
+    {
+     "name": "Dry Level",
+     "short": "Dry Level",
+     "sym": "dry_level",
+     "min": 0,
+     "max": 100,
+     "def": 80,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Early Level",
+     "short": "Early Level",
+     "sym": "early_level",
+     "min": 0,
+     "max": 100,
+     "def": 10,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Early Send",
+     "short": "Early Send",
+     "sym": "early_send",
+     "min": 0,
+     "max": 100,
+     "def": 20,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Late Level",
+     "short": "Late Level",
+     "sym": "late_level",
+     "min": 0,
+     "max": 100,
+     "def": 20,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Size",
+     "short": "Size",
+     "sym": "size",
+     "min": 8,
+     "max": 32,
+     "def": 12,
+     "unit": "m",
+     "render": "%f m",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Width",
+     "short": "Width",
+     "sym": "width",
+     "min": 50,
+     "max": 150,
+     "def": 100,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Predelay",
+     "short": "Predelay",
+     "sym": "predelay",
+     "min": 0,
+     "max": 100,
+     "def": 8,
+     "unit": "ms",
+     "render": "%f ms",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Decay",
+     "short": "Decay",
+     "sym": "decay",
+     "min": 0.10000000149011612,
+     "max": 10,
+     "def": 0.4000000059604645,
+     "unit": "s",
+     "render": "%f s",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Diffuse",
+     "short": "Diffuse",
+     "sym": "diffuse",
+     "min": 0,
+     "max": 100,
+     "def": 70,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Spin",
+     "short": "Spin",
+     "sym": "spin",
+     "min": 0,
+     "max": 5,
+     "def": 0.800000011920929,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Wander",
+     "short": "Wander",
+     "sym": "wander",
+     "min": 0,
+     "max": 100,
+     "def": 40,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "High Cut",
+     "short": "High Cut",
+     "sym": "in_high_cut",
+     "min": 1000,
+     "max": 16000,
+     "def": 16000,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Early Damp",
+     "short": "Early Damp",
+     "sym": "early_damp",
+     "min": 1000,
+     "max": 16000,
+     "def": 10000,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Late Damp",
+     "short": "Late Damp",
+     "sym": "late_damp",
+     "min": 1000,
+     "max": 16000,
+     "def": 9400,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Low Boost",
+     "short": "Low Boost",
+     "sym": "low_boost",
+     "min": 0,
+     "max": 100,
+     "def": 50,
+     "unit": "%",
+     "render": "%f%%",
+     "w": "knob",
+     "scale": []
+    },
+    {
+     "name": "Boost Freq",
+     "short": "Boost Freq",
+     "sym": "boost_freq",
+     "min": 50,
+     "max": 1050,
+     "def": 600,
+     "unit": "Hz",
+     "render": "%f Hz",
+     "w": "knob",
+     "scale": []
+    }
+   ],
+   "comment": "Dragonfly Room Reverb is a high fidelity reverb effect."
+  }
+ ]
+}
