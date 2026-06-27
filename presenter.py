@@ -460,6 +460,18 @@ class Presenter:
             self.backend.load_snapshot(self.pedalboard.current_snapshot_idx)
             self.refresh_pedalboard()
 
+    def go_to_snapshot(self, idx):
+        """Load snapshot ``idx`` directly (the editor's snapshot picker, vs the
+        footswitch's prev/next). Applies the snapshot's param/bypass values to the
+        live graph, then refreshes. Returns the rebuilt Pedalboard for the editor
+        to reseed (so node values update), or None for an out-of-range idx."""
+        if str(idx) not in (self.pedalboard.list_of_snapshots or {}):
+            return None
+        self.pedalboard.current_snapshot_idx = idx
+        self.backend.load_snapshot(idx)
+        self.refresh_pedalboard()
+        return self.pedalboard
+
     def assign_pb_ss_to_footswitch(self, fs_idx_to_assign):
         """
         FS indices are 0-3. Assigns the current pedalboard and snapshot to the given footswitch.
@@ -789,11 +801,13 @@ class Presenter:
         pass
 
     def save_snapshot(self):
-        self.backend.snapshot_save()
+        ok = self.backend.snapshot_save()   # overwrites current snapshot + persists the pedalboard
         self.refresh_pedalboard()
+        return bool(ok)
     def  save_snapshot_as(self, name):
-        self.backend.snapshot_save_as(new_name=name)
+        res = self.backend.snapshot_save_as(new_name=name)
         self.refresh_pedalboard()
+        return res
 
     def modechange(self, mode=None):
         if mode is None:

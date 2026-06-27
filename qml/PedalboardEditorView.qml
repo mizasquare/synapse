@@ -29,6 +29,8 @@ Item {
     property bool trashHot: false
     property bool boardsOpen: false       // mock board manager (non-live)
     property bool liveBoardsOpen: false   // live host board switcher (M6a)
+    property bool snapsOpen: false        // live snapshot manager (M6c)
+    property bool snapNaming: false       // snapshot save-as naming panel (M6c)
     property string pendingSwitchBundle: ""  // live switch awaiting dirty-discard confirm
     property string pendingSwitchTitle: ""
     property string pendingNewKind: ""   // "quick"/"advanced" awaiting discard confirmation
@@ -96,6 +98,9 @@ Item {
                 Pill { label: editor.dirty ? "SAVE *" : "SAVE"; accent: cGreen
                        visible: editor.live; dim: !editor.dirty
                        onTap: editor.saveBoard() }
+                // live snapshot manager (change / save / save-as)
+                Pill { label: "SNAP"; accent: cPurple; visible: editor.live
+                       onTap: win.snapsOpen = true }
                 Pill { label: "UNDO"; accent: cBorder; visible: !editor.live; dim: !editor.canUndo
                        onTap: if (editor.canUndo) editor.undo() }
                 Pill { label: "REDO"; accent: cBorder; visible: !editor.live; dim: !editor.canRedo
@@ -1078,6 +1083,119 @@ Item {
                                   // (a failed switch keeps the overlay + shows a failure toast).
                                   onTap: { editor.confirmedLiveBoardSwitch(win.pendingSwitchBundle)
                                            win.pendingSwitchBundle = "" } }
+                    }
+                }
+            }
+        }
+
+        // -------- LIVE snapshot manager (overlay, M6c) --------
+        // Snapshots = param/bypass/preset presets within the current board.
+        // Tap a row to load; 저장 overwrites current (also persists the board);
+        // 새로 저장 opens the naming panel.
+        Item {
+            visible: win.snapsOpen; anchors.fill: parent; z: 73
+            MouseArea { anchors.fill: parent; onClicked: win.snapsOpen = false }
+            Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.55 }
+            Rectangle {
+                width: 478; height: 408; radius: 10; anchors.centerIn: parent
+                color: cPanel; border.width: 1; border.color: cBorder
+                MouseArea { anchors.fill: parent }
+                Column {
+                    anchors.fill: parent; anchors.margins: 14; spacing: 10
+                    Item {
+                        width: parent.width; height: 24
+                        Text { text: "스냅샷"; color: cText; font.family: uiFont; font.pixelSize: 18
+                               anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
+                        Text { text: "✕"; color: cMuted; font.pixelSize: 18
+                               anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                               MouseArea { anchors.fill: parent; onClicked: win.snapsOpen = false } }
+                    }
+                    Flow {
+                        width: parent.width; spacing: 8
+                        WideBtn { label: editor.dirty ? "현재 스냅샷 저장 *" : "현재 스냅샷 저장"; accent: cPurple
+                                  onTap: editor.saveSnapshot() }
+                        WideBtn { label: "새 스냅샷으로 저장"; accent: cPurple
+                                  onTap: win.snapNaming = true }
+                    }
+                    Text { text: "스냅샷 (" + editor.snapList.length + ")  ·  탭하면 그 세팅으로 전환"
+                           color: cDim; font.family: uiFont; font.pixelSize: 13 }
+                    Flickable {
+                        width: parent.width; height: 268; contentHeight: snapCol.height; clip: true
+                        Column {
+                            id: snapCol; width: parent.width; spacing: 6
+                            Repeater {
+                                model: editor.snapList
+                                Rectangle {
+                                    width: snapCol.width; height: 44; radius: 5
+                                    color: modelData.current ? cElev : "#161b26"
+                                    border.width: 1; border.color: modelData.current ? cPurple : cBorder
+                                    Row {
+                                        anchors.fill: parent; anchors.margins: 8; spacing: 8
+                                        Text {
+                                            width: parent.width - 96; anchors.verticalCenter: parent.verticalCenter
+                                            text: (modelData.current ? "● " : "") + modelData.name
+                                            color: modelData.current ? cPurple : cText
+                                            font.family: uiFont; font.pixelSize: 15; elide: Text.ElideRight
+                                        }
+                                        Pill { label: modelData.current ? "현재" : "전환"
+                                               accent: modelData.current ? cBorder : cPurple
+                                               dim: modelData.current
+                                               onTap: if (!modelData.current) editor.selectSnapshot(modelData.idx) }
+                                    }
+                                }
+                            }
+                            Text { visible: editor.snapList.length === 0
+                                   text: "스냅샷 없음"; color: cDim
+                                   font.family: uiFont; font.pixelSize: 14; topPadding: 18 }
+                        }
+                    }
+                }
+            }
+        }
+
+        // -------- snapshot save-as naming panel (M6c) --------
+        Item {
+            visible: win.snapNaming; anchors.fill: parent; z: 83
+            onVisibleChanged: if (visible) snapNameField.text = ""
+            MouseArea { anchors.fill: parent; onClicked: win.snapNaming = false }
+            Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.6 }
+            Rectangle {
+                width: 460; height: 300; radius: 10; anchors.centerIn: parent
+                color: cPanel; border.width: 1; border.color: cPurple
+                MouseArea { anchors.fill: parent }
+                Column {
+                    anchors.fill: parent; anchors.margins: 16; spacing: 12
+                    Text { text: "새 스냅샷 이름"; color: cText; font.family: uiFont; font.pixelSize: 18 }
+                    Rectangle {
+                        width: parent.width; height: 40; radius: 6; color: cElev; border.width: 1; border.color: cBorder
+                        TextInput {
+                            id: snapNameField; anchors.fill: parent; anchors.leftMargin: 8
+                            verticalAlignment: Text.AlignVCenter; color: cText
+                            font.family: uiFont; font.pixelSize: 16; clip: true
+                            onAccepted: if (text.trim().length) { editor.saveSnapshotNamed(text); win.snapNaming = false; win.snapsOpen = false }
+                        }
+                        Text { visible: snapNameField.text === ""; anchors.fill: parent; anchors.leftMargin: 8
+                               verticalAlignment: Text.AlignVCenter; text: "이름 입력 또는 아래 용어로 추천"
+                               color: cDim; font.family: uiFont; font.pixelSize: 15 }
+                    }
+                    Flow {
+                        width: parent.width; spacing: 6
+                        Repeater {
+                            model: editor.boardTerms
+                            Rectangle {
+                                height: 26; width: stTxt.width + 16; radius: 13
+                                color: "#1b2230"; border.width: 1; border.color: cBorder
+                                Text { id: stTxt; anchors.centerIn: parent; text: modelData
+                                       color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 14 }
+                                MouseArea { anchors.fill: parent; onClicked: snapNameField.text = editor.suggestSnapshotName(modelData) }
+                            }
+                        }
+                    }
+                    Row {
+                        anchors.right: parent.right; spacing: 8
+                        WideBtn { label: "취소"; accent: cBorder; onTap: win.snapNaming = false }
+                        WideBtn { label: "저장"; accent: cPurple; dim: snapNameField.text.trim().length === 0
+                                  onTap: if (snapNameField.text.trim().length) { editor.saveSnapshotNamed(snapNameField.text); win.snapNaming = false; win.snapsOpen = false } }
                     }
                 }
             }

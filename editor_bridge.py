@@ -139,6 +139,7 @@ class EditorBridge(QObject):
     boardsChanged = Signal()  # saved-board list / current name / dirty changed
     confirmBoardSwitch = Signal(str, str)  # (bundle, title) — dirty live switch needs confirm
     boardSwitched = Signal()  # a live board switch actually completed -> close the switcher overlay
+    snapsChanged = Signal()   # snapshot list / current snapshot changed (M6c)
 
     def __init__(self, catalog_path=None):
         super().__init__()
@@ -429,6 +430,12 @@ class EditorBridge(QObject):
         self._fly_id = -1
         self._undo = []
         self._redo = []
+        # Drop the standalone-mock quick chain (bluesbreaker/GxCompressor/…). Those
+        # nodes get ids 1..N that COLLIDE with the live gnode ids, and _node()
+        # searches self.nodes first — so without this the inspector for live gnode
+        # id=2 (e.g. NAM) would resolve to the mock node id=2 (GxCompressor) and
+        # edits would read the wrong plugin's controls while writing to the live one.
+        self.nodes = []
 
         effects = list(pb.effects)
         self._gid_by_inst = {}
@@ -1358,6 +1365,89 @@ class EditorBridge(QObject):
                 return name
         return '%s-%s' % (term, random.choice(words))
 
+    # ------------------------------------------------ live snapshot mgmt (M6c)
+    def _live_pb(self):
+        """The presenter's live Pedalboard (snapshots live on it). None in mock."""
+        if not self._live_flag or not self.presenter:
+            return None
+        return getattr(self.presenter, 'pedalboard', None)
+
+    @Property('QVariantList', notify=snapsChanged)
+    def snapList(self):
+        """The current board's snapshots as [{idx,name,current}] for the editor
+        picker. list_of_snapshots is a {"0":name,...} dict; current_snapshot_idx
+        marks the active one."""
+        pb = self._live_pb()
+        if pb is None:
+            return []
+        snaps = pb.list_of_snapshots or {}
+        cur = pb.current_snapshot_idx
+        return [{'idx': int(k), 'name': snaps[k], 'current': int(k) == cur}
+                for k in sorted(snaps, key=lambda s: int(s))]
+
+    @Property(str, notify=snapsChanged)
+    def currentSnapshotName(self):
+        pb = self._live_pb()
+        if pb is None:
+            return ''
+        return (pb.list_of_snapshots or {}).get(str(pb.current_snapshot_idx), '')
+
+    @Slot(int)
+    def selectSnapshot(self, idx):
+        """Load snapshot ``idx`` (applies its param/bypass to the live graph) and
+        re-seed so node values + inspector reflect it. Snapshots don't change
+        graph structure, so nodes/wires are unchanged — only values."""
+        if not (self._live_flag and self.presenter):
+            return
+        pb = self.presenter.go_to_snapshot(idx)
+        if pb is None:
+            return
+        self._seed_from_pedalboard(pb)   # refresh node vals (also clears _dirty baseline)
+        self.snapsChanged.emit()
+        self.toast.emit('스냅샷 · %s' % self.currentSnapshotName)
+
+    @Slot()
+    def saveSnapshot(self):
+        """Overwrite the current snapshot. NOTE this also persists the pedalboard
+        to disk (mod-ui couples the two: snapshot_save save_pb_also=True) — it
+        therefore inherits the M6b 3-layer corruption defense."""
+        if not (self._live_flag and self.presenter):
+            return
+        ok = self.presenter.save_snapshot()
+        if ok:
+            self._dirty = False          # the board was persisted too
+            self.snapsChanged.emit()
+            self.boardsChanged.emit()
+            self.toast.emit('스냅샷 저장됨 · %s' % self.currentSnapshotName)
+        else:
+            self.toast.emit('스냅샷 저장 실패')
+
+    @Slot(str)
+    def saveSnapshotNamed(self, name):
+        """Save the current state as a NEW snapshot (also persists the board)."""
+        if not (self._live_flag and self.presenter):
+            return
+        name = (name or '').strip()
+        if not name:
+            return
+        self.presenter.save_snapshot_as(name)
+        self._dirty = False
+        self.snapsChanged.emit()
+        self.boardsChanged.emit()
+        self.toast.emit('새 스냅샷 · %s' % name)
+
+    @Slot(str, result=str)
+    def suggestSnapshotName(self, term):
+        """A stage term + quirky suffix, avoiding existing snapshot names."""
+        pb = self._live_pb()
+        existing = set((pb.list_of_snapshots or {}).values()) if pb else set()
+        words = _load_words()
+        for _ in range(12):
+            name = '%s-%s' % (term, random.choice(words))
+            if name not in existing:
+                return name
+        return '%s-%s' % (term, random.choice(words))
+
     # inspector
     @Property(bool, notify=changed)
     def inspOpen(self):
@@ -1980,12 +2070,14 @@ class EditorBridge(QObject):
 
     @Slot()
     def saveBoard(self):
-        """Overwrite the current board in place. Live: persist the live host graph
-        to its .ttl bundle via presenter.save_current_board (asNew=0, inherits the
-        app+host 3-layer corruption defense); the graph already lives in the host
-        (M5 host-first), so this only triggers the save. Mock: write the .json."""
+        """Overwrite the current board in place. Live: re-capture the CURRENT
+        snapshot AND persist the board to its .ttl bundle in one shot via
+        presenter.save_snapshot (snapshot_make + save_pb_also=True). Capturing the
+        snapshot is essential — board-only save leaves param/bypass/NAM edits out
+        of the snapshot, so a snapshot round-trip would revert them. Inherits the
+        app+host 3-layer corruption defense (the save_pb path). Mock: write .json."""
         if self._live_flag:
-            ok = self.presenter.save_current_board() if self.presenter else False
+            ok = self.presenter.save_snapshot() if self.presenter else False
             if ok:
                 self._dirty = False
                 # adopt any host-side title change (factory board -> save-new)
@@ -1993,8 +2085,9 @@ class EditorBridge(QObject):
                 if pb is not None and pb.title:
                     self.board_name = pb.title
                 self.refreshBoards()
+                self.snapsChanged.emit()
                 self.boardsChanged.emit()
-                self.toast.emit('보드 저장됨 · %s' % self.board_name)
+                self.toast.emit('저장됨 · %s' % self.board_name)
             else:
                 self.toast.emit('저장 실패')
             return
