@@ -4,7 +4,7 @@
 > (검증 내역 = [`qt-migration-FINISHED.md`](qt-migration-FINISHED.md) 아카이브).
 > 이 문서는 그 위의 **남은 기능·신뢰성·정리·부팅·설계결정·검증**을 모은 살아있는 로드맵이다.
 > 구 `qt-migration-handoff`(후속작업) + `ui-migration-review`(시안↔현행 갭 분석)를 **흡수·통합**했다.
-> 마지막 갱신: 2026-06-27 (**에디터 라이브 배선 M1~M3 완료** — 임베드·읽기전용로드·파라미터/바이패스 쓰기; FOCUS parameter_set 점검+throttle; patch_set은 **M3.5**로 예정).
+> 마지막 갱신: 2026-06-28 (**페달보드 에디터 트랙 M1~M6d 전부 완료·라이브검증** — 임베드/읽기로드/파라미터·바이패스/패치(M3.5)/그래프변형(M4·M5)/보드 로드·저장·스냅샷(M6a~c)/라이브 QUICK 모드(M6d)까지. 마일스톤별 상세는 메모리 `synapse-roadmap`이 권위본. **다음 최우선 = M7 라이브 플러그인 카탈로그**).
 
 **현재 사실관계:** PyQt6+QML+eglfs 앱이 Pi에서 라이브 동작하고 autostart도 전환됨(`dfd42c6`).
 FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이브 검증됨(커밋 `1074b5e`).
@@ -14,8 +14,8 @@ FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이
 원격 개발 동안 labwc 창모드가 remote desktop(PiConnect/VNC) 접속 이득이 커서, 당분간 컴포지터 유지.
 무대 실사용/기기 확정 단계에서 다시 올린다. (2026-06-25 사용자 결정.)
 
-**★다음 최우선 = 페달보드 에디터(아래 전용 섹션). Tier 1 신뢰성이 다 `[x]`라 다음 큰 덩어리이자 가장 무거운 태스크.**
-EDIT 버튼은 이미 붙었으나 화면이 placeholder뿐 — 이펙트 추가/삭제/연결을 실호스트에 배선하는 본체가 통째로 남았다.
+**★페달보드 에디터 트랙(가장 무거운 덩어리)은 M1~M6d로 완료됨**(아래 전용 섹션). 그래프 편집·보드 로드/저장·스냅샷·라이브 QUICK 모드까지 실호스트 배선·라이브검증 끝.
+**★다음 최우선 = M7 라이브 플러그인 카탈로그**(아래 전용 섹션) — 에디터를 동결 72-플러그인 서브셋에서 **호스트의 전체 설치 플러그인**으로 승격.
 
 각 항목은 `파일:라인` 근거로 검증됨. 작업은 한 번에 하나씩, 변경 전 사용자 승인.
 
@@ -55,16 +55,17 @@ EDIT 버튼은 이미 붙었으나 화면이 placeholder뿐 — 이펙트 추가
 > 이 백엔드(`/effect/add`+`/connect`+`/parameter/address`)를 공유한다. 여러 화면·백엔드·역방향싱크가 동시에
 > 엮여서 지금까지 손댄 어떤 항목보다 표면이 크다. 한 번에 하나씩, 단계별로 라이브 검증하며 진행할 것.
 
-**현재 상태 (라이브 배선 진행 중 — 2026-06-27):**
+**현재 상태 (트랙 완료 — 2026-06-28, 브랜치 `pedalboard-editor`, master 미머지):**
 - **목업 본체 완성**(브랜치 `pedalboard-editor`): `editor_bridge.py`(브레인) + `qml/PedalboardEditorView.qml`(본문, advanced 포트그래프·레이디얼연결·bake·인스펙터) + standalone `qt_editor.py`. P1~P3 완료(메모리 로드맵 참조).
 - **라이브 앱 배선을 마일스톤으로 진행**(각 끝에서 Pi 육안검증). 진실원 = `presenter.pedalboard`; 에디터는 거기서 advanced 그래프를 시드하고 쓰기는 backend로, 리버스 채널이 자동 갱신:
   - [x] **M1 — 임베드 ✅(2026-06-27)** — `PedalboardEditor.qml` 본문을 `PedalboardEditorView.qml`(Item)로 분리 → standalone Window와 라이브 EDIT 화면이 **같은 본문** 공유. [`main.qml`](../qml/main.qml) `editScreen` = `PedalboardEditorView` Loader(`source:`, EDIT 진입마다 새로 생성), 헤더 `◄ 나가기`→`view.goOverview()`. `editor` 컨텍스트 프로퍼티를 `qt_main.py`/`qt_app.py`에 등록. **+ 라이브 앱도 `showFullScreen()`+`Ctrl+Q`**(에디터와 동일).
   - [x] **M2 — 읽기전용 라이브 로드 ✅(2026-06-27)** — `editor.enterLive()`(Loader onLoaded)가 `_seed_from_pedalboard(presenter.pedalboard)` 호출 → 실제 체인 렌더. 식별자 매핑: **정수 gnode id ↔ 라이브 인스턴스**(`_gid_by_inst`/`_inst_by_gid`; 피드백 DFS의 `int()` 제약 + 이후 backend 주소지정용). `Connection`(`bluesbreaker/out0`) → 포트키(`gid:out:audio:idx`), HW(`capture_N`/`playback_N`)→IN/OUT. 좌표 정규화·`vals`=라이브 포트값·보드명=`pb.title`. `live` 프로퍼티가 목업 크롬(BOARD/UNDO/REDO/SHUF) 숨김. ClaudeCanEdit 검증 OK.
   - [x] **M3 — 파라미터·바이패스 라이브 쓰기 ✅(2026-06-27)** — 인스펙터 노브/토글/enum/리셋→`parameter_set`, bypass→`bypass_effect`(신규 backend API 0). 에디터가 `self.presenter.view`(QtView)를 통해 써서 **FOCUS와 같은 throttle 재사용**(별도 배선 0): `_inst_of`/`_live_param`/`_live_bypass`, gnode id→라이브 인스턴스. 부수: **FOCUS parameter_set 점검(이미 동작 확인) + 정리** — `model.EffectPort.set_value` 디버그 `print('wow')` 제거·`return error_msg`, `qtview.setParameter`에 **드래그 throttle**(`(inst,sym)`별 coalesce, leading+trailing, 40ms≈25/s). ClaudeCanEdit GAIN/bypass 라이브 검증 OK.
-  - [ ] **M3.5 — patch_set(파일 로딩: NAM 모델·IR) 구현** — 제어포트(parameter_set)와 **별개 메커니즘**(속성 URI+파일경로, [[param-vs-patch-set]]). 라이브 앱 **FOCUS·에디터 둘 다 미구현**(IR/NAM 읽기전용 라벨만). 필요한 것: ① QtView `setPatch(inst,uri,path)` 슬롯 → 기존 `presenter.patch_changed`→`EffectPatch.set_patch`→`backend.patch_set`(이미 존재) ② `qtview.update_patch_display`(현재 `pass`)로 라벨 갱신 ③ 파일목록 소스(`configs.PATCH_FILE_DIR_MAP`의 디렉토리 스캔) ④ 파일 선택기 UI(FOCUS 카드 + 에디터 인스펙터). 모델은 이미 `effect.patches`(EffectPatch) 빌드, 역방향 `EffectPatchSet`도 처리됨(`apply_external_patch`). = UI + 표시갱신 + 파일목록이 핵심. (roadmap Tier 2 "패치/IR 파일 선택기"와 동일 작업 — 통합.)
-  - [ ] **M4 — backend 그래프변형 4종 신규** — `modepctrl` add/remove/connect/disconnect(`parameter_set` 패턴: 동기 requests, None/에러), `Backend` ABC + `fakemodep` 구현. off-device 검증.
-  - [ ] **M5 — 구조편집 + 식별자 매핑** — remove/disconnect→connect→add 순. 포트키↔jack포트명(`/graph/<inst>/<port>`) 매핑, 인스턴스 minting(add), 리버스 채널 이중적용 가드.
-  - [ ] **M6 — 저장 + bake/undo** — `save_current_pedalboard`로 .ttl 영속화, bake/undo를 diff-and-apply 시퀀스로 재표현. 라운드트립 검증.
+  - [x] **M3.5 — patch_set(NAM·IR·cabsim 파일 로딩) ✅(2026-06-27, 커밋 `e89a458`+`cf0fcfe`)** — FOCUS·에디터 인스펙터 둘 다 구현. 공유 `qml/PatchPicker.qml` + `presenter.list_patch_files`(디렉터리 재귀스캔) + `qtview.setPatch`/`update_patch_display` + `editor.inspPatches`/`setPatch`. ★mod-ui `fileTypes`=카테고리명('nammodel','cabsim')→`configs.PATCH_FILE_TYPE_EXTS` 매핑. (Tier 2 "패치/IR 파일 선택기"와 동일 — 완료.) 상세 [[param-vs-patch-set]].
+  - [x] **M4 — 라이브 그래프 read + backend 그래프변형 4종 ✅(커밋 `3b9f163`[M4a]·`4fba6c3`[M4b])** — M4a: `syn_dump_graph` 포크 엔드포인트로 **라이브 그래프 read**(stale 디스크 근본해결, plugins/connections만 라이브 우선·폴백 안전). M4b: `modepctrl` add/remove/connect/disconnect 래퍼(포크 무관, 웹UI desktop.js와 동일 엔드포인트) + Backend ABC + fakemodep. namespace [[mod-port-namespaces]].
+  - [x] **M5 — 구조편집 + 식별자 매핑 ✅(커밋 `9779e99`)** — 노드 add/remove·케이블 connect/disconnect이 라이브 그래프에 반영. **포트심볼 해석층**(`model.Effect.audio_inputs/outputs` + `_endpoint_from_port_key` + `_mint_instance`), 편집슬롯 host-first 낙관반영, **화면 진입=호스트 재독**(`enterLive`/`goOverview`가 `refresh_pedalboard`), 고아 인스턴스 보존.
+  - [x] **M6a/b/c — 보드 로드·저장·스냅샷 ✅(커밋 `0e860ae`/`9a28727`/`9074982`)** — M6a: 에디터 라이브 보드 전환(LOAD, dirty 폐기-확인). M6b: SAVE in-place + SAVE AS(기존 3겹 부패방어 위임, 새 직렬화 0). M6c: 인-앱 스냅샷 관리(목록/탭전환/저장, 헤더 SAVE가 스냅샷 재캡처+보드저장 통합).
+  - [x] **M6d — 라이브 QUICK 모드 + NEW BOARD + 모드 라우팅 ✅(커밋 ~`e0860ae`, on-device 통합검증)** — **생성기=판정기 단일함수 `_quick_wire_keys()`**(편집 배선생성+표현가능 판정 둘 다 파생→desync 불가). `_quick_representable`(mono/stereo 둘 다 시도), `_reconcile_live_quick`(델타 connect-first), NEW 빈보드+강제 save-as, default 보호/숨김, 양방향 토글+전환이펙트. evolve/bake 제거(모드=라우팅에서 판독되는 뷰).
 
 **백엔드 완전 부재 (가장 큰 덩어리):**
 - [`modepctrl.py`](../modepctrl.py)에 **그래프 변형 메서드가 하나도 없다** — 현재는 parameter/bypass/patch/snapshot/PB-load뿐.
@@ -112,6 +113,58 @@ EDIT 버튼은 이미 붙었으나 화면이 placeholder뿐 — 이펙트 추가
 
 **열린 설계 결정:** 편집을 **앱 단독**(웹발 배선변경 동기화 불필요 → 5번 생략)으로 둘지, 진짜 양방향으로 갈지 먼저 정할 것.
 
+## 페달보드 에디터 — 남은 후속 (소, 사용자 제시 2026-06-28)
+
+> 트랙 본체(M1~M6d)는 끝났고, 아래는 일관성·편의 후속. 큰 카탈로그 작업은 M7로 분리.
+
+- [ ] **메인 nav도 default 보드 제외** — 에디터 목록은 default를 이미 제외하나
+      `modepctrl.get_all_pedalboards`/`set_next_pedalboard`/`set_prev_pedalboard`는 **default 포함** →
+      풋스위치 NAVIGATE가 숨김 보드를 밟음. 에디터와 동일 제외 규칙으로 통일. (제일 쌈)
+- [ ] **오버뷰에서도 보드 매니저 열기** — 현재 라이브 보드 스위처/매니저는 **에디터 안에서만**. 오버뷰 헤더에도 진입점.
+- [ ] **페달보드 순서 정렬 UI** — 보드 재정렬 인터페이스(뱅크/라이브러리 순서 관리).
+- [ ] **UNDO/REDO/SHUF 라이브** — 에디터 크롬에 버튼은 있으나 라이브 미배선. 스냅샷-restore desync 때문에
+      **역연산(diff-and-apply) 시퀀스**로 재표현 필요 — 약간 까다로움.
+- [ ] **이펙터 프리셋 적용** — M7으로 프리셋 **이름/uri**까지 노출되면, `/effect/preset/load` 엔드포인트 래퍼 추가해
+      실제 적용. (지금은 카탈로그가 개수만 → M7이 이름 공급, 적용은 별도 작은 후속.)
+
+## ★ 라이브 플러그인 카탈로그 (M7 — 다음 최우선)
+
+> 에디터를 **동결 72-플러그인 서브셋**(`resources/effects-catalog.json`)에서 **호스트의 전체 설치 플러그인**으로 승격.
+> 동결본은 오프디바이스 베이크라 재생성 불가 + 다음이 잘려 있음: ① **`ctl` 16포트 truncate**(8개 플러그인이
+> 포트 손실 — amsynth 41, Step Seq 79, Aether 47…) ② **프리셋 개수만**(값/이름 없음) ③ 포트 범위 베이크값(우회 원인).
+
+**호스트 라이브 경로(이미 존재):**
+- `GET /effect/list` → `get_all_plugins()` = **전체 설치 플러그인 풀 정보**(포트 범위·프리셋 리스트·카테고리, truncation 0). `modepctrl` 래퍼 **신규 필요**.
+- `GET /effect/get?uri=` → `get_plugin_info(uri)` = 단일 풀 정보. `modepctrl.effect_get_information()`로 **이미 있음**.
+- `POST /effect/bulk` → uri 리스트 배치 조회.
+
+**설계(결정됨):**
+- **소스만 교체, 소비 스키마 유지** — `modepctrl.effect_list()`(라이브 풀 dump) + **정규화 함수**(mod-ui 네이티브 →
+  에디터 축약 스키마, 전 포트 보존). `editor_bridge`는 `self.cat`/`by_uri`/`by_name` 구성만 바뀌고 소비코드 거의 무변.
+  Backend ABC + fakemodep에도 메서드 추가(오프디바이스 dev 유지). → 16-truncation·프리셋·포트범위 우회 **부수 해소**.
+- **캐시/갱신 = B. 자가치유 하이브리드(결정 2026-06-28):**
+  ① 기동시 `get_all_plugins` 1회 → 세션 메모리 캐시.
+  ② **미스시 per-uri 폴백** — add/seed가 캐시에 없는 uri를 만나면 `effect/get?uri=`로 **그 하나만** 라이브 조회해
+     캐시에 흡수(전체 리스캔 없이 self-heal; "있다고 생각했는데 못 부르는" 케이스 자동복구).
+  ③ **수동 리스캔** 버튼(config/메뉴) — 실행 중 설치한 플러그인 반영용.
+  ④ (옵션·보류) 디스크 영속+서명체크는 **Pi에서 startup 비용 실측 후**에만 — 동결JSON이 애초에 startup 스캔 회피용일 수 있어 측정 먼저.
+- **프리셋**: 라이브가 `{uri,label}` 리스트 제공 → 이름까지 노출 가능(개수→목록). 적용은 `/effect/preset/load` 래퍼(에디터 후속).
+
+**검증:** off-device(fakemodep 정규화) → Pi 라이브(전 버킷 브라우저·>16포트 플러그인 인스펙터 포트 전부·미스 폴백·수동 리스캔).
+
+## i18n / 테마 토큰화 (한 묶음 — 결정 2026-06-28)
+
+> 핵심 난이도는 메커니즘이 아니라 **흩어진 리터럴/하드코딩 값을 전부 찾아 중앙화**하는 것. 둘 다 "하드코딩→스왑가능 토큰 추출"
+> 동일 패턴이라 한 묶음으로. 방식 = **커스텀 테이블 + 테마 토큰(결정)**.
+
+- [ ] **문자열 중앙화(i18n)** — 모든 사용자 노출 리터럴(QML `Text`, Python 토스트·스테이지 단어·라벨)을
+      중앙 카탈로그(`resources/strings/<lang>.json`)로 추출 + `tr("key")` 인다이렉션(QML엔 `tr` 컨텍스트 프로퍼티).
+      오늘은 한국어 identity, 언어 추가 = 카탈로그 추가. **작업 본체 = 리터럴 감사+추출 스윕**(기계적, 멀티에이전트 적합).
+- [ ] **테마 토큰화** — `qml/Theme.qml`(`pragma Singleton`)에 색상 토큰(`bg/surface/accent/text/meter…`) +
+      폰트 토큰(`fontFamily/sizeTier1/sizeTier2`) 집약, 전 QML이 참조 → 테마 전환 = 토큰셋 스왑.
+      기존 [`ui-design-rules.md`](ui-design-rules.md)(800×480 2-tier 가시성)와 정합.
+- **열린 결정**: 런타임 언어/테마 전환 UI를 config 화면에 둘지, 빌드/설정파일 고정으로 둘지(후순위).
+
 ## 부팅 — 무컴포지터 (남은 이주 항목) — ⏸ 보류 (원격 개발 중 컴포지터 유지)
 
 > ⏸ **우선순위 내림(2026-06-25).** 주말까지 원격 개발이라 labwc 위 창모드가 remote desktop 접속에 유리.
@@ -140,10 +193,9 @@ EDIT 버튼은 이미 붙었으나 화면이 placeholder뿐 — 이펙트 추가
 - [ ] **튜너** — 콤보 B+C가 `pass`([`presenter.py:402`](../presenter.py)), Qt 튜너 화면 없음.
       ★피치검출 `yin.py`가 `under_vsersion1/`로 빠져 **누락**([`tunerpopup.py:8`](../tunerpopup.py) import 실패).
       필요: YIN DSP 복원(또는 대체) + presenter 배선(탭템포 패턴) + 풀스크린 QML 튜너 화면. (오디오버퍼 파이프는 아이캔디와 공유.)
-- [ ] **패치/IR 파일 선택기 → 에디터 ★M3.5로 통합** — [`qtview.py`](../qtview.py) `update_patch_display`가 `pass` →
-      FOCUS는 IR/NAM/cabsim을 **읽기전용**([`main.qml`](../qml/main.qml))으로만 표시, 기기에서 새 파일 못 부름 +
-      역방향 패치변경도 라벨 미갱신. QML 파일선택기 + `PATCH_FILE_DIR_MAP`([`configs.py`](../configs.py)) 재사용.
-      → 에디터 patch_set과 같은 작업이라 **★페달보드 에디터 섹션 M3.5**에서 FOCUS·에디터 함께 구현.
+- [x] **패치/IR 파일 선택기 ✅(2026-06-27, M3.5, 커밋 `e89a458`+`cf0fcfe`)** — FOCUS·에디터 둘 다 구현.
+      공유 `qml/PatchPicker.qml` + `presenter.list_patch_files` + `qtview.setPatch`/`update_patch_display`.
+      ★mod-ui `fileTypes`=카테고리명→`configs.PATCH_FILE_TYPE_EXTS` 매핑. 상세는 에디터 섹션 M3.5 / [[param-vs-patch-set]].
 - [x] **풋스위치 모드 스펙 재정의 ✅(2026-06-26)** — mode 0(NAVIGATE)는 **전체 페달보드 라이브러리** 순회
       (`get_all_pedalboards`, 기존 뱅크 한정→전체). mode 2(BANK)는 **RECALL 폐기 → 뱅크 페달보드를 풋스위치에 바인딩**:
       뱅크 자체를 고르는 게 아니라, 활성 뱅크(`current_bank`, 현재 0 고정; **뱅크 전환·편집은 추후 터치UI** placeholder)의
@@ -152,19 +204,23 @@ EDIT 버튼은 이미 붙었으나 화면이 placeholder뿐 — 이펙트 추가
       옛 `recall_pb_ss`/`assign_pb_ss_to_footswitch`는 죽은코드로 잔존(Tier 3 정리).
 - [ ] **STOMP 스트립 캡션 일치** — [`qtview.py:351`](../qtview.py) 스트립이 **첫 4개** 이펙트를 보여주는데
       presenter는 **카테고리필터 [0,1,-2,-1]**을 토글([`presenter.py:427`](../presenter.py)) → 캡션이 실제 토글대상과 다름. presenter가 선택 4개를 노출하도록.
-- [ ] **스냅샷 브라우저 / 페달보드 브라우저** — 이름으로 점프. 데이터·백엔드 있음(`get_snapshot_list`+`load_snapshot`,
-      `get_pedalboards_in_bank`+`set_pedalboard`) → 리스트/모달 UI만. 현재 헤더 라벨([`main.qml:69`](../qml/main.qml),[:82](../qml/main.qml))뿐, prev/next만 가능.
-- [ ] **페달보드 다른이름 저장** — `save_current_pedalboard`가 `asNew:0`만 → `asNew:1`+title 확장 + 이름입력 연결.
+- [ ] **스냅샷 브라우저 / 페달보드 브라우저(오버뷰)** — 이름으로 점프. 데이터·백엔드 있음(`get_snapshot_list`+`load_snapshot`,
+      `get_pedalboards_in_bank`+`set_pedalboard`) → 리스트/모달 UI만. **에디터 안에는 이미 보드 스위처·스냅샷 관리 있음(M6a/c)** →
+      오버뷰로 끌어오는 작업(에디터 후속 "오버뷰에서도 보드 매니저"와 동일). 현재 오버뷰 헤더는 라벨+prev/next만.
+- [x] **페달보드 다른이름 저장 ✅(M6b, 커밋 `9a28727`)** — `modepctrl.save_pedalboard_as`(asNew=1, dir=symbolify(title)=부패면역) +
+      에디터 SAVE AS UI. (오버뷰 헤더에서의 PB save-as 노출은 위 "오버뷰 보드 매니저" 후속에 포함.)
 - [x] **스냅샷 SAVE / SAVE AS / EDIT 버튼 + SAVE AS 네이밍 모달 ✅(2026-06-26)** — 오버뷰 헤더에 3버튼. SAVE=
       `save_snapshot`, SAVE AS=**3+2 네이밍 모달**(무대용어 칩 탭→`Drive-cupcake`식 제안[중복회피 무작위 접미사],
       제안 탭 저장/칩 재탭 재롤/✎ HW키보드 직접입력/취소). 접미사 풀=외부 `resources/snapshot_words.txt`(Hunspell 6천단어,
-      lazy-load+모듈캐시). EDIT=`edit` 화면(플레이스홀더, **실 편집기는 위 ★페달보드 에디터 섹션 = 다음 최우선**). 신규 **토스트 시스템**(`view.show_toast`+QML 자동소멸).
+      lazy-load+모듈캐시). EDIT=실 페달보드 에디터(M1~M6d 완료, 위 섹션). 신규 **토스트 시스템**(`view.show_toast`+QML 자동소멸).
 - [ ] **볼륨페달**(ADS1115→MIDI CC) — [`volumepedal.py`](../volumepedal.py)는 독립 프로세스로만 존재, 앱 폴링 미통합, 화면 미터 없음.
       ★먼저 정의할 미결 스펙: **페달이 물리적으로 미연결일 때 앱 거동**. 코드개선(미적용): 단발→연속모드, 860→64~128SPS, EMA+히스테리시스로 CC 지터 제거.
 - [ ] **모멘터리(홀드) 모드** — [`presenter.py:365`](../presenter.py) 폴링이 릴리스엣지 전용 → press-ON/release-OFF 모멘터리 없음.
 - [ ] **Bypass-all / 전역 풋스위치 액션** — presenter에 `bypass_all()` 없음.
 - [ ] **확장 콤보** — [`presenter.py:408`](../presenter.py) A+B/B+C/C+D 외(A+C·A+D·B+D·3중)는 "Invalid". 콤보→액션 맵 리맵 가능화(→ [`config-todo.md`](config-todo.md)).
-- [ ] **이펙터 프리셋** — 블록 단위 설정 저장/불러오기. **진짜 신규**(패치파일 IR/NAM 로딩과 다른 개념). mod-ui LV2 plugin preset 엔드포인트 지원 여부 확인 필요(→ 열린 설계결정).
+- [ ] **이펙터 프리셋** — 블록 단위 설정 저장/불러오기. **진짜 신규**(패치파일 IR/NAM 로딩과 다른 개념).
+      ★M7로 확인됨: mod-ui `get_plugin_info`가 프리셋 `{uri,label}` 리스트 제공 + `/effect/preset/load` 적용 엔드포인트 존재 →
+      "지원 여부" 열린결정 해소. M7이 이름 공급, 적용 래퍼는 에디터 후속(위 에디터 후속 섹션).
 - [ ] **이펙터 타입 구분(model vs param)** — 앰프/NAM(모델 줄 크게) vs 컴프/게이트(노브만). `patches` 유무/카테고리로 도출 — 모델에 작은 플래그.
 - [ ] **LED 정상상태 색** — HW가 red/blue/purple 지원([`fsledctrl.py`](../hardwares/fsledctrl.py))인데 지금은 누를 때 blink만 → 할당/포커스 상태에 따라 **색을 켜둔 채 유지**로.
 
@@ -174,9 +230,11 @@ EDIT 버튼은 이미 붙었으나 화면이 placeholder뿐 — 이펙트 추가
 - [ ] **메뉴(☰) 화면** — 3층위 저장/불러오기. 현재 스냅샷 save/saveas만.
 - [x] **토스트 / 온스크린 알림 ✅(2026-06-26)** — `QtView.show_toast`+`toastRequested` 시그널 + QML 자동소멸 오버레이(2.6s).
       presenter `_notify()`가 사용(Kivy 가드). 뱅크 없음 등 메시지에 쓰임. (presenter의 잔여 `print`는 점진 이전.)
-- [ ] **인앱 키보드** — `toggle_keyboard`(wvkbd) 있으나([`presenter.py:477`](../presenter.py)) Qt 경로서 호출 안 됨. 시안=자체 QWERTY. (→ 열린 설계결정: 라이브러리 vs 커스텀.)
+- ~~**인앱 키보드**~~ **폐기(2026-06-28).** 주 용도였던 PB/스냅샷 저장시 이름입력은 **이름추천기**(스테이지 단어 칩→제안,
+      `Drive-cupcake`식)로 해결됨 + 필요시 연결된 **HW 무선 키보드**가 폴백. 온스크린 키보드(wvkbd/커스텀 QWERTY) 불필요.
+      잔재 `toggle_keyboard`(wvkbd, [`presenter.py:477`](../presenter.py))는 Qt 경로서 미호출 죽은코드 → Tier 3 삭제 대상.
 
-> 시안 화면 매핑(참고): Overview·Focus·TapTempo=구현됨 / Tuner·Menu·Keyboard·Browser·Toast=미구현 / HW 풋스위치 행=스트립으로 존재.
+> 시안 화면 매핑(참고): Overview·Focus·TapTempo·Toast=구현됨 / Tuner·Menu·Browser=미구현 / **Keyboard=폐기**(이름추천기로 대체) / HW 풋스위치 행=스트립으로 존재.
 
 ## Tier 3 — 정리 / 폴리시
 
@@ -184,7 +242,8 @@ EDIT 버튼은 이미 붙었으나 화면이 placeholder뿐 — 이펙트 추가
       `xdotool`([:519](../presenter.py)) + `minimize`/`restore`/`enable_webui_button`([`qtview.py:228`](../qtview.py) 등 `pass`) + Kivy bezel 버튼.
       **Qt 경로선 호출조차 안 됨(죽은 코드)**, 온디바이스 웹UI는 스펙서 폐기 결정.
 - [ ] **죽은 스텁 제거** — `view_mode_change`([`presenter.py:149`](../presenter.py)), `view_update_footsw_display`([:152](../presenter.py)),
-      `footswitch_combo_assigns` 빈 dict([:35](../presenter.py)), `boot_lightshow` 주석처리([:582](../presenter.py)).
+      `footswitch_combo_assigns` 빈 dict([:35](../presenter.py)), `boot_lightshow` 주석처리([:582](../presenter.py)),
+      `toggle_keyboard`(wvkbd, [:477](../presenter.py) — 온스크린 키보드 폐기로 죽은코드).
 - [x] **노드 라벨 겹침 ✅(2026-06-25, 커밋 `b06dbad`)** — 단순 elide 대신 **스네이크 그리드**로 개편(행당 4노드
       170×72, 라벨 2줄 wrap+elide, 세로스크롤 Flickable). 6이펙트 박스겹침0. ★Pi 라이브 육안검증만 추후.
 - [ ] **`[undefined]→bool` 경고** — [`main.qml:307`](../qml/main.qml) FOCUS 패치 visible 바인딩, 무해. `!!(...)`로 정리.
@@ -205,8 +264,9 @@ EDIT 버튼은 이미 붙었으나 화면이 placeholder뿐 — 이펙트 추가
 
 ## 열린 설계 결정
 
-1. **이펙터 프리셋 백엔드** — mod-ui가 LV2 plugin preset save/load를 주는가? 아니면 "현재 포트값 묶음"을 앱 JSON으로 자체구현?
-2. **온스크린 키보드** — Qt VirtualKeyboard(라이브러리) vs 커스텀 QWERTY. UI 배치와 엮임.
+1. ~~**이펙터 프리셋 백엔드**~~ ✅ **해소(M7 조사)** — mod-ui `get_plugin_info`가 프리셋 `{uri,label}` 리스트 제공 +
+   `/effect/preset/load` 적용 엔드포인트 존재. LV2 plugin preset을 그대로 쓰면 됨(앱 JSON 자체구현 불필요). 적용 래퍼만 남음.
+2. ~~**온스크린 키보드**~~ ✅ **해소 = 폐기(2026-06-28).** 이름입력은 이름추천기+HW 키보드 폴백으로 충분 → 온스크린 키보드 미채택.
 3. **케이블 색 의미** — 시안의 CLEAN/DRIVE/FEEDBACK은 **디자인이 만든 의미**, mod는 source→target만 줌. 현재 전부 단색(green). 규칙 정의(카테고리 기반/피드백=사이클탐지) or 단색 유지.
 
 ## 폐기 / 재배치 (의도 확정됨)
@@ -215,6 +275,7 @@ EDIT 버튼은 이미 붙었으나 화면이 placeholder뿐 — 이펙트 추가
 - **WebUI(Chromium)** → 온디바이스 폐기 결정(웹UI는 폰/옆 데스크톱 접속). 코드 삭제는 Tier 3.
 - **베젤 합성영역**(save/saveas/pb/ss/mode/bpm) → 해체 재배치: 저장/로드→☰, PB/SS 이동→콤보, 모드→FS 설정, BPM→Tap+헤더.
 - **패치파일 파일선택기(IR/NAM)** → "이펙터 프리셋/모델 불러오기" 브라우저로 흡수되는 그림.
+- **온스크린 키보드(wvkbd/커스텀 QWERTY)** → **폐기(2026-06-28).** 이름입력은 이름추천기(스테이지 단어 칩)+HW 무선 키보드 폴백으로 해결. 잔재 `toggle_keyboard` 죽은코드는 Tier 3 삭제.
 
 ## 미래 기능
 
