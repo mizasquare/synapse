@@ -509,6 +509,16 @@ class EditorBridge(QObject):
         self.gwires = wires
 
         self._assert_single_ws()
+        # M6d-2: run the quick-representability classifier (gate OFF — telemetry
+        # only, routing stays ADVANCED until M6d-4). Surfaces whether this live
+        # board could open as a quick serial chain.
+        try:
+            rep, _why = self._quick_representable(pb)
+            print('[editor] quick-representable: %s%s' % (rep, '' if rep else ' (%s)' % _why))
+            if rep:
+                self.toast.emit('이 보드는 QUICK 표현 가능')
+        except Exception as e:
+            print('[editor] quick-representable check failed: %s' % e)
         self._rebuild()
         self.boardsChanged.emit()
 
@@ -743,6 +753,79 @@ class EditorBridge(QObject):
             for i in range(min(len(fo), len(ti))):
                 out.append({'id': self._new_wid(), 'frm': fo[i], 'to': ti[i]})
 
+    # ---- quick serial-chain wiring: THE single source of truth (M6d-2) ----
+    # _quick_wire_keys() generates the desired audio wiring for the current quick
+    # working set (self.nodes). Bake, (M6d-3) live reconcile, and (M6d-2)
+    # representability classification all derive from THIS one function, so the
+    # edit-time wires and the classifier can never diverge (the desync that would
+    # otherwise cut a user's real cables on the first edit after entering quick).
+    def _n_ao(self, n):
+        syms = n.get('aout')
+        return len(syms) if syms is not None else self.by_uri[n['uri']]['ao']
+
+    def _n_ai(self, n):
+        syms = n.get('ain')
+        return len(syms) if syms is not None else self.by_uri[n['uri']]['ai']
+
+    def _quick_wire_keys(self):
+        """Desired audio wiring for self.nodes as a set of (frm_key, to_key) port
+        keys. Mirrors the bake topology: a serial trunk of inline fx (ai>0 & ao>0)
+        ordered by x (IN -> fx -> ... -> OUT), taps (ao==0) fed from the nearest
+        prior trunk fx, sources (ai==0) into OUT."""
+        wires = []
+        src = sorted(self.nodes, key=lambda n: n['x'])
+        fx = [n for n in src if self._n_ai(n) > 0 and self._n_ao(n) > 0]
+        prev = 'IN'
+        for n in fx:
+            self._connect_audio(prev, n['id'], wires)
+            prev = n['id']
+        if fx:
+            self._connect_audio(prev, 'OUT', wires)
+        for n in src:
+            if self._n_ai(n) > 0 and self._n_ao(n) > 0:
+                continue
+            if self._n_ao(n) == 0 and self._n_ai(n) > 0:        # tap
+                prior = [f for f in fx if f['x'] < n['x']]
+                self._connect_audio(prior[-1]['id'] if prior else 'IN', n['id'], wires)
+            elif self._n_ai(n) == 0 and self._n_ao(n) > 0:      # source
+                self._connect_audio(n['id'], 'OUT', wires)
+        return {(w['frm'], w['to']) for w in wires}
+
+    def _quick_representable(self, pb):
+        """Can pb be shown as a quick serial chain? Returns (ok, reason).
+        GENERATOR=CLASSIFIER: project pb's effects to candidate quick nodes,
+        generate the desired wiring with _quick_wire_keys, and require
+        instance+channel set-equality with the host's actual audio connections.
+        That single comparison auto-rejects fan-out/fan-in/feedback/L-R-swap with
+        no separate hand-coded topology rule. Catalog-filtered (any missing
+        plugin -> advanced); MIDI/CV-only (no audio ports) -> advanced; empty/
+        passthrough -> advanced (M6d-3 전 무음 회피). Instance-keyed."""
+        effects = list(pb.effects)
+        if not effects:
+            return (False, '빈 보드')
+        if any(e.uri not in self.by_uri for e in effects):
+            return (False, '카탈로그 누락')
+        proj = []
+        for i, e in enumerate(effects):
+            ain, aout = list(e.audio_inputs or []), list(e.audio_outputs or [])
+            if not ain and not aout:
+                return (False, 'MIDI/CV 전용')
+            proj.append({'id': i + 1, 'uri': e.uri, 'inst': e.instance,
+                         'x': i, 'y': 0, 'ain': ain, 'aout': aout})
+        saved = self.nodes
+        self.nodes = proj
+        try:
+            desired = set()
+            for f, t in self._quick_wire_keys():
+                ef, et = self._endpoint_from_port_key(f), self._endpoint_from_port_key(t)
+                if not ef or not et:
+                    return (False, '포트 해석 실패')
+                desired.add((self._norm_inst(ef), self._norm_inst(et)))
+        finally:
+            self.nodes = saved
+        host = {(self._norm_inst(c.source), self._norm_inst(c.target)) for c in pb.connections}
+        return (True, '') if desired == host else (False, '직렬체인 아님')
+
     def _port_counts(self, nid, side):
         if nid == 'IN':
             return {'a': (2 if self.in_mode == 'stereo' else 1), 'm': 1, 'cv': 0} if side == 'out' else {'a': 0, 'm': 0, 'cv': 0}
@@ -842,30 +925,15 @@ class EditorBridge(QObject):
         src = sorted(self.nodes, key=lambda n: n['x'])
         gnodes = [{'id': n['id'], 'uri': n['uri'], 'x': n['x'], 'y': n['y'],
                    'bypass': n['bypass'], 'vals': dict(n['vals'])} for n in src]
+        # Single source of truth: derive wires from _quick_wire_keys (on self.nodes,
+        # still populated here) so bake and the classifier can't diverge. Then drop
+        # the quick working set — bake reuses the same ids, so leaving self.nodes
+        # would let the unified _node() resolve a gnode id to its stale quick twin
+        # (_do_evolve clears undo, so quick->advanced is intentionally one-way).
+        pairs = self._quick_wire_keys()
         self.gnodes = gnodes
-        # Drop the quick working set once baked to advanced — bake reuses the same
-        # ids, so leaving self.nodes populated would let the unified _node() resolve
-        # a gnode id to its stale quick twin. (_do_evolve clears undo, so quick->
-        # advanced is intentionally one-way; nothing to preserve.)
         self.nodes = []
-        wires = []
-        fx = [n for n in gnodes if self.by_uri[n['uri']]['ai'] > 0 and self.by_uri[n['uri']]['ao'] > 0]
-        prev = 'IN'
-        for n in fx:
-            self._connect_audio(prev, n['id'], wires)
-            prev = n['id']
-        if fx:
-            self._connect_audio(prev, 'OUT', wires)
-        for n in gnodes:
-            p = self.by_uri[n['uri']]
-            if p['ai'] > 0 and p['ao'] > 0:
-                continue
-            if p['ao'] == 0 and p['ai'] > 0:           # tap: feed from nearest prior fx
-                prior = [f for f in fx if f['x'] < n['x']]
-                self._connect_audio(prior[-1]['id'] if prior else 'IN', n['id'], wires)
-            elif p['ai'] == 0 and p['ao'] > 0:         # source: into OUT
-                self._connect_audio(n['id'], 'OUT', wires)
-        self.gwires = wires
+        self.gwires = [{'id': self._new_wid(), 'frm': f, 'to': t} for (f, t) in sorted(pairs)]
         self.mode = 'advanced'
         self.sel = -1
         self.conn = None
