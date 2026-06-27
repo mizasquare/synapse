@@ -443,8 +443,13 @@ class EditorBridge(QObject):
         self.board_name = pb.title or 'Untitled'
         self.board_path = None
         self._dirty = False
-        # Loading any board clears scratch; NEW BOARD re-sets it AFTER this seed.
-        self._scratch_default = False
+        # Scratch = the loaded board IS the shared default, regardless of HOW it
+        # became current (NEW BOARD, footswitch, or just open at startup). This is
+        # the real guard: any save on the default is forced to save-as so the
+        # shared template is never overwritten in place. (NEW BOARD also loads the
+        # default, so this covers it without relying on requestNewLiveBoard.)
+        self._scratch_default = (self._norm_bundle(getattr(pb, 'current_pb_path', '')) ==
+                                 self._norm_bundle(configs.DEFAULT_PEDALBOARD))
         self.in_mode = 'stereo' if (getattr(pb, 'audio_ins', 2) or 2) >= 2 else 'mono'
         self.sel = -1
         self.gwire_sel = None
@@ -1411,13 +1416,15 @@ class EditorBridge(QObject):
             self.boardsChanged.emit()
             return
         cur = self._norm_bundle(be.get_current_pedalboard())
+        default = self._norm_bundle(configs.DEFAULT_PEDALBOARD)
         entries = be.get_all_pedalboard_entries() or []
+        # Hide the shared default.pedalboard from the switcher — it's the empty
+        # scratch template (NEW BOARD loads it), not a user-selectable board.
         self._live_boards = [{'bundle': e['bundle'],
                               'title': e.get('title', '') or e['bundle'],
                               'current': self._norm_bundle(e['bundle']) == cur}
-                             for e in entries]
-        if not entries:
-            self.toast.emit('호스트 보드 목록 비어있음')
+                             for e in entries
+                             if self._norm_bundle(e['bundle']) != default]
         self.boardsChanged.emit()
 
     @Slot(str, str, result=bool)
