@@ -92,6 +92,10 @@ Item {
                     font.family: uiFont; font.pixelSize: 14; anchors.verticalCenter: parent.verticalCenter
                     elide: Text.ElideRight; width: 110
                 }
+                // live in-place SAVE (persists the live host graph to its .ttl bundle)
+                Pill { label: editor.dirty ? "SAVE *" : "SAVE"; accent: cGreen
+                       visible: editor.live; dim: !editor.dirty
+                       onTap: editor.saveBoard() }
                 Pill { label: "UNDO"; accent: cBorder; visible: !editor.live; dim: !editor.canUndo
                        onTap: if (editor.canUndo) editor.undo() }
                 Pill { label: "REDO"; accent: cBorder; visible: !editor.live; dim: !editor.canRedo
@@ -921,7 +925,7 @@ Item {
                             id: nameField; anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
                             verticalAlignment: TextInput.AlignVCenter; clip: true; selectByMouse: true
                             color: cText; font.family: uiFont; font.pixelSize: 16
-                            onAccepted: if (text.trim().length) { editor.saveBoardNamed(text); win.namingMode = ""; win.boardsOpen = false }
+                            onAccepted: if (text.trim().length) { editor.saveBoardNamed(text); win.namingMode = ""; win.boardsOpen = false; win.liveBoardsOpen = false }
                         }
                         Text { visible: nameField.text === ""; anchors.fill: parent; anchors.leftMargin: 8
                                verticalAlignment: Text.AlignVCenter; text: "이름 입력 또는 아래 용어로 추천"
@@ -946,7 +950,7 @@ Item {
                         anchors.right: parent.right; spacing: 8
                         WideBtn { label: "취소"; accent: cBorder; onTap: win.namingMode = "" }
                         WideBtn { label: "저장"; accent: cGreen; dim: nameField.text.trim().length === 0
-                                  onTap: if (nameField.text.trim().length) { editor.saveBoardNamed(nameField.text); win.namingMode = ""; win.boardsOpen = false } }
+                                  onTap: if (nameField.text.trim().length) { editor.saveBoardNamed(nameField.text); win.namingMode = ""; win.boardsOpen = false; win.liveBoardsOpen = false } }
                     }
                 }
             }
@@ -1002,10 +1006,18 @@ Item {
                                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                                MouseArea { anchors.fill: parent; onClicked: win.liveBoardsOpen = false } }
                     }
+                    // save actions for the live (current) board
+                    Flow {
+                        width: parent.width; spacing: 8
+                        WideBtn { label: editor.dirty ? "저장 *" : "저장"; accent: cGreen; dim: !editor.dirty
+                                  onTap: { if (editor.dirty) editor.saveBoard() } }
+                        WideBtn { label: "다른 이름으로 저장"; accent: cGreen
+                                  onTap: win.namingMode = "saveas" }
+                    }
                     Text { text: "호스트 보드 (" + editor.liveBoardList.length + ")  ·  현재 편집 미저장 시 전환 전 확인"
                            color: cDim; font.family: uiFont; font.pixelSize: 13 }
                     Flickable {
-                        width: parent.width; height: 320; contentHeight: liveCol.height; clip: true
+                        width: parent.width; height: 268; contentHeight: liveCol.height; clip: true
                         Column {
                             id: liveCol; width: parent.width; spacing: 6
                             Repeater {

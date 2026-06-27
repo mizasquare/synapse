@@ -47,6 +47,9 @@ class Presenter:
 
         # Load pedalboard model
         self.pedalboard = initialize_modep_pedalboard()
+        # EditorBridge ref (wired by the entry point) so footswitch board nav can
+        # surface a non-blocking notice when it discards unsaved live editor edits.
+        self.editor = None
         # pb별 마지막 활성 스냅샷 기억 (세션 한정 인메모리). key=current_pb_path, value=snapshot idx
         self.pb_snapshot_memory = {}
         # Footswitch-mode-2 (RECALL) pedalboard+snapshot assignments, keyed "0".."3".
@@ -342,6 +345,18 @@ class Presenter:
         if callable(go):
             go()
 
+    def _warn_if_editor_dirty(self):
+        """Non-blocking notice that a footswitch board change is about to discard
+        unsaved live editor edits. The footswitch is a performance control and
+        NEVER blocks with a dialog (unlike the editor's own BOARD switcher, which
+        confirms) — this just surfaces the loss. The editor re-seeds from the new
+        live board on its next entry. (Covers edits-since-last-seed; re-entering
+        the editor rebaselines _dirty, so an edit→reenter→footswitch path won't
+        warn — a known limitation of the seed-relative dirty model.)"""
+        ed = self.editor
+        if ed is not None and getattr(ed, '_live_flag', False) and getattr(ed, '_dirty', False):
+            self._notify('보드 전환 — 미저장 편집 폐기')
+
     def _notify(self, text):
         """Transient on-screen message (toast). Guarded so a view without
         show_toast (the Kivy rollback) just logs instead of crashing."""
@@ -381,6 +396,31 @@ class Presenter:
             return None
         return self.pedalboard
 
+    def save_current_board(self):
+        """Save the current pedalboard in place (asNew=0) for the live editor.
+        ALWAYS refresh afterward and adopt the host's current path/title: a
+        FACTORY board falls through to save-new on the host (mints a new user
+        bundle and changes the current path), so the cached pedalboard would go
+        stale otherwise. Returns the backend's success bool."""
+        ok = self.backend.save_current_pedalboard()
+        self.refresh_pedalboard()   # adopt any path/title change (factory -> save-new)
+        return ok
+
+    def save_board_as(self, title):
+        """Save the current live graph as a NEW board named ``title`` (asNew=1).
+        The host switches the current board to the new bundle, so refresh to adopt
+        the new path/title and carry the remembered snapshot over to the new key.
+        Returns the new ``{'bundlepath','title'}`` or None on failure."""
+        prev = self.pedalboard.current_pb_path if self.pedalboard else None
+        res = self.backend.save_pedalboard_as(title)
+        self.refresh_pedalboard()   # host switched current -> adopt new path/title
+        if res:
+            # the new bundle starts at whatever snapshot the old board was on
+            new_path = res.get('bundlepath')
+            if prev in self.pb_snapshot_memory and new_path:
+                self.pb_snapshot_memory[new_path] = self.pb_snapshot_memory[prev]
+        return res
+
     def load_bank_pedalboard(self, slot):
         """Mode-2: load the bank board mapped to footswitch ``slot`` (0-3)."""
         if slot >= len(self.bank_boards):
@@ -389,9 +429,11 @@ class Presenter:
         if bundle == self.pedalboard.current_pb_path:
             self._return_to_overview()      # already here -> just leave any FOCUS card
             return
+        self._warn_if_editor_dirty()        # the switch /reset discards unsaved editor edits
         self._go_to_pedalboard(bundle)
 
     def prev_pedalboard(self):
+        self._warn_if_editor_dirty()         # /reset 이 미저장 에디터 편집을 폐기 (비차단 알림)
         self._remember_current_snapshot()   # /reset 으로 날아가기 전에 떠나는 보드 기록
         self.backend.set_prev_pedalboard()
         self.refresh_pedalboard()
@@ -399,6 +441,7 @@ class Presenter:
         self._return_to_overview()
 
     def next_pedalboard(self):
+        self._warn_if_editor_dirty()
         self._remember_current_snapshot()
         self.backend.set_next_pedalboard()
         self.refresh_pedalboard()
@@ -447,10 +490,11 @@ class Presenter:
         pb_path = assignment["pedalboard"]
         ss_idx = assignment["snapshot_idx"]
 
-        # Implementation detail: you might have a function that sets pedalboard by ID
-        # or you have a different approach for indexing
-        error = self.backend.set_pedalboard(pb_path)
-        if error is None:
+        # set_pedalboard returns a success BOOL (True == loaded; M6a made the
+        # partial-failure case detectable). It used to return None always, so the
+        # old `error is None` check is now wrong — branch on the bool.
+        self._warn_if_editor_dirty()         # the switch /reset discards unsaved editor edits
+        if self.backend.set_pedalboard(pb_path):
             # Re-initialize your pedalboard object
             self.refresh_pedalboard()
             # Then set the snapshot
@@ -459,7 +503,7 @@ class Presenter:
             self.view_update_effect()
             print(f"Recalled PB {pb_path}, snapshot {ss_idx}.")
         else:
-            print(f"Failed to load PB {pb_path}: {error}")
+            print(f"Failed to load PB {pb_path}.")
 
     # Consecutive identical samples required before a switch state change is
     # accepted (software debounce). At 100 Hz, 3 samples == ~30 ms: longer than

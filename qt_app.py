@@ -73,6 +73,7 @@ def main():
 
     editor = EditorBridge()
     editor.set_presenter(presenter)   # EDIT screen seeds from the live/fake board
+    presenter.editor = editor         # footswitch board nav warns on unsaved editor edits
 
     engine = QQmlApplicationEngine()
     ctx = engine.rootContext()

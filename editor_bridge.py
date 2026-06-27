@@ -1252,6 +1252,11 @@ class EditorBridge(QObject):
 
     @Property(bool, notify=boardsChanged)
     def boardSaved(self):
+        # Live: a current host bundle always exists, so the headline SAVE is a
+        # pure in-place overwrite and the naming panel never opens for it
+        # (asNew=1 / new-bundle only via explicit SAVE AS). Mock: needs a file.
+        if self._live_flag:
+            return True
         return self.board_path is not None
 
     @Property('QVariantList', notify=boardsChanged)
@@ -1975,7 +1980,24 @@ class EditorBridge(QObject):
 
     @Slot()
     def saveBoard(self):
-        """Overwrite the current board's file (only meaningful once it has one)."""
+        """Overwrite the current board in place. Live: persist the live host graph
+        to its .ttl bundle via presenter.save_current_board (asNew=0, inherits the
+        app+host 3-layer corruption defense); the graph already lives in the host
+        (M5 host-first), so this only triggers the save. Mock: write the .json."""
+        if self._live_flag:
+            ok = self.presenter.save_current_board() if self.presenter else False
+            if ok:
+                self._dirty = False
+                # adopt any host-side title change (factory board -> save-new)
+                pb = getattr(self.presenter, 'pedalboard', None)
+                if pb is not None and pb.title:
+                    self.board_name = pb.title
+                self.refreshBoards()
+                self.boardsChanged.emit()
+                self.toast.emit('보드 저장됨 · %s' % self.board_name)
+            else:
+                self.toast.emit('저장 실패')
+            return
         if self.board_path:
             self._write(self.board_path)
             self.toast.emit('저장됨 · %s' % self.board_name)
@@ -1983,7 +2005,20 @@ class EditorBridge(QObject):
 
     @Slot(str)
     def saveBoardNamed(self, name):
-        """Save current state under a (uniquely-suffixed) name — first save or 'save as'."""
+        """Save current state under a name. Live: SAVE AS = a NEW host bundle
+        (asNew=1, corruption-immune — dir derived from title) that becomes the
+        current board; adopt its title. Mock: write a uniquely-suffixed .json."""
+        if self._live_flag:
+            res = self.presenter.save_board_as(name) if self.presenter else None
+            if res:
+                self.board_name = res.get('title') or name
+                self._dirty = False
+                self.refreshBoards()         # the new bundle is now current
+                self.boardsChanged.emit()
+                self.toast.emit('새 보드로 저장됨 · %s' % self.board_name)
+            else:
+                self.toast.emit('저장 실패')
+            return
         base = self._safe_name(name)
         final, i = base, 2
         os.makedirs(MOCK_DIR, exist_ok=True)

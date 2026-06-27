@@ -143,6 +143,7 @@ def main():
         presenter = Presenter(view, scheduler, hardware=hardware)
         view.set_presenter(presenter)
         editor.set_presenter(presenter)              # EDIT screen seeds from the live board
+        presenter.editor = editor                    # so footswitch board nav can warn on unsaved edits
         presenter.initiate_view()
         sock = _start_reverse_listener(scheduler, presenter)
         # Live monitor feed: passive mod-ui websocket -> output_set -> meters.

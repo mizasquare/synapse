@@ -372,6 +372,32 @@ class ModepController:
 			return False
 
 	@staticmethod
+	def save_pedalboard_as(title):
+		"""Save the current live graph as a NEW pedalboard bundle named after
+		``title`` (asNew=1). The host mints a fresh dir = symbolify(title)[:16]
+		(with a '-NNNN' suffix on collision) and switches the current board to it.
+
+		This is structurally corruption-IMMUNE: the new dir is created FROM the
+		title, so dir==ttl==manifest holds by construction -- hence (unlike the
+		in-place save) there is intentionally NO dir==sym guard here. Returns
+		``{'bundlepath', 'title'}`` (the host's new bundle) on success, else None.
+		Form-encoded POST (data=), same as the in-place save."""
+		try:
+			r = ModepController._request("post", "pedalboard/save",
+										 data={'title': title, 'asNew': 1})
+			if r is None or r.status_code != 200:
+				if r is not None:
+					logging.error("Failed to save-as pedalboard. %s", r.text)
+				return None
+			j = r.json()
+			if not j.get('ok'):
+				return None
+			return {'bundlepath': j.get('bundlepath'), 'title': j.get('title') or title}
+		except Exception as e:
+			logging.error("Failed to save pedalboard as %r: %s", title, e)
+			return None
+
+	@staticmethod
 	def effect_get_information(uri=""):
 		try:
 			r = ModepController._request("get", "effect/get?uri=" + quote(uri, safe=''))

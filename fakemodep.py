@@ -97,6 +97,25 @@ class FakeModepController(Backend):
         return [{"bundle": p, "title": self._pb_by_path[p]["pedalboard_info"].get("title", "")}
                 for p in self._pb_order]
 
+    def save_current_pedalboard(self):
+        return True   # fixtures are in-memory; an in-place save is a no-op success
+
+    def save_pedalboard_as(self, title):
+        """Clone the current board under a new title/path and switch to it —
+        mirrors the host's asNew=1 (new bundle becomes current)."""
+        import copy, re
+        sym = (re.sub('[^A-Za-z0-9]+', '_', title).strip('_')[:16]) or 'board'
+        newpath = '/fake/%s.pedalboard' % sym
+        data = copy.deepcopy(self._pb_by_path[self._current_path])
+        data['current_pedalboard'] = newpath
+        data['pedalboard_info']['title'] = title
+        self._pb_by_path[newpath] = data
+        if newpath not in self._pb_order:
+            self._pb_order.append(newpath)
+        self._current_path = newpath
+        self._seed_current()
+        return {'bundlepath': newpath, 'title': title}
+
     def set_next_pedalboard(self):
         i = self._pb_order.index(self._current_path)
         self._current_path = self._pb_order[(i + 1) % len(self._pb_order)]

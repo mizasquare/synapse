@@ -123,6 +123,20 @@ class Backend:
         """Disconnect two graph-namespace ports ('/graph/<inst>/<sym>')."""
         raise NotImplementedError
 
+    # -- Persist (pedalboard save) ---------------------------------------------
+    def save_current_pedalboard(self):
+        """Save the current pedalboard in place (asNew=0), serializing the live
+        host graph to its .ttl bundle. Returns ``True`` on success. Carries the
+        app-side dir==symbolify(title) guard that refuses a mismatched save."""
+        raise NotImplementedError
+
+    def save_pedalboard_as(self, title):
+        """Save the current live graph as a NEW bundle named ``title`` (asNew=1);
+        the host mints a fresh dir and switches current to it. Returns
+        ``{'bundlepath','title'}`` on success, else ``None``. Corruption-immune
+        (new dir derived from title)."""
+        raise NotImplementedError
+
     # -- Snapshot --------------------------------------------------------------
     def snapshot_current_idx(self):
         """Return the current snapshot index (int; ``-1`` if unknown)."""
