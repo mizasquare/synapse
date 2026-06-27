@@ -264,6 +264,16 @@ class EditorBridge(QObject):
         if inst and view:
             view.toggleBypass(inst, bool(bypassed))
 
+    def _live_effect(self):
+        """The presenter-side Effect for the selected live node (None in the mock).
+        Lets the inspector read the node's patch params from the live model — the
+        editor catalog carries no patch info, only the host-derived model does."""
+        inst = self._inst_of(self.sel)
+        pb = getattr(self.presenter, 'pedalboard', None) if self.presenter else None
+        if not inst or pb is None:
+            return None
+        return pb.get_effect_by_instance(inst)
+
     @staticmethod
     def _audio_idx_from_symbol(sym, count):
         """Map a real audio port symbol to its 0-based channel index. Single-port
@@ -1214,6 +1224,17 @@ class EditorBridge(QObject):
     def knobs(self):
         return self._knobs
 
+    @Property('QVariantList', notify=changed)
+    def inspPatches(self):
+        """Patch params (NAM model / IR / cabsim) of the selected live node, for the
+        inspector file picker. [] in the mock (catalog carries no patch info)."""
+        eff = self._live_effect()
+        if not eff:
+            return []
+        return [{'label': p.label, 'uri': p.uri,
+                 'value': os.path.basename(p.value) if p.value else ''}
+                for p in eff.patches.values()]
+
     # ============================================================ slots (QML->py)
     @Slot(str)
     def pickCategory(self, key):
@@ -1339,6 +1360,27 @@ class EditorBridge(QObject):
         n['vals'][sym] = c['def']
         self._touch()
         self._live_param(self.sel, sym, c['def'])
+        self._build_inspector()
+        self.changed.emit()
+
+    @Slot(str, result='QVariantList')
+    def patchFiles(self, uri):
+        """Selectable files for a patch URI on the selected live node ([{label,path}]).
+        Delegates to the same presenter scan the FOCUS picker uses."""
+        inst = self._inst_of(self.sel)
+        if not inst or not self.presenter:
+            return []
+        return self.presenter.list_patch_files(inst, uri)
+
+    @Slot(str, str)
+    def setPatch(self, uri, path):
+        """Inspector picked a file -> load it on the selected live node (NAM/IR/cabsim),
+        then refresh so the chip label updates. No-op in the mock."""
+        inst = self._inst_of(self.sel)
+        if not (inst and self.presenter):
+            return
+        self.presenter.patch_changed(inst, uri, path)
+        self._touch()
         self._build_inspector()
         self.changed.emit()
 

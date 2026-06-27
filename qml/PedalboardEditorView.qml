@@ -701,8 +701,34 @@ Item {
                     Text { x: 10; text: editor.inspMeta + " · 노브 더블탭=기본값"; color: cDim
                            font.family: uiFont; font.pixelSize: 12 }
                 }
+                // patch params (NAM model / IR / cabsim) — live nodes only; tap to pick a file
+                Column {
+                    id: patchSection
+                    width: parent.width; spacing: 4
+                    visible: editor.inspPatches.length > 0
+                    topPadding: visible ? 2 : 0; bottomPadding: visible ? 6 : 0
+                    Repeater {
+                        model: editor.inspPatches
+                        Rectangle {
+                            x: 10; width: parent.width - 20; height: 30; radius: 5
+                            color: "#1f5fd0a0"; border.width: 1; border.color: cGreen
+                            Text {
+                                anchors.left: parent.left; anchors.leftMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width - 16
+                                text: "▦ " + modelData.label + ": " + (modelData.value || "—") + "  ▾"
+                                color: cGreen; font.family: uiFont; font.pixelSize: 13; elide: Text.ElideMiddle
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: editPatchPicker.openFor(modelData.uri, modelData.label, modelData.value || "")
+                            }
+                        }
+                    }
+                }
                 Flickable {
-                    width: parent.width; height: parent.height - 96; contentHeight: knobGrid.height; clip: true
+                    width: parent.width; clip: true; contentHeight: knobGrid.height
+                    height: parent.height - 96 - (patchSection.visible ? patchSection.height : 0)
                     Grid {
                         id: knobGrid; width: parent.width; columns: 2; rowSpacing: 12; columnSpacing: 8
                         padding: 10
@@ -952,6 +978,19 @@ Item {
                 NumberAnimation { target: flash; property: "opacity"; from: 0; to: 0.55; duration: 200 }
                 NumberAnimation { target: flash; property: "opacity"; to: 0; duration: 560 }
             }
+        }
+    }
+
+    // patch file picker (shared PatchPicker.qml) — opened from an inspector patch
+    // chip; lists/loads via the editor bridge (selected live node). Top z overlay.
+    PatchPicker {
+        id: editPatchPicker
+        colElev: cElev; colBorder: cBorder; colText: cText; colAccent: cGreen; fontFamily: uiFont
+        property string pUri: ""
+        onPicked: (path) => editor.setPatch(pUri, path)
+        function openFor(uri, label, current) {
+            pUri = uri;
+            present(editor.patchFiles(uri), label, current);
         }
     }
 
