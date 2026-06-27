@@ -148,6 +148,49 @@ class FakeModepController(Backend):
             })
         return {"plugins": plugins, "connections": info.get("connections", [])}
 
+    # -- Graph mutation --------------------------------------------------------
+    # Mutate the current fixture's pedalboard_info in place so a subsequent
+    # dump_graph() (and rebuild) reflects the edit -- this is what makes the
+    # full add/connect/remove loop exercisable off device. get_pedalboard_info
+    # returns the live dict (not a copy), so these mutations persist for the
+    # session. Connection endpoints are stored bare (no '/graph/'), matching the
+    # on-disk form the real host's syn_dump_graph normalizes to.
+    @staticmethod
+    def _bare(port):
+        return port[7:] if port.startswith("/graph/") else port
+
+    def add_effect(self, instance, uri, x=0.0, y=0.0):
+        info = self.get_pedalboard_info(self._current_path)
+        if not any(p["instance"] == instance for p in info["plugins"]):
+            info["plugins"].append({
+                "instance": instance, "uri": uri, "bypassed": False,
+                "x": float(x), "y": float(y), "ports": [],
+            })
+            self._bypass[instance] = False
+        return None
+
+    def remove_effect(self, instance):
+        info = self.get_pedalboard_info(self._current_path)
+        info["plugins"] = [p for p in info["plugins"] if p["instance"] != instance]
+        info["connections"] = [c for c in info["connections"]
+                               if c["source"].split("/")[0] != instance
+                               and c["target"].split("/")[0] != instance]
+        self._bypass.pop(instance, None)
+        return None
+
+    def connect(self, port_from, port_to):
+        info = self.get_pedalboard_info(self._current_path)
+        c = {"source": self._bare(port_from), "target": self._bare(port_to)}
+        if c not in info["connections"]:
+            info["connections"].append(c)
+        return None
+
+    def disconnect(self, port_from, port_to):
+        info = self.get_pedalboard_info(self._current_path)
+        c = {"source": self._bare(port_from), "target": self._bare(port_to)}
+        info["connections"] = [x for x in info["connections"] if x != c]
+        return None
+
     # -- Snapshot --------------------------------------------------------------
     def snapshot_current_idx(self):
         return self._snapshot_idx

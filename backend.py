@@ -94,6 +94,27 @@ class Backend:
         endpoints use the bare on-disk form ('BBCstereo/inR', 'capture_2')."""
         raise NotImplementedError
 
+    # -- Graph mutation --------------------------------------------------------
+    # Port/instance arguments are in the graph namespace ('/graph/<inst>/<sym>',
+    # bare instance name for add/remove). Higher-level concerns (port-symbol
+    # resolution, instance minting, self-echo guard) belong to the caller, not
+    # here. All four return ``None`` on success, else an error string.
+    def add_effect(self, instance, uri, x=0.0, y=0.0):
+        """Add plugin ``uri`` as new instance ``instance`` (bare name) at (x, y)."""
+        raise NotImplementedError
+
+    def remove_effect(self, instance):
+        """Remove instance ``instance`` (bare name) and its connections."""
+        raise NotImplementedError
+
+    def connect(self, port_from, port_to):
+        """Connect two graph-namespace ports ('/graph/<inst>/<sym>')."""
+        raise NotImplementedError
+
+    def disconnect(self, port_from, port_to):
+        """Disconnect two graph-namespace ports ('/graph/<inst>/<sym>')."""
+        raise NotImplementedError
+
     # -- Snapshot --------------------------------------------------------------
     def snapshot_current_idx(self):
         """Return the current snapshot index (int; ``-1`` if unknown)."""

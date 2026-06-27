@@ -446,6 +446,70 @@ class ModepController:
 			logging.error(f"Error dumping live graph: {e}")
 		return None
 
+	# ── Graph mutation (M4b) ──────────────────────────────────────────────
+	# Thin pass-through wrappers over the existing mod-ui graph endpoints (the
+	# same ones the web UI's desktop.js drives). Port/instance arguments are in
+	# the graph namespace ('/graph/<inst>/<symbol>', bare instance name for
+	# add/remove); the harder mapping (port-symbol↔jack-name, instance minting,
+	# self-echo guard) lives one layer up in the editor (M5), not here. Return
+	# ``None`` on success or an error string, like the other write calls.
+	@staticmethod
+	def add_effect(instance, uri, x=0.0, y=0.0):
+		"""Add plugin ``uri`` as new instance ``instance`` (bare name) at (x, y).
+		Mirrors web UI /effect/add (returns the new plugin's data on success)."""
+		try:
+			endpoint = (f"effect/add/graph/{quote(instance, safe='')}"
+						f"?uri={quote(uri, safe='')}&x={x}&y={y}")
+			r = ModepController._request("get", endpoint)
+			if r is None:
+				return "MODEP host did not respond"
+			if r.status_code == 200 and r.json():
+				return None
+			return r.text or "effect add failed"
+		except Exception as e:
+			return f"An error occurred: {e}"
+
+	@staticmethod
+	def remove_effect(instance):
+		"""Remove instance ``instance`` (bare name) and its connections."""
+		try:
+			r = ModepController._request("get", f"effect/remove/graph/{quote(instance, safe='')}")
+			if r is None:
+				return "MODEP host did not respond"
+			if r.status_code == 200 and r.json():
+				return None
+			return r.text or "effect remove failed"
+		except Exception as e:
+			return f"An error occurred: {e}"
+
+	@staticmethod
+	def connect(port_from, port_to):
+		"""Connect two ports given in graph-namespace form ('/graph/<inst>/<sym>',
+		'/graph/capture_1'). Mirrors web UI /effect/connect/<from>,<to>."""
+		try:
+			r = ModepController._request("get", f"effect/connect/{port_from},{port_to}")
+			if r is None:
+				return "MODEP host did not respond"
+			if r.status_code == 200 and r.json():
+				return None
+			return r.text or "connect failed"
+		except Exception as e:
+			return f"An error occurred: {e}"
+
+	@staticmethod
+	def disconnect(port_from, port_to):
+		"""Disconnect two ports given in graph-namespace form. Mirrors web UI
+		/effect/disconnect/<from>,<to>."""
+		try:
+			r = ModepController._request("get", f"effect/disconnect/{port_from},{port_to}")
+			if r is None:
+				return "MODEP host did not respond"
+			if r.status_code == 200 and r.json():
+				return None
+			return r.text or "disconnect failed"
+		except Exception as e:
+			return f"An error occurred: {e}"
+
 	@staticmethod
 	def set_bpm(value):
 		try:
