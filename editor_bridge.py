@@ -175,6 +175,8 @@ class EditorBridge(QObject):
         self._live_boards = []        # cached live host board list [{bundle,title,current}]
         self._scratch_default = False # NEW BOARD loaded the shared default -> SAVE must save-as
         self._pending_new = False     # a NEW request is awaiting the dirty-confirm dialog
+        self._lq_wires = set()        # live-quick: tracked host wiring (port-key pairs) for reconcile
+        self._live_quick_enabled = True   # gate for live QUICK entry (manual toggle / M6d-4 routing)
 
         # live wiring (None/False in the standalone mock; set when embedded in the app)
         self.presenter = None         # Presenter seam — source of truth is presenter.pedalboard
@@ -792,14 +794,19 @@ class EditorBridge(QObject):
         return {(w['frm'], w['to']) for w in wires}
 
     def _quick_representable(self, pb):
-        """Can pb be shown as a quick serial chain? Returns (ok, reason).
+        """Can pb be shown as a quick serial chain? Returns (ok, in_mode_or_reason)
+        — on success the second value is the matching 'mono'/'stereo' (callers seed
+        in_mode with it).
+
         GENERATOR=CLASSIFIER: project pb's effects to candidate quick nodes,
         generate the desired wiring with _quick_wire_keys, and require
         instance+channel set-equality with the host's actual audio connections.
         That single comparison auto-rejects fan-out/fan-in/feedback/L-R-swap with
-        no separate hand-coded topology rule. Catalog-filtered (any missing
-        plugin -> advanced); MIDI/CV-only (no audio ports) -> advanced; empty/
-        passthrough -> advanced (M6d-3 전 무음 회피). Instance-keyed."""
+        no separate hand-coded topology rule. The board's actual input usage is
+        mono (capture_1 only) or stereo (capture_1+2) regardless of the hardware
+        audio_ins, so we try BOTH in_modes and accept the one that matches.
+        Catalog-filtered (missing plugin -> advanced); MIDI/CV-only -> advanced;
+        empty/passthrough -> advanced (M6d-3 전 무음 회피). Instance-keyed."""
         effects = list(pb.effects)
         if not effects:
             return (False, '빈 보드')
@@ -812,19 +819,24 @@ class EditorBridge(QObject):
                 return (False, 'MIDI/CV 전용')
             proj.append({'id': i + 1, 'uri': e.uri, 'inst': e.instance,
                          'x': i, 'y': 0, 'ain': ain, 'aout': aout})
-        saved = self.nodes
+        host = {(self._norm_inst(c.source), self._norm_inst(c.target)) for c in pb.connections}
+        saved_nodes, saved_in = self.nodes, self.in_mode
         self.nodes = proj
         try:
-            desired = set()
-            for f, t in self._quick_wire_keys():
-                ef, et = self._endpoint_from_port_key(f), self._endpoint_from_port_key(t)
-                if not ef or not et:
-                    return (False, '포트 해석 실패')
-                desired.add((self._norm_inst(ef), self._norm_inst(et)))
+            for im in ('mono', 'stereo'):
+                self.in_mode = im
+                desired, bad = set(), False
+                for f, t in self._quick_wire_keys():
+                    ef, et = self._endpoint_from_port_key(f), self._endpoint_from_port_key(t)
+                    if not ef or not et:
+                        bad = True
+                        break
+                    desired.add((self._norm_inst(ef), self._norm_inst(et)))
+                if not bad and desired == host:
+                    return (True, im)
         finally:
-            self.nodes = saved
-        host = {(self._norm_inst(c.source), self._norm_inst(c.target)) for c in pb.connections}
-        return (True, '') if desired == host else (False, '직렬체인 아님')
+            self.nodes, self.in_mode = saved_nodes, saved_in
+        return (False, '직렬체인 아님')
 
     def _port_counts(self, nid, side):
         if nid == 'IN':
@@ -1660,6 +1672,14 @@ class EditorBridge(QObject):
             if node is None:
                 return
             self._touch()
+        elif self.mode == 'quick' and self._live_flag:
+            # Live quick: host-first add at the chain end, then reconcile wires it
+            # into the serial chain (old last->OUT becomes last->new, new->OUT).
+            node = self._live_add_quick(uri)
+            if node is None:
+                return
+            self._reconcile_live_quick()
+            self._touch()
         elif self.mode == 'advanced':
             self._push_hist()
             node = {'id': self._new_id(), 'uri': uri, 'x': tx, 'y': ty,
@@ -1698,6 +1718,124 @@ class EditorBridge(QObject):
         self._inst_by_gid[gid] = inst
         return node
 
+    # ------------------------------------------------ live QUICK mode (M6d-3)
+    @Slot()
+    def toggleLiveMode(self):
+        """Live ADV<->QUICK toggle. To QUICK only if the board is quick-
+        representable AND live-quick is enabled (host-first reconcile makes quick
+        edits safe). To ADVANCED re-seeds from the live host (authoritative)."""
+        if not (self._live_flag and self.presenter):
+            return
+        if self.mode == 'advanced':
+            if not self._live_quick_enabled:
+                self.toast.emit('라이브 퀵 비활성')
+                return
+            if not self._project_to_quick():
+                self.toast.emit('이 보드는 QUICK 표현 불가 — 어드밴스드 유지')
+        else:
+            pb = self._live_pb()
+            if pb is not None:
+                self._seed_from_pedalboard(pb)   # quick -> advanced: rebuild from host
+
+    def _project_to_quick(self):
+        """Inverse of bake: build the quick working set (self.nodes) from the live
+        pedalboard in serial order, clear the advanced set, and seed _lq_wires with
+        the current host wiring (== _quick_wire_keys for a representable board, so
+        the first reconcile is a no-op). Returns False if not representable."""
+        pb = self._live_pb()
+        if pb is None:
+            return False
+        rep, im = self._quick_representable(pb)
+        if not rep:
+            return False
+        nodes = []
+        self._gid_by_inst = {}
+        self._inst_by_gid = {}
+        for i, e in enumerate(pb.effects):
+            gid = i + 1
+            ai, ao = len(e.audio_inputs or []), len(e.audio_outputs or [])
+            y = CANVAS_H / 2 - 30
+            if ao == 0 and ai > 0:
+                y = CANVAS_H / 2 + 70          # tap -> below the trunk
+            elif ai == 0 and ao > 0:
+                y = CANVAS_H / 2 - 130         # source -> above the trunk
+            nodes.append({'id': gid, 'uri': e.uri, 'inst': e.instance,
+                          'x': 120 + i * 150, 'y': y, 'bypass': bool(e.bypassed),
+                          'vals': {sym: pt.value for sym, pt in (e.ports or {}).items()},
+                          'ain': list(e.audio_inputs or []), 'aout': list(e.audio_outputs or []),
+                          'inAdapt': 'auto', 'mergeAdapt': 'auto'})
+            self._gid_by_inst[e.instance] = gid
+            self._inst_by_gid[gid] = e.instance
+        self.nodes = nodes
+        self.gnodes = []
+        self.gwires = []
+        self.mode = 'quick'
+        self.in_mode = im   # the in_mode the classifier matched (mono/stereo)
+        self.sel = -1
+        self._lq_wires = self._quick_wire_keys()   # current host wiring (representable)
+        self._assert_single_ws()
+        self._rebuild()
+        self.boardsChanged.emit()
+        self.toast.emit('QUICK 모드')
+        return True
+
+    def _reconcile_live_quick(self):
+        """Bring the host wiring to match the quick layout: diff desired
+        (_quick_wire_keys) against the tracked _lq_wires and push only the delta.
+        Dry-run resolves all new endpoints first; then CONNECT new cables BEFORE
+        disconnecting old ones (minimize the silence window — never teardown-first).
+        Only host-acked changes update _lq_wires (M5 host-first discipline)."""
+        if not (self._live_flag and self.mode == 'quick' and self.presenter):
+            return
+        be = self._backend()
+        if not be:
+            return
+        desired = self._quick_wire_keys()
+        to_add = desired - self._lq_wires
+        to_remove = self._lq_wires - desired
+        # dry-run: resolve endpoints for all adds up front
+        adds = []
+        for (f, t) in to_add:
+            ef, et = self._endpoint_from_port_key(f), self._endpoint_from_port_key(t)
+            if not ef or not et:
+                self.toast.emit('포트 해석 실패 — 일부 배선 보류')
+                continue
+            adds.append((f, t, ef, et))
+        for (f, t, ef, et) in adds:                     # connect-first
+            if be.connect(ef, et) is None:
+                self._lq_wires.add((f, t))
+        for (f, t) in list(to_remove):                  # then disconnect
+            ef, et = self._endpoint_from_port_key(f), self._endpoint_from_port_key(t)
+            if ef and et:
+                be.disconnect(ef, et)                    # failure == already gone
+            self._lq_wires.discard((f, t))
+        self._touch()
+        self._rebuild()
+
+    def _live_add_quick(self, uri):
+        """Mint + add a plugin on the host and append it to the right end of the
+        quick chain. The caller reconciles to wire it in. None on host failure."""
+        be = self._backend()
+        if not be:
+            self.toast.emit('백엔드 없음 — 추가 불가')
+            return None
+        inst = self._mint_instance(uri)
+        err = be.add_effect(inst, uri, 0, 0)
+        if err is not None:
+            self.toast.emit('추가 실패: %s' % err)
+            return None
+        gid = self._new_id()
+        ain, aout = self._fetch_audio_syms(uri)
+        p = self.by_uri[uri]
+        maxx = max([n['x'] for n in self.nodes], default=80)
+        node = {'id': gid, 'uri': uri, 'inst': inst, 'x': maxx + 150, 'y': CANVAS_H / 2 - 30,
+                'bypass': False, 'ain': ain, 'aout': aout, 'inAdapt': 'auto', 'mergeAdapt': 'auto',
+                'vals': {c['sym']: c['def'] for c in p.get('ctl', []) if c['w'] != 'bypass'}}
+        self.nodes.append(node)
+        self._gid_by_inst[inst] = gid
+        self._inst_by_gid[gid] = inst
+        return node
+
     @Slot()
     def clearFly(self):
         self._fly_id = -1
@@ -1718,6 +1856,28 @@ class EditorBridge(QObject):
         n = self._node(nid)
         if not n:
             return
+        if over_trash and self._live_flag:
+            # Live quick: host-first remove (host severs its cables), drop the node
+            # + its tracked wires, then reconcile to bridge the neighbours.
+            inst = n.get('inst')
+            be = self._backend()
+            if be and inst:
+                err = be.remove_effect(inst)
+                if err is not None:
+                    self.toast.emit('삭제 실패: %s' % err)
+                    self._rebuild()
+                    return
+                self._gid_by_inst.pop(inst, None)
+                self._inst_by_gid.pop(nid, None)
+                sid = str(nid)
+                self._lq_wires = {(f, t) for (f, t) in self._lq_wires
+                                  if f.split(':')[0] != sid and t.split(':')[0] != sid}
+            self.nodes = [m for m in self.nodes if m['id'] != nid]
+            if self.sel == nid:
+                self.sel = -1
+            self._reconcile_live_quick()     # reconnect the neighbours
+            self._touch()
+            return
         if over_trash:
             self._push_hist()
             self.nodes = [m for m in self.nodes if m['id'] != nid]
@@ -1726,6 +1886,10 @@ class EditorBridge(QObject):
         else:
             n['x'] = max(40, min(CANVAS_W - NODEW - 4, x))
             n['y'] = max(4, min(CANVAS_H - 58, y))
+            if self._live_flag:
+                self._reconcile_live_quick()  # reorder -> re-wire to the new x-order
+                self._touch()
+                return
         self._touch()
         self._rebuild()
 

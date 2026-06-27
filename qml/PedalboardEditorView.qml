@@ -81,10 +81,14 @@ Item {
                 anchors.left: parent.left; anchors.leftMargin: 10; anchors.verticalCenter: parent.verticalCenter
                 spacing: 7
                 Pill { label: "◄ 나가기"; accent: cMuted; onTap: win.exitRequested() }
+                // ADV/QUICK indicator — tappable in live to toggle modes (M6d-3).
+                // QUICK only engages for a quick-representable board.
                 Text {
-                    text: editor.advanced ? "ADV" : "QUICK"
+                    text: (editor.advanced ? "ADV" : "QUICK") + (editor.live ? " ⇄" : "")
                     color: editor.advanced ? cOrange : cMuted
                     font.family: uiFont; font.pixelSize: 15; anchors.verticalCenter: parent.verticalCenter
+                    MouseArea { anchors.fill: parent; enabled: editor.live
+                                onClicked: editor.toggleLiveMode() }
                 }
                 Pill { label: "BOARD"; accent: cBlue
                        onTap: { if (editor.live) { editor.refreshBoards(); win.liveBoardsOpen = true }
