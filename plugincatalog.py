@@ -128,6 +128,15 @@ def _plugin(p):
     }
 
 
+def normalize_plugin(native_info):
+    """Normalise a single mod-ui plugin info dict (from /effect/get) into the
+    condensed schema, or None if it has no uri. Used for on-demand self-heal of a
+    uri the bulk catalog was missing (a plugin installed after startup)."""
+    if not native_info or not native_info.get('uri'):
+        return None
+    return _plugin(native_info)
+
+
 def normalize(native_plugins):
     """``native_plugins``: list of mod-ui ``get_plugin_info`` dicts (or a uri->info
     dict, as ``effect/bulk`` returns). Returns the condensed editor catalog

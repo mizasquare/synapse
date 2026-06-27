@@ -289,6 +289,36 @@ class EditorBridge(QObject):
         self._apply_catalog(cat)
         self._rebuild()                 # rail / browser / count reflect the live catalog
 
+    def _heal_plugin(self, uri):
+        """Self-heal a uri the live catalog is missing (a plugin installed after
+        startup, or a partial load): fetch its full info on demand and fold it into
+        the catalog. Returns the condensed plugin dict, or None if the host doesn't
+        know it either. (Browser rail counts refresh on the next rescan/rebuild.)"""
+        if uri in self.by_uri:
+            return self.by_uri[uri]
+        be = self._backend()
+        if not be:
+            return None
+        try:
+            info = be.effect_get_information(uri)
+        except Exception:
+            info = None
+        p = plugincatalog.normalize_plugin(info) if info else None
+        if not p:
+            return None
+        self.by_uri[uri] = p
+        self.by_name[p['name'].lower()] = uri
+        self.cat['plugins'].append(p)
+        self.cat['count'] = len(self.cat['plugins'])
+        return p
+
+    @Slot()
+    def rescanCatalog(self):
+        """Manually re-fetch the host's full plugin catalog (e.g. after installing
+        a new plugin). Plugin install is rare, so this is on-demand, not polled."""
+        self._load_live_catalog()
+        self.toast.emit('플러그인 카탈로그 갱신 · %d개' % self.cat.get('count', 0))
+
     @Slot()
     def enterLive(self):
         """Called when the app opens the EDIT screen: refresh from the LIVE host
@@ -504,9 +534,9 @@ class EditorBridge(QObject):
 
         gnodes, missing = [], []
         for i, e in enumerate(effects):
-            if e.uri not in self.by_uri:
-                # plugin installed but absent from the frozen catalog dump — skip so
-                # the editor renders the rest rather than crashing on geometry lookups.
+            if e.uri not in self.by_uri and not self._heal_plugin(e.uri):
+                # the host doesn't know this uri either — skip so the editor renders
+                # the rest rather than crashing on geometry lookups.
                 missing.append(e.name or e.uri)
                 continue
             gid = i + 1
