@@ -27,7 +27,10 @@ Item {
     readonly property color cDim:    "#5a6270"
 
     property bool trashHot: false
-    property bool boardsOpen: false
+    property bool boardsOpen: false       // mock board manager (non-live)
+    property bool liveBoardsOpen: false   // live host board switcher (M6a)
+    property string pendingSwitchBundle: ""  // live switch awaiting dirty-discard confirm
+    property string pendingSwitchTitle: ""
     property string pendingNewKind: ""   // "quick"/"advanced" awaiting discard confirmation
     property string namingMode: ""       // ""=closed, "save"=first save, "saveas"=save copy
 
@@ -46,6 +49,13 @@ Item {
     Connections {
         target: editor
         function onToast(msg) { win.toastText = msg; toastTimer.restart() }
+        // dirty live board switch -> raise the discard-confirm dialog (don't switch yet)
+        function onConfirmBoardSwitch(bundle, title) {
+            win.pendingSwitchBundle = bundle; win.pendingSwitchTitle = title
+        }
+        // a switch actually completed (clean tap OR confirmed discard) -> close the
+        // switcher overlay so both paths land on the editor consistently.
+        function onBoardSwitched() { win.liveBoardsOpen = false }
         function onEvolveFlash() { flashAnim.restart() }
         function onSpawnFly(name, color, fromX, fromY, toX, toY) {
             flyName.text = name; flyGhost.accent = color
@@ -73,7 +83,9 @@ Item {
                     color: editor.advanced ? cOrange : cMuted
                     font.family: uiFont; font.pixelSize: 15; anchors.verticalCenter: parent.verticalCenter
                 }
-                Pill { label: "BOARD"; accent: cBlue; visible: !editor.live; onTap: win.boardsOpen = true }
+                Pill { label: "BOARD"; accent: cBlue
+                       onTap: { if (editor.live) { editor.refreshBoards(); win.liveBoardsOpen = true }
+                                else win.boardsOpen = true } }
                 Text {
                     text: editor.boardName + (editor.dirty ? " *" : "")
                     color: editor.dirty ? cOrange : cText
@@ -963,6 +975,97 @@ Item {
                         WideBtn { label: "취소"; accent: cBorder; onTap: win.pendingNewKind = "" }
                         WideBtn { label: "버리고 새로"; accent: cOrange
                                   onTap: { editor.newBoard(win.pendingNewKind); win.pendingNewKind = ""; win.boardsOpen = false } }
+                    }
+                }
+            }
+        }
+
+        // -------- LIVE board switcher (overlay, M6a) --------
+        // Lists the host's pedalboards; tapping 전환 routes through
+        // editor.requestLiveBoardSwitch (no-op on current, dirty-confirm gated).
+        // Read-only switcher — no save/delete/new here (live save = M6b).
+        Item {
+            visible: win.liveBoardsOpen; anchors.fill: parent; z: 72
+            MouseArea { anchors.fill: parent; onClicked: win.liveBoardsOpen = false }
+            Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.55 }
+            Rectangle {
+                width: 478; height: 408; radius: 10; anchors.centerIn: parent
+                color: cPanel; border.width: 1; border.color: cBorder
+                MouseArea { anchors.fill: parent }   // swallow clicks
+                Column {
+                    anchors.fill: parent; anchors.margins: 14; spacing: 10
+                    Item {
+                        width: parent.width; height: 24
+                        Text { text: "보드 전환 (라이브)"; color: cText; font.family: uiFont; font.pixelSize: 18
+                               anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
+                        Text { text: "✕"; color: cMuted; font.pixelSize: 18
+                               anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                               MouseArea { anchors.fill: parent; onClicked: win.liveBoardsOpen = false } }
+                    }
+                    Text { text: "호스트 보드 (" + editor.liveBoardList.length + ")  ·  현재 편집 미저장 시 전환 전 확인"
+                           color: cDim; font.family: uiFont; font.pixelSize: 13 }
+                    Flickable {
+                        width: parent.width; height: 320; contentHeight: liveCol.height; clip: true
+                        Column {
+                            id: liveCol; width: parent.width; spacing: 6
+                            Repeater {
+                                model: editor.liveBoardList
+                                Rectangle {
+                                    width: liveCol.width; height: 44; radius: 5
+                                    color: modelData.current ? cElev : "#161b26"
+                                    border.width: 1; border.color: modelData.current ? cBlue : cBorder
+                                    Row {
+                                        anchors.fill: parent; anchors.margins: 8; spacing: 8
+                                        Text {
+                                            width: parent.width - 96; anchors.verticalCenter: parent.verticalCenter
+                                            text: (modelData.current ? "● " : "") + modelData.title
+                                            color: modelData.current ? cBlue : cText
+                                            font.family: uiFont; font.pixelSize: 15; elide: Text.ElideRight
+                                        }
+                                        Pill { label: modelData.current ? "현재" : "전환"
+                                               accent: modelData.current ? cBorder : cBlue
+                                               dim: modelData.current
+                                               // clean switch -> boardSwitched closes the overlay;
+                                               // dirty -> confirmBoardSwitch raises the dialog (stays open).
+                                               onTap: if (!modelData.current)
+                                                          editor.requestLiveBoardSwitch(modelData.bundle, modelData.title) }
+                                    }
+                                }
+                            }
+                            Text { visible: editor.liveBoardList.length === 0
+                                   text: "호스트 보드 목록 없음"; color: cDim
+                                   font.family: uiFont; font.pixelSize: 14; topPadding: 18 }
+                        }
+                    }
+                }
+            }
+        }
+
+        // -------- LIVE switch discard-confirm (unsaved live edits) --------
+        Item {
+            visible: win.pendingSwitchBundle !== ""; anchors.fill: parent; z: 82
+            MouseArea { anchors.fill: parent; onClicked: win.pendingSwitchBundle = "" }
+            Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.6 }
+            Rectangle {
+                width: 388; height: 168; radius: 10; anchors.centerIn: parent
+                color: cPanel; border.width: 1; border.color: cOrange
+                MouseArea { anchors.fill: parent }
+                Column {
+                    anchors.fill: parent; anchors.margins: 16; spacing: 12
+                    Text { text: "미저장 변경을 폐기할까요?"; color: cText; font.family: uiFont; font.pixelSize: 18 }
+                    Text {
+                        width: parent.width; wrapMode: Text.WordWrap
+                        text: "저장하지 않은 라이브 편집이 사라지고 '" + win.pendingSwitchTitle + "'(으)로 전환합니다."
+                        color: cMuted; font.family: uiFont; font.pixelSize: 14
+                    }
+                    Row {
+                        anchors.right: parent.right; spacing: 8
+                        WideBtn { label: "취소"; accent: cBorder; onTap: win.pendingSwitchBundle = "" }
+                        WideBtn { label: "폐기하고 전환"; accent: cOrange
+                                  // clear the dialog; the overlay closes via onBoardSwitched on success
+                                  // (a failed switch keeps the overlay + shows a failure toast).
+                                  onTap: { editor.confirmedLiveBoardSwitch(win.pendingSwitchBundle)
+                                           win.pendingSwitchBundle = "" } }
                     }
                 }
             }

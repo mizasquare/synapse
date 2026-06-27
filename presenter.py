@@ -350,14 +350,36 @@ class Presenter:
         if callable(toast):
             toast(text)
 
+    def _switch_to_bundle(self, bundle, return_to_overview=True):
+        """Shared board-switch discipline for BOTH footswitch nav and the editor
+        live switcher, so remember/restore-snapshot can never diverge between the
+        two paths. Returns True on success.
+
+        On a failed load (backend.set_pedalboard False) it does NOT refresh /
+        restore / change screens: /reset already wiped the live graph, so the
+        caller must surface the failure rather than resync to an empty board."""
+        self._remember_current_snapshot()
+        if not self.backend.set_pedalboard(bundle):
+            return False
+        self.refresh_pedalboard()
+        self._restore_snapshot_for_current_pb()
+        if return_to_overview:
+            self._return_to_overview()
+        return True
+
     def _go_to_pedalboard(self, bundle):
         """Load a specific pedalboard via the footswitch path (same remember /
         restore-snapshot / return-to-overview discipline as prev/next)."""
-        self._remember_current_snapshot()
-        self.backend.set_pedalboard(bundle)
-        self.refresh_pedalboard()
-        self._restore_snapshot_for_current_pb()
-        self._return_to_overview()
+        self._switch_to_bundle(bundle, return_to_overview=True)
+
+    def editor_switch_pedalboard(self, bundle):
+        """Live board switch from the editor: same discipline but stay on the
+        editor canvas (no return-to-overview). Returns the freshly-built
+        Pedalboard for the editor to reseed, or None if the load failed — on
+        None the caller MUST NOT reseed (the host graph is wiped)."""
+        if not self._switch_to_bundle(bundle, return_to_overview=False):
+            return None
+        return self.pedalboard
 
     def load_bank_pedalboard(self, slot):
         """Mode-2: load the bank board mapped to footswitch ``slot`` (0-3)."""

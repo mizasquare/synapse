@@ -44,7 +44,15 @@ class Backend:
         raise NotImplementedError
 
     def set_pedalboard(self, board):
-        """Load the pedalboard at bundle path ``board``."""
+        """Load the pedalboard at bundle path ``board``. Returns ``True`` if the
+        host's current pedalboard is ``board`` afterward, else ``False`` — a
+        destroy-then-reseed caller (the live editor switch) must bail on
+        ``False`` since /reset already wiped the graph."""
+        raise NotImplementedError
+
+    def get_all_pedalboard_entries(self):
+        """All pedalboards as ``[{'bundle','title'}]`` (one call, titles included).
+        For the editor's live board switcher; ``[]`` on failure."""
         raise NotImplementedError
 
     def set_next_pedalboard(self):

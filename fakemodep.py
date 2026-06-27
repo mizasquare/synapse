@@ -90,7 +90,12 @@ class FakeModepController(Backend):
         if board in self._pb_by_path:
             self._current_path = board
             self._seed_current()
-        return None
+            return True
+        return False   # unknown bundle -> load failed (mirrors host verify)
+
+    def get_all_pedalboard_entries(self):
+        return [{"bundle": p, "title": self._pb_by_path[p]["pedalboard_info"].get("title", "")}
+                for p in self._pb_order]
 
     def set_next_pedalboard(self):
         i = self._pb_order.index(self._current_path)

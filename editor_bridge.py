@@ -137,6 +137,8 @@ class EditorBridge(QObject):
     evolveFlash = Signal()    # tell QML to play the EVOLVING animation
     spawnFly = Signal(str, str, float, float, float, float)  # name,color,fromX,fromY,toX,toY
     boardsChanged = Signal()  # saved-board list / current name / dirty changed
+    confirmBoardSwitch = Signal(str, str)  # (bundle, title) — dirty live switch needs confirm
+    boardSwitched = Signal()  # a live board switch actually completed -> close the switcher overlay
 
     def __init__(self, catalog_path=None):
         super().__init__()
@@ -166,7 +168,8 @@ class EditorBridge(QObject):
         self.board_name = 'Untitled'
         self.board_path = None        # file this board was saved to/loaded from
         self._dirty = False
-        self._boards = []             # cached saved-board list
+        self._boards = []             # cached saved-board (mock .json) list
+        self._live_boards = []        # cached live host board list [{bundle,title,current}]
 
         # live wiring (None/False in the standalone mock; set when embedded in the app)
         self.presenter = None         # Presenter seam — source of truth is presenter.pedalboard
@@ -284,11 +287,13 @@ class EditorBridge(QObject):
         inst, view = self._inst_of(nid), self._live_view()
         if inst and view:
             view.setParameter(inst, sym, float(value))
+            self._touch()   # a live param edit is unsaved state (dirty-confirm honesty)
 
     def _live_bypass(self, nid, bypassed):
         inst, view = self._inst_of(nid), self._live_view()
         if inst and view:
             view.toggleBypass(inst, bool(bypassed))
+            self._touch()
 
     def _live_effect(self):
         """The presenter-side Effect for the selected live node (None in the mock).
@@ -1253,6 +1258,86 @@ class EditorBridge(QObject):
     def boardList(self):
         return self._boards
 
+    # ----------------------------------------------- live board switch (M6a)
+    @staticmethod
+    def _norm_bundle(p):
+        """Canonical bundle path for comparison (host paths may carry a trailing
+        slash). One shared normalizer for BOTH the current-highlight and the
+        no-op guard so clicking the current board can never trigger a needless
+        /reset that wipes dirty edits."""
+        return (p or '').rstrip('/')
+
+    @Property('QVariantList', notify=boardsChanged)
+    def liveBoardList(self):
+        """Host's full pedalboard list for the editor switcher: each entry
+        {bundle,title,current}. Populated by refreshBoards() (fresh, not stale)."""
+        return self._live_boards
+
+    @Slot()
+    def refreshBoards(self):
+        """(Re)fetch the live host board list — call when the BOARD overlay opens
+        so it's fresh, not a stale bank cache. Marks the current board via the
+        shared normalizer. No-op (and clears) in the mock."""
+        be = self._backend()
+        if not (self._live_flag and be):
+            self._live_boards = []
+            self.boardsChanged.emit()
+            return
+        cur = self._norm_bundle(be.get_current_pedalboard())
+        entries = be.get_all_pedalboard_entries() or []
+        self._live_boards = [{'bundle': e['bundle'],
+                              'title': e.get('title', '') or e['bundle'],
+                              'current': self._norm_bundle(e['bundle']) == cur}
+                             for e in entries]
+        if not entries:
+            self.toast.emit('호스트 보드 목록 비어있음')
+        self.boardsChanged.emit()
+
+    @Slot(str, str, result=bool)
+    def requestLiveBoardSwitch(self, bundle, title):
+        """Editor asked to switch to ``bundle``. No-op if it's already current
+        (avoids a needless graph-wiping /reset). If there are unsaved live edits,
+        raise confirmBoardSwitch for a dialog; else switch immediately.
+
+        Returns True ONLY when the switch happened right now (clean path), so the
+        caller can close the overlay. False when it no-op'd (current) or deferred
+        to the confirm dialog — in the dialog case the confirm action closes the
+        overlay, so both paths end consistently (overlay closed, on the editor)."""
+        if not self._live_flag:
+            return False
+        be = self._backend()
+        cur = self._norm_bundle(be.get_current_pedalboard()) if be else ''
+        if self._norm_bundle(bundle) == cur:
+            self.toast.emit('이미 현재 보드')
+            return False
+        if self._dirty:
+            self.confirmBoardSwitch.emit(bundle, title or bundle)
+            return False
+        return self._doLiveBoardSwitch(bundle)
+
+    @Slot(str)
+    def confirmedLiveBoardSwitch(self, bundle):
+        """Dialog confirmed 'discard & switch'."""
+        if self._live_flag:
+            self._doLiveBoardSwitch(bundle)
+
+    def _doLiveBoardSwitch(self, bundle):
+        """Perform the live switch through the presenter. On failure (host graph
+        wiped by /reset, load_bundle failed) DO NOT reseed — surface it instead,
+        so we never paint a blank/stale canvas over a destroyed graph. Returns
+        True on a successful switch."""
+        if not (self._live_flag and self.presenter):
+            return False
+        pb = self.presenter.editor_switch_pedalboard(bundle)
+        if pb is None:
+            self.toast.emit('전환 실패 — 보드 유지됨')
+            return False
+        self._seed_from_pedalboard(pb)   # reseeds gnodes/gwires, clears _dirty
+        self.refreshBoards()             # refresh current-board highlight
+        self.toast.emit('보드 전환됨')
+        self.boardSwitched.emit()        # tell QML to close the switcher overlay (both paths)
+        return True
+
     @Property('QVariantList', constant=True)
     def boardTerms(self):
         return _BOARD_TERMS
@@ -1858,6 +1943,8 @@ class EditorBridge(QObject):
 
     @Slot(str)
     def newBoard(self, kind):
+        if self._live_flag:
+            return   # mock board-lifecycle has no live meaning (defense-in-depth)
         self.mode = 'advanced' if kind == 'advanced' else 'quick'
         self.in_mode = 'mono'
         self.out_adapt = 'auto'
@@ -1909,6 +1996,8 @@ class EditorBridge(QObject):
 
     @Slot(str)
     def loadBoard(self, path):
+        if self._live_flag:
+            return   # live switching goes through requestLiveBoardSwitch, never the mock .json namespace
         try:
             with open(path, encoding='utf-8') as fh:
                 data = json.load(fh)
@@ -1924,6 +2013,8 @@ class EditorBridge(QObject):
 
     @Slot(str)
     def deleteBoard(self, path):
+        if self._live_flag:
+            return   # never let a mock-manager delete reach the live host bundle dirs
         try:
             os.remove(path)
         except OSError:

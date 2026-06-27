@@ -93,12 +93,43 @@ class ModepController:
 			return {}
 
 	@staticmethod
+	def get_all_pedalboard_entries():
+		"""All pedalboards as ``[{'bundle','title'}]`` in a single GET — the
+		pedalboard/list handler already includes titles, so this avoids a
+		per-board get_pedalboard_info fan-out. For the editor's live board
+		switcher (M6a). Empty list on host error."""
+		try:
+			r = ModepController._request("get", "pedalboard/list")
+			if r is not None:
+				return [{"bundle": i["bundle"], "title": i.get("title", "")}
+						for i in r.json()]
+		except Exception as e:
+			logging.error(f"Error fetching pedalboard entries: {e}")
+		return []
+
+	@staticmethod
 	def set_pedalboard(board):
+		"""Load bundle ``board``: GET /reset wipes the live JACK graph, then POST
+		load_bundle rebuilds it. Returns ``True`` only if the host's current
+		pedalboard is ``board`` afterward, else ``False``.
+
+		The boolean is load-bearing for the editor's switch path: /reset destroys
+		the live graph *before* load_bundle, so a load_bundle failure leaves an
+		EMPTY host graph. A caller that destroys+reseeds (editor_switch_pedalboard)
+		must bail on ``False`` rather than paint a blank/stale canvas over the
+		wiped graph and falsely report success. Footswitch callers ignore the
+		return — behavior unchanged."""
 		try:
 			ModepController._request("get", "reset")
 			ModepController._request("post", "pedalboard/load_bundle/?bundlepath=" + quote(board, safe=''))
 		except Exception as e:
 			logging.error(f"Failed to set pedalboard: {e}")
+			return False
+		# Authoritative check: the host's current bundle must now be `board`
+		# (normalized) — this catches a reset-done / load_bundle-failed window that
+		# _request swallows (it returns None, not an exception, on HTTP failure).
+		cur = ModepController.get_current_pedalboard()
+		return bool(cur) and cur.rstrip("/") == board.rstrip("/")
 
 	@staticmethod
 	def get_last_pedalboard():
