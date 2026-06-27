@@ -290,6 +290,21 @@ def initialize_modep_pedalboard() -> Optional[Pedalboard]:
 	if not pb_data:
 		print("⚠️ Failed to retrieve pedalboard data.")
 		return None
+
+	# Prefer the LIVE in-memory graph for plugins + connections: those are the
+	# only parts that diverge from disk after a live edit (add/remove/connect).
+	# Board-level scaffolding (title/size/hardware/timeInfo/midi) is stable, so
+	# keep it from the .ttl. Fall back to disk silently if the fork lacks the
+	# syn_dump_graph endpoint or the host is unreachable. See backend.dump_graph.
+	try:
+		live = get_backend().dump_graph()
+	except Exception as e:
+		print(f"⚠️ dump_graph failed, using disk graph: {e}")
+		live = None
+	if live and live.get("plugins") is not None:
+		pb_data["plugins"] = live["plugins"]
+		pb_data["connections"] = live.get("connections", pb_data["connections"])
+
 	title = pb_data["title"]
 	width = pb_data["width"]
 	height = pb_data["height"]

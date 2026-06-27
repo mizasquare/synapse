@@ -85,6 +85,15 @@ class Backend:
         success, else an error string."""
         raise NotImplementedError
 
+    # -- Live graph ------------------------------------------------------------
+    def dump_graph(self):
+        """Return the live in-memory graph as a pedalboard/info-compatible dict
+        ``{"plugins": [...], "connections": [...]}`` -- the *running* JACK graph,
+        not the on-disk .ttl -- or ``None`` on failure. ``plugins`` entries carry
+        ``instance``/``uri``/``bypassed``/``x``/``y``/``ports`` and connection
+        endpoints use the bare on-disk form ('BBCstereo/inR', 'capture_2')."""
+        raise NotImplementedError
+
     # -- Snapshot --------------------------------------------------------------
     def snapshot_current_idx(self):
         """Return the current snapshot index (int; ``-1`` if unknown)."""

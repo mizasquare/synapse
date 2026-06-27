@@ -432,6 +432,21 @@ class ModepController:
 			print(f"An error occurred: {e}")
 
 	@staticmethod
+	def dump_graph():
+		"""Return the LIVE in-memory graph (plugins + connections) from the mod
+		host as a pedalboard/info-compatible dict, or ``None`` on host failure.
+		Lets ``model.initialize_modep_pedalboard`` build from the running JACK
+		graph instead of the stale on-disk .ttl (custom fork endpoint; see
+		host.syn_dump_graph / webserver GraphDumpSYN)."""
+		try:
+			r = ModepController._request("get", "syn_dump_graph")
+			if r is not None and r.status_code == 200:
+				return r.json()
+		except Exception as e:
+			logging.error(f"Error dumping live graph: {e}")
+		return None
+
+	@staticmethod
 	def set_bpm(value):
 		try:
 			# Construct the URL with the instance and symbol as part of the path

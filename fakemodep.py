@@ -126,6 +126,28 @@ class FakeModepController(Backend):
         self._patches.setdefault(instance, {})[uri] = [value, "path"]
         return None
 
+    # -- Live graph ------------------------------------------------------------
+    def dump_graph(self):
+        """Fixture-backed live graph: the current pedalboard's plugins +
+        connections, with in-memory bypass/param mutations overlaid so the
+        build matches what the real fork's syn_dump_graph would return."""
+        info = self.get_pedalboard_info(self._current_path)
+        plugins = []
+        for p in info.get("plugins", []):
+            inst = p["instance"]
+            ports = [{"symbol": pt["symbol"],
+                      "value": self._params.get((inst, pt["symbol"]), pt.get("value"))}
+                     for pt in p.get("ports", [])]
+            plugins.append({
+                "instance": inst,
+                "uri"     : p["uri"],
+                "bypassed": bool(self._bypass.get(inst, p.get("bypassed", False))),
+                "x"       : p.get("x", 0),
+                "y"       : p.get("y", 0),
+                "ports"   : ports,
+            })
+        return {"plugins": plugins, "connections": info.get("connections", [])}
+
     # -- Snapshot --------------------------------------------------------------
     def snapshot_current_idx(self):
         return self._snapshot_idx
