@@ -146,7 +146,10 @@ class Presenter:
             bypass_status = "active"
             if effect.bypassed:
                 bypass_status = "bypassed"
-            plugins.append((effect.instance, effect.name, effect.category[0], [bypass_status, "unassigned"]))
+            # category can be an empty list (e.g. dragonfly-reverb declares none) —
+            # don't assume [0] exists, or the whole overview refresh aborts.
+            category = effect.category[0] if isinstance(effect.category, (list, tuple)) and effect.category else "Unknown"
+            plugins.append((effect.instance, effect.name, category, [bypass_status, "unassigned"]))
 
         self.view.refresh_plugin_display(pb_title=self.pedalboard.title, plugins=plugins,
                                          snapshot=[self.pedalboard.current_snapshot_idx, self.pedalboard.list_of_snapshots])

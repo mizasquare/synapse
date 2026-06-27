@@ -25,7 +25,9 @@ import json
 import math
 import os
 import random
+import re
 import time
+import unicodedata
 
 from PyQt6.QtCore import (QObject, QTimer, pyqtProperty as Property,
                           pyqtSignal as Signal, pyqtSlot as Slot)
@@ -44,6 +46,18 @@ BUCKET = {
 }
 
 PORTCOL = {'audio': '#3b6fe0', 'midi': '#e8694a', 'cv': '#b58af0'}
+
+
+def _symbolify(name):
+    """Fold a plugin label to a jack-safe instance symbol (mirrors mod-ui's
+    symbolify). Used to mint new instance names for live add."""
+    name = unicodedata.normalize('NFKD', name or '').encode('ascii', 'ignore').decode('ascii')
+    name = re.sub('[^_a-zA-Z0-9]+', '_', name).strip('_')
+    if not name:
+        name = 'fx'
+    if name[0].isdigit():
+        name = '_' + name
+    return name
 
 # SAVE AS naming — mirrors qtview's snapshot suggester: a guitarist stage term +
 # '-' + a random quirky suffix (e.g. "Drive-cupcake"). Same word pool file.
@@ -234,9 +248,21 @@ class EditorBridge(QObject):
 
     @Slot()
     def enterLive(self):
-        """Called when the app opens the EDIT screen: (re)seed the advanced graph
-        from the currently-loaded live pedalboard. No-op in the standalone mock."""
-        pb = getattr(self.presenter, 'pedalboard', None) if self.presenter else None
+        """Called when the app opens the EDIT screen: refresh from the LIVE host
+        graph, then (re)seed the advanced graph. Refreshing first means every
+        editor entry reflects the running JACK graph -- the editor's own edits
+        (already pushed to the host) AND anything changed via the web UI / HMI
+        while in the overview -- instead of a stale cached pedalboard. Without
+        this, re-entering after an add/connect would re-seed from the old cache
+        and the live (host-present) node would vanish from the canvas. No-op in
+        the standalone mock."""
+        if self.presenter is None:
+            return
+        try:
+            self.presenter.refresh_pedalboard()
+        except Exception as e:
+            print(f"[editor] refresh on enter failed: {e}")
+        pb = getattr(self.presenter, 'pedalboard', None)
         if pb is None:
             return
         self._seed_from_pedalboard(pb)
@@ -317,10 +343,70 @@ class EditorBridge(QObject):
         if gid is None:
             return None
         n = self._gnode(gid)
+        # ClaudeCanEdit is audio-only; MIDI/CV symbol typing is a later milestone.
+        return '%d:%s:audio:%d' % (gid, side, self._audio_idx(n, side, sym))
+
+    def _audio_idx(self, n, side, sym):
+        """0-based channel index of audio port ``sym`` on node ``n``. Prefer the
+        node's stored ordered symbol list (exact, symmetric with
+        _endpoint_from_port_key); fall back to the trailing-digit heuristic when
+        the symbols aren't known (e.g. a node added before symbol fetch)."""
+        syms = (n.get('aout') if side == 'out' else n.get('ain')) if n else None
+        if syms and sym in syms:
+            return syms.index(sym)
         p = self.by_uri.get(n['uri']) if n else None
         count = (p['ao'] if side == 'out' else p['ai']) if p else 1
-        # ClaudeCanEdit is audio-only; MIDI/CV symbol typing is a later milestone.
-        return '%d:%s:audio:%d' % (gid, side, self._audio_idx_from_symbol(sym, count))
+        return self._audio_idx_from_symbol(sym, count)
+
+    def _endpoint_from_port_key(self, key):
+        """Inverse of _port_key_from_endpoint: mock port key "nid:side:type:idx"
+        -> graph-namespace endpoint "/graph/<inst>/<symbol>" (or "/graph/capture_N"
+        / "/graph/playback_N" for the HW IN/OUT nodes). None if unresolvable or
+        non-audio (M5 wires audio only). Pairs with the stored ordered symbol
+        lists so seed and edit are perfectly symmetric."""
+        parts = key.split(':')
+        if len(parts) != 4 or parts[2] != 'audio':
+            return None
+        nid, side, _typ, idx_s = parts
+        idx = int(idx_s)
+        if nid == 'IN':
+            return '/graph/capture_%d' % (idx + 1)
+        if nid == 'OUT':
+            return '/graph/playback_%d' % (idx + 1)
+        n = self._gnode(int(nid)) if nid.lstrip('-').isdigit() else None
+        if not n or not n.get('inst'):
+            return None
+        syms = n.get('aout') if side == 'out' else n.get('ain')
+        if not syms or idx >= len(syms):
+            return None
+        return '/graph/%s/%s' % (n['inst'], syms[idx])
+
+    # ------------------------------------------------ live graph-edit helpers
+    def _backend(self):
+        """The MODEP backend (host seam) when embedded in the app; None in mock."""
+        return getattr(self.presenter, 'backend', None) if self.presenter else None
+
+    def _fetch_audio_syms(self, uri):
+        """Ordered (audio_in, audio_out) port symbols for a plugin uri, fetched
+        from the host's plugin definition (cached server-side). ([], []) on miss."""
+        be = self._backend()
+        info = be.effect_get_information(uri) if be else None
+        ap = (info or {}).get('ports', {}).get('audio', {})
+        return ([p['symbol'] for p in ap.get('input', [])],
+                [p['symbol'] for p in ap.get('output', [])])
+
+    def _mint_instance(self, uri):
+        """Pick a fresh bare instance name for a new live node. web_add adopts the
+        name we send, so it only needs to be a valid symbol unique among the
+        instances we know about (seeded + added this session)."""
+        p = self.by_uri.get(uri, {})
+        base = _symbolify(p.get('label') or p.get('name') or 'fx')
+        if base not in self._gid_by_inst:
+            return base
+        n = 1
+        while '%s_%d' % (base, n) in self._gid_by_inst:
+            n += 1
+        return '%s_%d' % (base, n)
 
     def _seed_from_pedalboard(self, pb):
         """Build the advanced graph (gnodes + gwires) from a live Pedalboard.
@@ -373,7 +459,10 @@ class EditorBridge(QObject):
             vals = {sym: port.value for sym, port in (e.ports or {}).items()}
             gnodes.append({'id': gid, 'uri': e.uri, 'inst': inst,
                            'x': sx(e.x), 'y': sy(e.y),
-                           'bypass': bool(e.bypassed), 'vals': vals})
+                           'bypass': bool(e.bypassed), 'vals': vals,
+                           # ordered audio port symbols — jack names for live wiring
+                           'ain': list(e.audio_inputs or []),
+                           'aout': list(e.audio_outputs or [])})
         self.gnodes = gnodes
         if missing:
             self.toast.emit('카탈로그 누락 %d개 생략: %s' % (len(missing), ', '.join(missing[:3])))
@@ -1250,14 +1339,22 @@ class EditorBridge(QObject):
     def addEffect(self, uri):
         if uri not in self.by_uri:
             return
-        self._push_hist()
         p = self.by_uri[uri]
         tx, ty = self._free_spot(self.mode, uri)
-        if self.mode == 'advanced':
+        if self.mode == 'advanced' and self._live_flag:
+            # Live: push to the host FIRST, only mirror the node on success — so a
+            # rejected add never leaves a phantom on the canvas (no rollback path).
+            node = self._live_add_node(uri, tx, ty)
+            if node is None:
+                return
+            self._touch()
+        elif self.mode == 'advanced':
+            self._push_hist()
             node = {'id': self._new_id(), 'uri': uri, 'x': tx, 'y': ty,
                     'bypass': False, 'vals': {c['sym']: c['def'] for c in p.get('ctl', []) if c['w'] != 'bypass'}}
             self.gnodes.append(node)
         else:
+            self._push_hist()
             node = self._add(uri, tx, ty)
         self.sel = node['id']
         self._fly_id = node['id']
@@ -1265,6 +1362,29 @@ class EditorBridge(QObject):
         self._rebuild()
         # fly in from off-screen (palette side) to the chosen slot
         self.spawnFly.emit(p['name'], bcol(p['bucket']), -NODEW - 16.0, ty, tx, ty)
+
+    def _live_add_node(self, uri, tx, ty):
+        """Mint an instance, add it on the host, and build the matching gnode
+        (with audio port symbols + gid↔inst mapping). None on backend failure."""
+        be = self._backend()
+        if not be:
+            self.toast.emit('백엔드 없음 — 추가 불가')
+            return None
+        inst = self._mint_instance(uri)
+        err = be.add_effect(inst, uri, tx, ty)
+        if err is not None:
+            self.toast.emit('추가 실패: %s' % err)
+            return None
+        gid = self._new_id()
+        ain, aout = self._fetch_audio_syms(uri)
+        p = self.by_uri[uri]
+        node = {'id': gid, 'uri': uri, 'inst': inst, 'x': tx, 'y': ty, 'bypass': False,
+                'ain': ain, 'aout': aout,
+                'vals': {c['sym']: c['def'] for c in p.get('ctl', []) if c['w'] != 'bypass'}}
+        self.gnodes.append(node)
+        self._gid_by_inst[inst] = gid
+        self._inst_by_gid[gid] = inst
+        return node
 
     @Slot()
     def clearFly(self):
@@ -1313,7 +1433,21 @@ class EditorBridge(QObject):
         if not n:
             return
         if over_trash:
-            self._push_hist()
+            if self._live_flag:
+                # Host-first: remove the instance (the host severs its cables too).
+                # Keep the node on canvas if the host rejects it.
+                inst = n.get('inst')
+                be = self._backend()
+                if be and inst:
+                    err = be.remove_effect(inst)
+                    if err is not None:
+                        self.toast.emit('삭제 실패: %s' % err)
+                        self._rebuild()
+                        return
+                    self._gid_by_inst.pop(inst, None)
+                    self._inst_by_gid.pop(nid, None)
+            else:
+                self._push_hist()
             sid = str(nid)
             self.gnodes = [m for m in self.gnodes if str(m['id']) != sid]
             self.gwires = [w for w in self.gwires
@@ -1321,6 +1455,7 @@ class EditorBridge(QObject):
             if self.sel == nid:
                 self.sel = -1
         else:
+            # Position is editor-local in live mode (cosmetic until M6 save).
             n['x'] = max(2, min(CANVAS_W - NODEW - 4, x))
             n['y'] = max(2, min(CANVAS_H - 58, y))
         self._touch()
@@ -1566,13 +1701,32 @@ class EditorBridge(QObject):
         else:
             pairs = list(zip(O, I))
         fid, tid, typ = str(out_sel['node']), str(in_sel['node']), src_sel['type']
-        self._push_hist()
+        be = self._backend() if self._live_flag else None
+        if not be:
+            self._push_hist()
         have = {(w['frm'], w['to']) for w in self.gwires}
+        added = False
         for o, i in pairs:
             frm = '%s:out:%s:%d' % (fid, typ, o)
             to = '%s:in:%s:%d' % (tid, typ, i)
-            if (frm, to) not in have:
-                self.gwires.append({'id': self._new_wid(), 'frm': frm, 'to': to})
+            if (frm, to) in have:
+                continue
+            if be:
+                # Host-first per cable: resolve port keys to graph endpoints and
+                # connect; only mirror the wire on success (M5 = audio only).
+                ep_f = self._endpoint_from_port_key(frm)
+                ep_t = self._endpoint_from_port_key(to)
+                if not ep_f or not ep_t:
+                    self.toast.emit('포트 해석 실패 (오디오만 지원)')
+                    continue
+                err = be.connect(ep_f, ep_t)
+                if err is not None:
+                    self.toast.emit('연결 실패: %s' % err)
+                    continue
+            self.gwires.append({'id': self._new_wid(), 'frm': frm, 'to': to})
+            added = True
+        if be and added:
+            self._touch()
 
     @Slot(str)
     def selectWire(self, wid):
@@ -1584,8 +1738,22 @@ class EditorBridge(QObject):
     def removeSelectedWire(self):
         if not self.gwire_sel:
             return
-        self._push_hist()
-        self.gwires = [w for w in self.gwires if w['id'] != self.gwire_sel]
+        w = next((x for x in self.gwires if x['id'] == self.gwire_sel), None)
+        if not w:
+            return
+        if self._live_flag:
+            be = self._backend()
+            ep_f = self._endpoint_from_port_key(w['frm'])
+            ep_t = self._endpoint_from_port_key(w['to'])
+            if be and ep_f and ep_t:
+                err = be.disconnect(ep_f, ep_t)
+                if err is not None:
+                    self.toast.emit('해제 실패: %s' % err)
+                    return
+            self._touch()
+        else:
+            self._push_hist()
+        self.gwires = [x for x in self.gwires if x['id'] != self.gwire_sel]
         self.gwire_sel = None
         self._rebuild()
 

@@ -167,6 +167,16 @@ class QtView(QObject):
 
     @Slot()
     def goOverview(self):
+        # Re-read the live host graph on entry so the overview always reflects the
+        # running JACK graph. A structural edit in the editor (or via the web UI /
+        # HMI) leaves the cached pedalboard stale otherwise — any screen that gets
+        # redrawn must resync from the host (M4a dump = single source of truth).
+        # Mirrors the editor's enterLive refresh.
+        if self.presenter:
+            try:
+                self.presenter.refresh_pedalboard()
+            except Exception as e:
+                print(f"[view] refresh on overview failed: {e}")
         self._screen = "overview"
         self.dataChanged.emit()
 
