@@ -399,12 +399,22 @@ class ModepController:
 
 	@staticmethod
 	def effect_list():
-		"""Every installed plugin's native info via mod-ui /effect/list
-		(get_all_plugins). Returns a list of dicts; [] on failure."""
+		"""Every installed plugin's FULL native info. mod-ui's /effect/list is a
+		reduced list (no ports), so enrich the URIs with one /effect/bulk POST.
+		Returns a uri->info dict (plugincatalog.normalize accepts it); [] on failure.
+		Generous timeout: this is a one-shot startup scan that may build the host's
+		plugin cache on first call."""
 		try:
-			r = ModepController._request("get", "effect/list")
-			if r is not None and r.status_code == 200:
-				return r.json()
+			r = ModepController._request("get", "effect/list", timeout=15)
+			if r is None or r.status_code != 200:
+				return []
+			plugins = r.json() or []
+			uris = [p["uri"] for p in plugins if isinstance(p, dict) and p.get("uri")]
+			if not uris:
+				return []
+			rb = ModepController._request("post", "effect/bulk", json=uris, timeout=30)
+			if rb is not None and rb.status_code == 200:
+				return rb.json()
 		except Exception as e:
 			logging.error(f"An error occurred: {e}")
 		return []

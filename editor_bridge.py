@@ -32,6 +32,7 @@ import re
 import unicodedata
 
 import configs
+import plugincatalog
 
 from PyQt6.QtCore import (QObject, QTimer, pyqtProperty as Property,
                           pyqtSignal as Signal, pyqtSlot as Slot)
@@ -146,11 +147,12 @@ class EditorBridge(QObject):
 
     def __init__(self, catalog_path=None):
         super().__init__()
+        # Bootstrap from the frozen dump; set_presenter() then swaps in the live
+        # host catalog (full installed plugins, un-truncated). Frozen stays as the
+        # offline fallback if the live fetch ever fails.
         path = catalog_path or os.path.join(BASE, 'resources', 'effects-catalog.json')
         with open(path, encoding='utf-8') as fh:
-            self.cat = json.load(fh)
-        self.by_uri = {p['uri']: p for p in self.cat['plugins']}
-        self.by_name = {p['name'].lower(): p['uri'] for p in self.cat['plugins']}
+            self._apply_catalog(json.load(fh))
 
         self._uid = 0
         self._wid = 0
@@ -256,8 +258,36 @@ class EditorBridge(QObject):
     # ===================================================== live wiring (app embed)
     def set_presenter(self, presenter):
         """Inject the app's Presenter. The live MODEP board (presenter.pedalboard)
-        becomes the source of truth; enterLive() seeds the advanced graph from it."""
+        becomes the source of truth; enterLive() seeds the advanced graph from it.
+        Also swaps the bootstrap catalog for the live host's full plugin set."""
         self.presenter = presenter
+        self._load_live_catalog()
+
+    def _apply_catalog(self, cat):
+        """Install a catalog ({count, buckets, plugins}) and rebuild the uri/name
+        indices plugins are looked up by."""
+        self.cat = cat
+        self.by_uri = {p['uri']: p for p in cat['plugins']}
+        self.by_name = {p['name'].lower(): p['uri'] for p in cat['plugins']}
+
+    def _load_live_catalog(self):
+        """Swap the bootstrap (frozen) catalog for the live host's full installed
+        plugin set: backend.effect_list() -> plugincatalog.normalize(). Held for the
+        session (plugin install is rare; M7-3 adds manual rescan + per-uri self-heal).
+        Keeps the frozen fallback if the host returns nothing or errors."""
+        be = self._backend()
+        if not be:
+            return
+        try:
+            native = be.effect_list()
+        except Exception as e:
+            print(f"[editor] live catalog fetch failed: {e}")
+            return
+        cat = plugincatalog.normalize(native or [])
+        if not cat['plugins']:
+            return                      # nothing usable -> keep the frozen fallback
+        self._apply_catalog(cat)
+        self._rebuild()                 # rail / browser / count reflect the live catalog
 
     @Slot()
     def enterLive(self):
