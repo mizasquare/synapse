@@ -64,6 +64,12 @@ class Backend:
         raise NotImplementedError
 
     # -- Effect / parameter ----------------------------------------------------
+    def effect_list(self):
+        """Return every installed plugin's native mod-ui info (list of dicts, the
+        ``get_all_plugins`` shape). Normalised by ``plugincatalog`` for the editor.
+        ``[]`` on failure."""
+        raise NotImplementedError
+
     def effect_get_information(self, uri):
         """Return plugin metadata for ``uri`` (mod-ui JSON dict)."""
         raise NotImplementedError

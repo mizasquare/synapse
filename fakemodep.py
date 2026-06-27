@@ -38,6 +38,7 @@ class FakeModepController(Backend):
         self._pb_order = []        # pedalboard bundle paths, in bank order
         self._pb_by_path = {}      # path -> whole fixture dict
         self._effects_by_uri = {}  # plugin uri -> effect_get_information dict
+        self._catalog = []         # installed plugins (native shape) for effect_list()
         self._load_fixtures()
 
         self._current_path = self._pb_order[0]
@@ -53,7 +54,10 @@ class FakeModepController(Backend):
             with open(fp, "rt", encoding="utf-8") as f:
                 data = json.load(f)
             if "current_pedalboard" not in data:
-                continue   # non-pedalboard JSON (e.g. installed-effects.json catalog dump)
+                # catalog dump (installed-effects.json): feed effect_list(), not a board
+                if "plugins" in data:
+                    self._catalog = data["plugins"]
+                continue
             path = data["current_pedalboard"]
             self._pb_by_path[path] = data
             self._pb_order.append(path)
@@ -129,6 +133,9 @@ class FakeModepController(Backend):
         self._seed_current()
 
     # -- Effect / parameter ----------------------------------------------------
+    def effect_list(self):
+        return self._catalog
+
     def effect_get_information(self, uri):
         return self._effects_by_uri.get(uri, {})
 

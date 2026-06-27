@@ -398,6 +398,18 @@ class ModepController:
 			return None
 
 	@staticmethod
+	def effect_list():
+		"""Every installed plugin's native info via mod-ui /effect/list
+		(get_all_plugins). Returns a list of dicts; [] on failure."""
+		try:
+			r = ModepController._request("get", "effect/list")
+			if r is not None and r.status_code == 200:
+				return r.json()
+		except Exception as e:
+			logging.error(f"An error occurred: {e}")
+		return []
+
+	@staticmethod
 	def effect_get_information(uri=""):
 		try:
 			r = ModepController._request("get", "effect/get?uri=" + quote(uri, safe=''))
