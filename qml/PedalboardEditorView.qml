@@ -1149,30 +1149,30 @@ Item {
             }
         }
 
-        // -------- NEW BOARD modal (live, M6d-1): quick / advanced --------
-        // ADVANCED loads the empty default bundle as a scratch board (SAVE forced
-        // to save-as). QUICK is deferred until live-quick lands (M6d-4).
+        // -------- NEW BOARD modal (live, M6d): quick / advanced --------
+        // Loads the empty default bundle as a scratch board (SAVE forced to
+        // save-as). The kind picks the initial editor mode for the empty board.
         Item {
             visible: win.newBoardOpen; anchors.fill: parent; z: 84
             MouseArea { anchors.fill: parent; onClicked: win.newBoardOpen = false }
             Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.6 }
             Rectangle {
-                width: 420; height: 196; radius: 10; anchors.centerIn: parent
+                width: 440; height: 196; radius: 10; anchors.centerIn: parent
                 color: cPanel; border.width: 1; border.color: cBlue
                 MouseArea { anchors.fill: parent }
                 Column {
                     anchors.fill: parent; anchors.margins: 16; spacing: 12
                     Text { text: "새 보드"; color: cText; font.family: uiFont; font.pixelSize: 18 }
                     Text { width: parent.width; wrapMode: Text.WordWrap
-                           text: "빈 보드에서 시작합니다. 저장 시 이름을 정해 새 보드로 저장돼요(기존 보드 안전)."
+                           text: "빈 보드에서 시작합니다. 저장 시 이름을 정해 새 보드로 저장돼요(기존 보드 안전). 퀵=직렬 빌드, 어드밴스드=자유 그래프."
                            color: cMuted; font.family: uiFont; font.pixelSize: 14 }
                     Row {
                         anchors.right: parent.right; spacing: 8
                         WideBtn { label: "취소"; accent: cBorder; onTap: win.newBoardOpen = false }
-                        WideBtn { label: "퀵 (곧)"; accent: cBorder; dim: true
-                                  onTap: { win.toastText = "라이브 퀵 보드는 곧 지원 (M6d-4)"; toastTimer.restart() } }
+                        WideBtn { label: "퀵"; accent: cGreen
+                                  onTap: { win.newBoardOpen = false; editor.requestNewLiveBoard("quick") } }
                         WideBtn { label: "어드밴스드"; accent: cOrange
-                                  onTap: { win.newBoardOpen = false; editor.requestNewLiveBoard() } }
+                                  onTap: { win.newBoardOpen = false; editor.requestNewLiveBoard("advanced") } }
                     }
                 }
             }

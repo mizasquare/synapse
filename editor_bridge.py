@@ -433,7 +433,7 @@ class EditorBridge(QObject):
             n += 1
         return '%s_%d' % (base, n)
 
-    def _seed_from_pedalboard(self, pb):
+    def _seed_from_pedalboard(self, pb, auto_quick=True):
         """Build the advanced graph (gnodes + gwires) from a live Pedalboard.
         Integer gnode ids (the feedback DFS does int()) are mapped to live instance
         strings so structural edits can later address the real MODEP graph."""
@@ -515,16 +515,19 @@ class EditorBridge(QObject):
         self.gwires = wires
 
         self._assert_single_ws()
-        # M6d-2: run the quick-representability classifier (gate OFF — telemetry
-        # only, routing stays ADVANCED until M6d-4). Surfaces whether this live
-        # board could open as a quick serial chain.
+        # M6d-4: mode follows shape — a quick-representable board auto-opens in
+        # QUICK (unless auto_quick is suppressed, e.g. the manual toggle to
+        # ADVANCED, which must not bounce straight back to quick). The advanced
+        # gnodes/gwires above are built regardless (cheap, shared seed work);
+        # _project_to_quick swaps the working set when it wins.
+        rep = False
         try:
             rep, _why = self._quick_representable(pb)
-            print('[editor] quick-representable: %s%s' % (rep, '' if rep else ' (%s)' % _why))
-            if rep:
-                self.toast.emit('이 보드는 QUICK 표현 가능')
         except Exception as e:
             print('[editor] quick-representable check failed: %s' % e)
+        if auto_quick and self._live_quick_enabled and rep:
+            self._project_to_quick()     # rebuilds + emits boardsChanged
+            return
         self._rebuild()
         self.boardsChanged.emit()
 
@@ -1411,37 +1414,49 @@ class EditorBridge(QObject):
     @Slot(str)
     def confirmedLiveBoardSwitch(self, bundle):
         """Dialog confirmed 'discard & switch' — routes to NEW BOARD when the
-        pending request was a NEW (the dialog is shared)."""
+        pending request was a NEW (the dialog is shared). _pending_new carries the
+        kind ('quick'/'advanced') or False."""
         if not self._live_flag:
             return
         if self._pending_new:
+            kind = self._pending_new if isinstance(self._pending_new, str) else 'advanced'
             self._pending_new = False
-            self._do_new_live_board()
+            self._do_new_live_board(kind)
         else:
             self._doLiveBoardSwitch(bundle)
 
-    @Slot()
-    def requestNewLiveBoard(self):
-        """NEW BOARD: start fresh on the empty default bundle. Goes through the
-        dirty-confirm (reusing confirmBoardSwitch) and BYPASSES requestLiveBoard
-        Switch's 'already current' no-op (default may already be current — NEW
-        must still reload it to clear the canvas)."""
+    @Slot(str)
+    def requestNewLiveBoard(self, kind='advanced'):
+        """NEW BOARD: start fresh on the empty default bundle in ``kind``
+        ('quick'/'advanced'). Goes through the dirty-confirm (reusing
+        confirmBoardSwitch) and BYPASSES requestLiveBoardSwitch's 'already current'
+        no-op (default may already be current — NEW must still reload it)."""
         if not self._live_flag:
             return
         if self._dirty:
-            self._pending_new = True
+            self._pending_new = kind or 'advanced'
             self.confirmBoardSwitch.emit(configs.DEFAULT_PEDALBOARD, '새 빈 보드')
         else:
-            self._do_new_live_board()
+            self._do_new_live_board(kind)
 
-    def _do_new_live_board(self):
-        """Load the empty default bundle as a SCRATCH board. On success mark it
-        scratch so the headline SAVE is forced to save-as (never overwrites the
-        shared default.pedalboard)."""
-        if self._doLiveBoardSwitch(configs.DEFAULT_PEDALBOARD):
-            self._scratch_default = True
-            self.boardsChanged.emit()    # boardSaved flipped -> SAVE becomes save-as
-            self.toast.emit('새 보드 — 빌드 후 SAVE로 이름 지어 저장')
+    def _do_new_live_board(self, kind='advanced'):
+        """Load the empty default bundle as a SCRATCH board (SAVE forced to
+        save-as). The default is empty + not representable, so it seeds ADVANCED;
+        if the user chose QUICK, force the empty quick canvas (no wires — adding
+        the first fx reconciles IN->fx->OUT)."""
+        if not self._doLiveBoardSwitch(configs.DEFAULT_PEDALBOARD):
+            return
+        self._scratch_default = True
+        if kind == 'quick':
+            self.mode = 'quick'
+            self.nodes = []
+            self.gnodes = []
+            self.gwires = []
+            self._lq_wires = set()
+            self._rebuild()
+        self.boardsChanged.emit()    # boardSaved flipped -> SAVE becomes save-as
+        self.toast.emit('새 %s 보드 — 빌드 후 SAVE로 이름 저장'
+                        % ('퀵' if kind == 'quick' else '어드밴스드'))
 
     def _doLiveBoardSwitch(self, bundle):
         """Perform the live switch through the presenter. On failure (host graph
@@ -1703,7 +1718,9 @@ class EditorBridge(QObject):
         else:
             pb = self._live_pb()
             if pb is not None:
-                self._seed_from_pedalboard(pb)       # quick -> advanced: rebuild from host
+                # auto_quick=False so the re-seed STAYS advanced (don't auto-route
+                # straight back to quick — this is an explicit transient override).
+                self._seed_from_pedalboard(pb, auto_quick=False)
                 self.modeFlash.emit('advanced')      # -> ADVANCED: "powerful"
 
     def _project_to_quick(self):
@@ -1745,8 +1762,7 @@ class EditorBridge(QObject):
         self._assert_single_ws()
         self._rebuild()
         self.boardsChanged.emit()
-        self.toast.emit('QUICK 모드')
-        return True
+        return True   # silent: auto-seed gives no feedback; the manual toggle flashes
 
     def _reconcile_live_quick(self):
         """Bring the host wiring to match the quick layout: diff desired
