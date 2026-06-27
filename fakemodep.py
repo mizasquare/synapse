@@ -52,6 +52,8 @@ class FakeModepController(Backend):
         for fp in paths:
             with open(fp, "rt", encoding="utf-8") as f:
                 data = json.load(f)
+            if "current_pedalboard" not in data:
+                continue   # non-pedalboard JSON (e.g. installed-effects.json catalog dump)
             path = data["current_pedalboard"]
             self._pb_by_path[path] = data
             self._pb_order.append(path)

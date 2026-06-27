@@ -1,11 +1,10 @@
 import QtQuick
 import QtQuick.Shapes
 
-// Pedalboard Editor body — shared between the standalone Window (PedalboardEditor.qml,
-// driven by qt_editor.py) and the live app's EDIT screen (embedded in qml/main.qml).
+// Pedalboard Editor body — the live app's EDIT screen (embedded in qml/main.qml).
 // QUICK (auto-routing) and ADVANCED (manual port-level routing) share one 734x446 canvas.
 // Visual tokens live here; data/logic in the `editor` context property. The host wires
-// `exitRequested` (standalone: quit; live: return to overview).
+// `exitRequested` (-> return to overview).
 Item {
     id: win
     anchors.fill: parent
@@ -27,22 +26,16 @@ Item {
     readonly property color cDim:    "#5a6270"
 
     property bool trashHot: false
-    property bool boardsOpen: false       // mock board manager (non-live)
     property bool liveBoardsOpen: false   // live host board switcher (M6a)
     property bool snapsOpen: false        // live snapshot manager (M6c)
     property bool snapNaming: false       // snapshot save-as naming panel (M6c)
     property bool newBoardOpen: false     // live NEW BOARD quick/advanced modal (M6d-1)
     property string pendingSwitchBundle: ""  // live switch awaiting dirty-discard confirm
     property string pendingSwitchTitle: ""
-    property string pendingNewKind: ""   // "quick"/"advanced" awaiting discard confirmation
     property string namingMode: ""       // ""=closed, "save"=first save, "saveas"=save copy
 
-    // New board: confirm first if the current board has unsaved edits (it gets discarded)
-    function requestNew(kind) {
-        if (editor.dirty) { win.pendingNewKind = kind }
-        else { editor.newBoard(kind); win.boardsOpen = false }
-    }
-    // Save: overwrite if the board already has a file; otherwise ask for a name first
+    // Save: overwrite in place, unless it's a scratch NEW board (the shared
+    // default) — then ask for a name first (save-as) so default is never clobbered
     function doSave() {
         if (editor.boardSaved) editor.saveBoard()
         else win.namingMode = "save"
@@ -91,8 +84,7 @@ Item {
                                 onClicked: editor.toggleLiveMode() }
                 }
                 Pill { label: "BOARD"; accent: cBlue
-                       onTap: { if (editor.live) { editor.refreshBoards(); win.liveBoardsOpen = true }
-                                else win.boardsOpen = true } }
+                       onTap: { editor.refreshBoards(); win.liveBoardsOpen = true } }
                 Text {
                     text: editor.boardName + (editor.dirty ? " *" : "")
                     color: editor.dirty ? cOrange : cText
@@ -769,90 +761,6 @@ Item {
             }
         }
 
-        // -------- BOARD manager (overlay) --------
-        Item {
-            visible: win.boardsOpen; anchors.fill: parent; z: 70
-            MouseArea { anchors.fill: parent; onClicked: win.boardsOpen = false }
-            Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.55 }
-            Rectangle {
-                id: boardPanel
-                width: 478; height: 408; radius: 10; anchors.centerIn: parent
-                color: cPanel; border.width: 1; border.color: cBorder
-                MouseArea { anchors.fill: parent }   // swallow clicks (don't close on panel tap)
-                // Save is meaningful only if there's something to save:
-                //  already-saved board -> when dirty (overwrite);  new board -> when it has nodes
-                property bool canSave: editor.boardSaved ? editor.dirty : !editor.empty
-                Column {
-                    anchors.fill: parent; anchors.margins: 14; spacing: 10
-                    Item {
-                        width: parent.width; height: 24
-                        Text { text: "보드"; color: cText; font.family: uiFont; font.pixelSize: 18
-                               anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: "✕"; color: cMuted; font.pixelSize: 18
-                               anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                               MouseArea { anchors.fill: parent; onClicked: win.boardsOpen = false } }
-                    }
-                    // current board (read-only) + dirty marker
-                    Rectangle {
-                        width: parent.width; height: 36; radius: 5; color: cElev; border.width: 1; border.color: cBorder
-                        Row {
-                            anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10; spacing: 8
-                            Text { text: "현재"; color: cDim; font.family: uiFont; font.pixelSize: 13
-                                   anchors.verticalCenter: parent.verticalCenter }
-                            Text { text: editor.boardName + (editor.dirty ? " *" : "")
-                                   color: editor.dirty ? cOrange : cText; font.family: uiFont; font.pixelSize: 16
-                                   anchors.verticalCenter: parent.verticalCenter
-                                   elide: Text.ElideRight; width: parent.width - 70 }
-                        }
-                    }
-                    // action buttons
-                    Flow {
-                        width: parent.width; spacing: 8
-                        WideBtn { label: "저장"; accent: cGreen; dim: !boardPanel.canSave
-                                  onTap: if (boardPanel.canSave) win.doSave() }
-                        WideBtn { label: "다른 이름으로"; accent: cGreen; dim: editor.empty
-                                  onTap: if (!editor.empty) win.namingMode = "saveas" }
-                        WideBtn { label: "+ QUICK"; accent: cBlue; onTap: win.requestNew("quick") }
-                        WideBtn { label: "+ ADVANCED"; accent: cOrange; onTap: win.requestNew("advanced") }
-                    }
-                    Text { text: "저장된 보드 (" + editor.boardList.length + ")"; color: cDim
-                           font.family: uiFont; font.pixelSize: 13 }
-                    // saved-board list
-                    Flickable {
-                        width: parent.width; height: 196; contentHeight: listCol.height; clip: true
-                        Column {
-                            id: listCol; width: parent.width; spacing: 6
-                            Repeater {
-                                model: editor.boardList
-                                Rectangle {
-                                    width: listCol.width; height: 44; radius: 5
-                                    color: modelData.current ? cElev : "#161b26"
-                                    border.width: 1; border.color: modelData.current ? cBlue : cBorder
-                                    Row {
-                                        anchors.fill: parent; anchors.margins: 8; spacing: 8
-                                        Column {
-                                            width: parent.width - 96; anchors.verticalCenter: parent.verticalCenter
-                                            Text { text: modelData.name; color: cText; font.family: uiFont; font.pixelSize: 15
-                                                   elide: Text.ElideRight; width: parent.width }
-                                            Text { text: modelData.sub; color: cMuted; font.family: uiFont; font.pixelSize: 12
-                                                   elide: Text.ElideRight; width: parent.width }
-                                        }
-                                        Pill { label: "열기"; accent: cBlue
-                                               onTap: { editor.loadBoard(modelData.path); win.boardsOpen = false } }
-                                        Text { text: "✕"; color: cMuted; font.pixelSize: 16; anchors.verticalCenter: parent.verticalCenter
-                                               MouseArea { anchors.fill: parent; onClicked: editor.deleteBoard(modelData.path) } }
-                                    }
-                                }
-                            }
-                            Text { visible: editor.boardList.length === 0
-                                   text: "저장된 보드 없음 — '저장'으로 첫 보드를 만드세요"; color: cDim
-                                   font.family: uiFont; font.pixelSize: 14; topPadding: 18 }
-                        }
-                    }
-                }
-            }
-        }
-
         // -------- naming panel (first save / save-as) with the term suggester --------
         Item {
             visible: win.namingMode !== ""; anchors.fill: parent; z: 80
@@ -877,7 +785,7 @@ Item {
                             id: nameField; anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
                             verticalAlignment: TextInput.AlignVCenter; clip: true; selectByMouse: true
                             color: cText; font.family: uiFont; font.pixelSize: 16
-                            onAccepted: if (text.trim().length) { editor.saveBoardNamed(text); win.namingMode = ""; win.boardsOpen = false; win.liveBoardsOpen = false }
+                            onAccepted: if (text.trim().length) { editor.saveBoardNamed(text); win.namingMode = ""; win.liveBoardsOpen = false }
                         }
                         Text { visible: nameField.text === ""; anchors.fill: parent; anchors.leftMargin: 8
                                verticalAlignment: Text.AlignVCenter; text: "이름 입력 또는 아래 용어로 추천"
@@ -902,35 +810,7 @@ Item {
                         anchors.right: parent.right; spacing: 8
                         WideBtn { label: "취소"; accent: cBorder; onTap: win.namingMode = "" }
                         WideBtn { label: "저장"; accent: cGreen; dim: nameField.text.trim().length === 0
-                                  onTap: if (nameField.text.trim().length) { editor.saveBoardNamed(nameField.text); win.namingMode = ""; win.boardsOpen = false; win.liveBoardsOpen = false } }
-                    }
-                }
-            }
-        }
-
-        // -------- discard-confirm dialog (new board with unsaved edits) --------
-        Item {
-            visible: win.pendingNewKind !== ""; anchors.fill: parent; z: 81
-            MouseArea { anchors.fill: parent; onClicked: win.pendingNewKind = "" }
-            Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.6 }
-            Rectangle {
-                width: 388; height: 160; radius: 10; anchors.centerIn: parent
-                color: cPanel; border.width: 1; border.color: cOrange
-                MouseArea { anchors.fill: parent }
-                Column {
-                    anchors.fill: parent; anchors.margins: 16; spacing: 12
-                    Text { text: "현재 보드를 버릴까요?"; color: cText; font.family: uiFont; font.pixelSize: 18 }
-                    Text {
-                        width: parent.width; wrapMode: Text.WordWrap
-                        text: "저장하지 않은 변경(" + editor.boardName + ")이 사라지고 새 "
-                              + (win.pendingNewKind === "advanced" ? "ADVANCED" : "QUICK") + " 보드를 만듭니다."
-                        color: cMuted; font.family: uiFont; font.pixelSize: 14
-                    }
-                    Row {
-                        anchors.right: parent.right; spacing: 8
-                        WideBtn { label: "취소"; accent: cBorder; onTap: win.pendingNewKind = "" }
-                        WideBtn { label: "버리고 새로"; accent: cOrange
-                                  onTap: { editor.newBoard(win.pendingNewKind); win.pendingNewKind = ""; win.boardsOpen = false } }
+                                  onTap: if (nameField.text.trim().length) { editor.saveBoardNamed(nameField.text); win.namingMode = ""; win.liveBoardsOpen = false } }
                     }
                 }
             }

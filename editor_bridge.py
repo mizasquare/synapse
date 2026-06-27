@@ -1,4 +1,4 @@
-"""Pedalboard Editor mock — Python brain exposed to QML as ``editor``.
+"""Pedalboard Editor — Python brain exposed to QML as ``editor``.
 
 A PyQt6 port of the Claude Design "Pedalboard Editor" mock. Two modes share one canvas:
 
@@ -19,7 +19,9 @@ History: structural edits push an undo snapshot (cap 30); undo/redo restore it. 
 Mirrors the repo's qtview.py pattern: one QObject, data + flags as notified properties, QML
 owns the visual tokens. Routing math is a faithful port of the design's pb_logic.
 
-Not wired to MODEP — a UX prototype fed by resources/effects-catalog.json.
+Wired to live MODEP through the Presenter seam (source of truth = presenter.pedalboard);
+the plugin catalog is currently fed by resources/effects-catalog.json (M7 swaps this for
+the live host catalog).
 """
 
 import json
@@ -27,7 +29,6 @@ import math
 import os
 import random
 import re
-import time
 import unicodedata
 
 import configs
@@ -36,7 +37,6 @@ from PyQt6.QtCore import (QObject, QTimer, pyqtProperty as Property,
                           pyqtSignal as Signal, pyqtSlot as Slot)
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-MOCK_DIR = os.path.join(BASE, 'mock-pedalboards')   # mock persistence (UX prototype, not real MODEP)
 
 # bucket -> (color, 3-letter abbreviation) — verbatim from the design's BUCKET map
 BUCKET = {
@@ -168,9 +168,7 @@ class EditorBridge(QObject):
         self._undo = []
         self._redo = []
         self.board_name = 'Untitled'
-        self.board_path = None        # file this board was saved to/loaded from
         self._dirty = False
-        self._boards = []             # cached saved-board (mock .json) list
         self._live_boards = []        # cached live host board list [{bundle,title,current}]
         self._scratch_default = False # NEW BOARD loaded the shared default -> SAVE must save-as
         self._pending_new = False     # a NEW request is awaiting the dirty-confirm dialog
@@ -182,13 +180,6 @@ class EditorBridge(QObject):
         self._live_flag = False       # True once seeded from a live MODEP board (Property: live)
         self._gid_by_inst = {}        # live instance string -> integer gnode id
         self._inst_by_gid = {}        # integer gnode id -> live instance string
-
-        # seed a small serial chain so the canvas isn't empty on first run
-        for nm in ('bluesbreaker', 'GxCompressor', 'Bollie Delay', 'Dragonfly Hall Reverb'):
-            uri = self.by_name.get(nm.lower())
-            if uri:
-                self._add(uri)
-        self._relayout_quick()
 
         # view caches
         self._rail = []
@@ -209,7 +200,6 @@ class EditorBridge(QObject):
         self._rad_items = []
         self._g_pos = {}
         self._rebuild()
-        self._refresh_boards()
 
     # ---------------------------------------------------------------- helpers
     def _new_id(self):
@@ -440,7 +430,6 @@ class EditorBridge(QObject):
         self._live_flag = True
         self.mode = 'advanced'
         self.board_name = pb.title or 'Untitled'
-        self.board_path = None
         self._dirty = False
         # Scratch = the loaded board IS the shared default, regardless of HOW it
         # became current (NEW BOARD, footswitch, or just open at startup). This is
@@ -1340,17 +1329,10 @@ class EditorBridge(QObject):
 
     @Property(bool, notify=boardsChanged)
     def boardSaved(self):
-        # Live: a current host bundle always exists, so SAVE is an in-place
-        # overwrite — EXCEPT a freshly NEW'd scratch board (the shared default),
-        # where SAVE must open the naming panel (save-as) so we never overwrite
-        # default.pedalboard. Mock: needs a file.
-        if self._live_flag:
-            return not self._scratch_default
-        return self.board_path is not None
-
-    @Property('QVariantList', notify=boardsChanged)
-    def boardList(self):
-        return self._boards
+        # A current host bundle always exists, so SAVE is an in-place overwrite —
+        # EXCEPT a freshly NEW'd scratch board (the shared default), where SAVE must
+        # open the naming panel (save-as) so we never overwrite default.pedalboard.
+        return not self._scratch_default
 
     # ----------------------------------------------- live board switch (M6a)
     @staticmethod
@@ -1481,8 +1463,8 @@ class EditorBridge(QObject):
 
     @Slot(str, result=str)
     def suggestName(self, term):
-        """A stage term + random quirky suffix, avoiding existing board names."""
-        existing = {b['name'] for b in self._boards} | {self.board_name}
+        """A stage term + random quirky suffix, avoiding the current board name."""
+        existing = {self.board_name}
         words = _load_words()
         for _ in range(12):
             name = '%s-%s' % (term, random.choice(words))
@@ -2241,184 +2223,52 @@ class EditorBridge(QObject):
             self._dirty = True
             self.boardsChanged.emit()
 
-    def _serialize(self):
-        return {
-            'name': self.board_name, 'mode': self.mode, 'in_mode': self.in_mode,
-            'out_adapt': self.out_adapt, 'uid': self._uid, 'wid': self._wid,
-            'nodes': [dict(n, vals=dict(n['vals'])) for n in self.nodes],
-            'gnodes': [dict(n, vals=dict(n['vals'])) for n in self.gnodes],
-            'gwires': [dict(w) for w in self.gwires],
-        }
-
-    def _load_state(self, data):
-        self.board_name = data.get('name', 'Untitled')
-        self.mode = data.get('mode', 'quick')
-        self.in_mode = data.get('in_mode', 'mono')
-        self.out_adapt = data.get('out_adapt', 'auto')
-        self.nodes = [dict(n, vals=dict(n.get('vals', {}))) for n in data.get('nodes', [])]
-        self.gnodes = [dict(n, vals=dict(n.get('vals', {}))) for n in data.get('gnodes', [])]
-        self.gwires = [dict(w) for w in data.get('gwires', [])]
-        # keep id counters ahead of anything loaded
-        ids = [n['id'] for n in self.nodes] + [n['id'] for n in self.gnodes]
-        self._uid = max([data.get('uid', 0)] + ids + [0])
-        wids = [int(w['id'][1:]) for w in self.gwires if str(w['id']).startswith('w') and w['id'][1:].isdigit()]
-        self._wid = max([data.get('wid', 0)] + wids + [0])
-        self.sel = -1
-        self.gwire_sel = None
-        self.conn = None
-        self._fly_id = -1
-        self._undo = []
-        self._redo = []
-
-    def _safe_name(self, name):
-        keep = ''.join(c if (c.isalnum() or c in ' -_().가-힣') else '_' for c in name).strip()
-        return keep or 'Untitled'
-
-    def _refresh_boards(self):
-        out = []
-        try:
-            names = sorted(os.listdir(MOCK_DIR))
-        except OSError:
-            names = []
-        for fn in names:
-            if not fn.endswith('.json'):
-                continue
-            path = os.path.join(MOCK_DIR, fn)
-            try:
-                with open(path, encoding='utf-8') as fh:
-                    d = json.load(fh)
-                nm = d.get('name', fn[:-5])
-                nodes = len(d.get('nodes', [])) if d.get('mode', 'quick') == 'quick' else len(d.get('gnodes', []))
-                sub = '%s · %s · %d개' % (d.get('mode', 'quick').upper(),
-                                          time.strftime('%m-%d %H:%M', time.localtime(os.path.getmtime(path))), nodes)
-            except (OSError, ValueError):
-                nm, sub = fn[:-5], '(손상)'
-            out.append({'name': nm, 'path': path, 'sub': sub, 'current': path == self.board_path})
-        self._boards = out
-        self.boardsChanged.emit()
-
-    @Slot(str)
-    def newBoard(self, kind):
-        if self._live_flag:
-            return   # mock board-lifecycle has no live meaning (defense-in-depth)
-        self.mode = 'advanced' if kind == 'advanced' else 'quick'
-        self.in_mode = 'mono'
-        self.out_adapt = 'auto'
-        self.nodes = []
-        self.gnodes = []
-        self.gwires = []
-        self.sel = -1
-        self.gwire_sel = None
-        self.conn = None
-        self._fly_id = -1
-        self._undo = []
-        self._redo = []
-        self.board_name = 'Untitled'
-        self.board_path = None
-        self._dirty = False
-        self._rebuild()
-        self.boardsChanged.emit()
-        self.toast.emit('새 %s 보드' % ('ADVANCED' if kind == 'advanced' else 'QUICK'))
-
-    def _write(self, path):
-        os.makedirs(MOCK_DIR, exist_ok=True)
-        with open(path, 'w', encoding='utf-8') as fh:
-            json.dump(self._serialize(), fh, ensure_ascii=False, indent=2)
-        self.board_path = path
-        self._dirty = False
-        self._refresh_boards()
-        self.boardsChanged.emit()
-
     @Slot()
     def saveBoard(self):
-        """Overwrite the current board in place. Live: re-capture the CURRENT
-        snapshot AND persist the board to its .ttl bundle in one shot via
-        presenter.save_snapshot (snapshot_make + save_pb_also=True). Capturing the
-        snapshot is essential — board-only save leaves param/bypass/NAM edits out
-        of the snapshot, so a snapshot round-trip would revert them. Inherits the
-        app+host 3-layer corruption defense (the save_pb path). Mock: write .json."""
-        if self._live_flag:
-            if self._scratch_default:
-                # defense-in-depth: never in-place save over the shared default —
-                # QML routes here via doSave() which opens the naming panel; guard
-                # the direct path too.
-                self.toast.emit('새 보드 — 다른 이름으로 저장하세요')
-                return
-            ok = self.presenter.save_snapshot() if self.presenter else False
-            if ok:
-                self._dirty = False
-                # adopt any host-side title change (factory board -> save-new)
-                pb = getattr(self.presenter, 'pedalboard', None)
-                if pb is not None and pb.title:
-                    self.board_name = pb.title
-                self.refreshBoards()
-                self.snapsChanged.emit()
-                self.boardsChanged.emit()
-                self.toast.emit('저장됨 · %s' % self.board_name)
-            else:
-                self.toast.emit('저장 실패')
+        """Overwrite the current board in place: re-capture the CURRENT snapshot AND
+        persist the board to its .ttl bundle in one shot via presenter.save_snapshot
+        (snapshot_make + save_pb_also=True). Capturing the snapshot is essential —
+        board-only save leaves param/bypass/NAM edits out of the snapshot, so a
+        snapshot round-trip would revert them. Inherits the app+host 3-layer
+        corruption defense (the save_pb path)."""
+        if not self._live_flag:
             return
-        if self.board_path:
-            self._write(self.board_path)
+        if self._scratch_default:
+            # defense-in-depth: never in-place save over the shared default — QML
+            # routes here via doSave() which opens the naming panel; guard the
+            # direct path too.
+            self.toast.emit('새 보드 — 다른 이름으로 저장하세요')
+            return
+        ok = self.presenter.save_snapshot() if self.presenter else False
+        if ok:
+            self._dirty = False
+            # adopt any host-side title change (factory board -> save-new)
+            pb = getattr(self.presenter, 'pedalboard', None)
+            if pb is not None and pb.title:
+                self.board_name = pb.title
+            self.refreshBoards()
+            self.snapsChanged.emit()
+            self.boardsChanged.emit()
             self.toast.emit('저장됨 · %s' % self.board_name)
-        # unnamed boards are saved via saveBoardNamed() (QML opens the naming panel)
+        else:
+            self.toast.emit('저장 실패')
 
     @Slot(str)
     def saveBoardNamed(self, name):
-        """Save current state under a name. Live: SAVE AS = a NEW host bundle
-        (asNew=1, corruption-immune — dir derived from title) that becomes the
-        current board; adopt its title. Mock: write a uniquely-suffixed .json."""
-        if self._live_flag:
-            res = self.presenter.save_board_as(name) if self.presenter else None
-            if res:
-                self.board_name = res.get('title') or name
-                self._dirty = False
-                self._scratch_default = False   # now a real named bundle, not scratch
-                self.refreshBoards()         # the new bundle is now current
-                self.boardsChanged.emit()
-                self.toast.emit('새 보드로 저장됨 · %s' % self.board_name)
-            else:
-                self.toast.emit('저장 실패')
+        """SAVE AS = a NEW host bundle (asNew=1, corruption-immune — dir derived
+        from title) that becomes the current board; adopt its title."""
+        if not self._live_flag:
             return
-        base = self._safe_name(name)
-        final, i = base, 2
-        os.makedirs(MOCK_DIR, exist_ok=True)
-        while os.path.exists(os.path.join(MOCK_DIR, final + '.json')):
-            final = '%s %d' % (base, i)
-            i += 1
-        self.board_name = final
-        self._write(os.path.join(MOCK_DIR, final + '.json'))
-        self.toast.emit('저장 · %s' % final)
-
-    @Slot(str)
-    def loadBoard(self, path):
-        if self._live_flag:
-            return   # live switching goes through requestLiveBoardSwitch, never the mock .json namespace
-        try:
-            with open(path, encoding='utf-8') as fh:
-                data = json.load(fh)
-        except (OSError, ValueError):
-            self.toast.emit('불러오기 실패')
-            return
-        self._load_state(data)
-        self.board_path = path
-        self._dirty = False
-        self._rebuild()
-        self._refresh_boards()
-        self.toast.emit('불러옴 · %s' % self.board_name)
-
-    @Slot(str)
-    def deleteBoard(self, path):
-        if self._live_flag:
-            return   # never let a mock-manager delete reach the live host bundle dirs
-        try:
-            os.remove(path)
-        except OSError:
-            return
-        if path == self.board_path:
-            self.board_path = None
-        self._refresh_boards()
-        self.toast.emit('삭제됨')
+        res = self.presenter.save_board_as(name) if self.presenter else None
+        if res:
+            self.board_name = res.get('title') or name
+            self._dirty = False
+            self._scratch_default = False   # now a real named bundle, not scratch
+            self.refreshBoards()         # the new bundle is now current
+            self.boardsChanged.emit()
+            self.toast.emit('새 보드로 저장됨 · %s' % self.board_name)
+        else:
+            self.toast.emit('저장 실패')
 
     # ------------------------------------------------------------- demo (dev)
     @Slot()

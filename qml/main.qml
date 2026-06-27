@@ -535,9 +535,8 @@ Window {
     }
 
     // ====================================================== PEDALBOARD EDIT
-    // The pedalboard editor, embedded from PedalboardEditorView.qml (same body the
-    // standalone qt_editor.py window uses). Loaded by file URL (own context, like the
-    // standalone window) and only while in EDIT — so it is created fresh on each entry
+    // The pedalboard editor, embedded from PedalboardEditorView.qml. Loaded by file URL
+    // (its own context) and only while in EDIT — so it is created fresh on each entry
     // (re-seeding from the live board) and adds no idle cost elsewhere. Its own header
     // hosts the "나가기" affordance (exitRequested -> back to overview).
     Loader {
