@@ -17,7 +17,7 @@ Visual tokens (colors/fonts) live in QML; this bridge passes data + flags only.
 import os
 import random
 
-from PyQt6.QtCore import QObject, pyqtProperty as Property, pyqtSignal as Signal, pyqtSlot as Slot
+from PyQt6.QtCore import QObject, QTimer, pyqtProperty as Property, pyqtSignal as Signal, pyqtSlot as Slot
 
 # SAVE AS naming (tap a stage term -> "term-quirkysuffix", e.g. "Drive-cupcake").
 # The stage terms are the names you actually want (song section / tone); the random
@@ -73,6 +73,8 @@ class QtView(QObject):
     monitorUpdated = Signal(str, float, float, str)  # (symbol, norm, value, display): per-meter live update
     toastRequested = Signal(str)                     # transient on-screen message
 
+    PARAM_THROTTLE_MS = 40   # max ~25 host writes/s during a knob drag
+
     def __init__(self):
         super().__init__()
         self.presenter = None
@@ -87,6 +89,16 @@ class QtView(QObject):
         self._screen = "overview"   # "booting" | "overview" | "focus" | "taptempo" | "edit"
         self._focus = {}            # FOCUS payload for QML
         self._tap = {}              # TAP TEMPO payload for QML ({bpb, klass})
+
+        # Parameter-write throttle: a knob drag fires setParameter on every
+        # positionChanged (~60/s), each a blocking HTTP POST on the GUI thread.
+        # Coalesce per (instance,symbol) to the latest value and flush at most
+        # every PARAM_THROTTLE_MS — leading edge (first move is immediate) +
+        # trailing (the release value always lands). Shared by FOCUS + editor.
+        self._pending_params = {}   # (instance, symbol) -> latest value
+        self._param_timer = QTimer(self)
+        self._param_timer.setInterval(self.PARAM_THROTTLE_MS)
+        self._param_timer.timeout.connect(self._flush_params)
 
     def set_presenter(self, presenter):
         self.presenter = presenter
@@ -155,6 +167,16 @@ class QtView(QObject):
 
     @Slot()
     def goOverview(self):
+        # Re-read the live host graph on entry so the overview always reflects the
+        # running JACK graph. A structural edit in the editor (or via the web UI /
+        # HMI) leaves the cached pedalboard stale otherwise — any screen that gets
+        # redrawn must resync from the host (M4a dump = single source of truth).
+        # Mirrors the editor's enterLive refresh.
+        if self.presenter:
+            try:
+                self.presenter.refresh_pedalboard()
+            except Exception as e:
+                print(f"[view] refresh on overview failed: {e}")
         self._screen = "overview"
         self.dataChanged.emit()
 
@@ -202,8 +224,24 @@ class QtView(QObject):
 
     @Slot(str, str, float)
     def setParameter(self, instance, symbol, value):
-        """Knob drag -> presenter applies it (fake backend = local state)."""
-        if self.presenter:
+        """Knob drag -> presenter applies it (coalesced/throttled — see _flush_params).
+        Keeps only the latest value per (instance,symbol); sends the first move
+        immediately, then at most every PARAM_THROTTLE_MS, and the final value on
+        release (trailing flush)."""
+        self._pending_params[(instance, symbol)] = value
+        if not self._param_timer.isActive():
+            self._param_timer.start()
+            self._flush_params()      # leading edge: first move is immediate
+
+    def _flush_params(self):
+        if not self._pending_params:
+            self._param_timer.stop()  # idle -> stop ticking until the next drag
+            return
+        pending = self._pending_params
+        self._pending_params = {}
+        if not self.presenter:
+            return
+        for (instance, symbol), value in pending.items():
             self.presenter.parameter_changed(instance, symbol, value)
 
     @Slot(str, bool)
@@ -215,6 +253,22 @@ class QtView(QObject):
             self._focus["bypassed"] = bool(on)
         if self.presenter:
             self.presenter.parameter_changed(instance, ":bypass", on)
+
+    @Slot(str, str, result="QVariantList")
+    def listPatchFiles(self, instance, uri):
+        """Picker UI -> list selectable patch files for this URI ([{label,path}]).
+        Discrete (not drag) so no throttle. Delegates to the presenter scan."""
+        if not self.presenter:
+            return []
+        return self.presenter.list_patch_files(instance, uri)
+
+    @Slot(str, str, str)
+    def setPatch(self, instance, uri, path):
+        """Picker chose a file -> load it on the host (NAM model / IR / cabsim).
+        Routes through presenter.patch_changed, which writes via EffectPatch and
+        calls back update_patch_display on success."""
+        if self.presenter:
+            self.presenter.patch_changed(instance, uri, path)
 
     @Slot()
     def focusPrev(self):
@@ -310,7 +364,18 @@ class QtView(QObject):
                 break
 
     def update_patch_display(self, instance, uri, file_path):
-        pass  # IR/NAM file picker -- deferred (phase-1 비목표)
+        # A patch file was loaded (by us via setPatch, or externally via the
+        # reverse channel). Patches aren't drag-owned (discrete pick), so unlike
+        # knobs a full focus rebind is safe: mutate the cached value in place and
+        # emit dataChanged. NO host re-fetch (we already know the new file).
+        if not self._focus or self._focus.get("instance") != instance:
+            return
+        base = os.path.basename(file_path) if file_path else ""
+        for pt in self._focus.get("patches", []):
+            if pt.get("uri") == uri:
+                pt["value"] = base
+                break
+        self.dataChanged.emit()
 
     def update_bpm_display(self, bpm):
         self._bpm = ("%g" % bpm) if isinstance(bpm, (int, float)) else str(bpm)
@@ -425,7 +490,8 @@ class QtView(QObject):
         cat = d.get("effect_category")
         cat = cat[0] if isinstance(cat, (list, tuple)) and cat else (cat or "")
         ins, outs = self._routing_for(inst)
-        patches = [{"label": pt.get("patch_label", ""), "value": self._patch_str(pt.get("patch_value"))}
+        patches = [{"label": pt.get("patch_label", ""), "value": self._patch_str(pt.get("patch_value")),
+                    "uri": pt.get("patch_uri", "")}
                    for pt in d.get("patches", [])]
         return {"instance": inst, "name": d.get("effect_name", inst), "category": cat,
                 "bypassed": bool(d.get("effect_bypassed")), "knobs": knobs, "monitors": monitors,

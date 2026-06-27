@@ -93,12 +93,43 @@ class ModepController:
 			return {}
 
 	@staticmethod
+	def get_all_pedalboard_entries():
+		"""All pedalboards as ``[{'bundle','title'}]`` in a single GET — the
+		pedalboard/list handler already includes titles, so this avoids a
+		per-board get_pedalboard_info fan-out. For the editor's live board
+		switcher (M6a). Empty list on host error."""
+		try:
+			r = ModepController._request("get", "pedalboard/list")
+			if r is not None:
+				return [{"bundle": i["bundle"], "title": i.get("title", "")}
+						for i in r.json()]
+		except Exception as e:
+			logging.error(f"Error fetching pedalboard entries: {e}")
+		return []
+
+	@staticmethod
 	def set_pedalboard(board):
+		"""Load bundle ``board``: GET /reset wipes the live JACK graph, then POST
+		load_bundle rebuilds it. Returns ``True`` only if the host's current
+		pedalboard is ``board`` afterward, else ``False``.
+
+		The boolean is load-bearing for the editor's switch path: /reset destroys
+		the live graph *before* load_bundle, so a load_bundle failure leaves an
+		EMPTY host graph. A caller that destroys+reseeds (editor_switch_pedalboard)
+		must bail on ``False`` rather than paint a blank/stale canvas over the
+		wiped graph and falsely report success. Footswitch callers ignore the
+		return — behavior unchanged."""
 		try:
 			ModepController._request("get", "reset")
 			ModepController._request("post", "pedalboard/load_bundle/?bundlepath=" + quote(board, safe=''))
 		except Exception as e:
 			logging.error(f"Failed to set pedalboard: {e}")
+			return False
+		# Authoritative check: the host's current bundle must now be `board`
+		# (normalized) — this catches a reset-done / load_bundle-failed window that
+		# _request swallows (it returns None, not an exception, on HTTP failure).
+		cur = ModepController.get_current_pedalboard()
+		return bool(cur) and cur.rstrip("/") == board.rstrip("/")
 
 	@staticmethod
 	def get_last_pedalboard():
@@ -341,6 +372,54 @@ class ModepController:
 			return False
 
 	@staticmethod
+	def save_pedalboard_as(title):
+		"""Save the current live graph as a NEW pedalboard bundle named after
+		``title`` (asNew=1). The host mints a fresh dir = symbolify(title)[:16]
+		(with a '-NNNN' suffix on collision) and switches the current board to it.
+
+		This is structurally corruption-IMMUNE: the new dir is created FROM the
+		title, so dir==ttl==manifest holds by construction -- hence (unlike the
+		in-place save) there is intentionally NO dir==sym guard here. Returns
+		``{'bundlepath', 'title'}`` (the host's new bundle) on success, else None.
+		Form-encoded POST (data=), same as the in-place save."""
+		try:
+			r = ModepController._request("post", "pedalboard/save",
+										 data={'title': title, 'asNew': 1})
+			if r is None or r.status_code != 200:
+				if r is not None:
+					logging.error("Failed to save-as pedalboard. %s", r.text)
+				return None
+			j = r.json()
+			if not j.get('ok'):
+				return None
+			return {'bundlepath': j.get('bundlepath'), 'title': j.get('title') or title}
+		except Exception as e:
+			logging.error("Failed to save pedalboard as %r: %s", title, e)
+			return None
+
+	@staticmethod
+	def effect_list():
+		"""Every installed plugin's FULL native info. mod-ui's /effect/list is a
+		reduced list (no ports), so enrich the URIs with one /effect/bulk POST.
+		Returns a uri->info dict (plugincatalog.normalize accepts it); [] on failure.
+		Generous timeout: this is a one-shot startup scan that may build the host's
+		plugin cache on first call."""
+		try:
+			r = ModepController._request("get", "effect/list", timeout=15)
+			if r is None or r.status_code != 200:
+				return []
+			plugins = r.json() or []
+			uris = [p["uri"] for p in plugins if isinstance(p, dict) and p.get("uri")]
+			if not uris:
+				return []
+			rb = ModepController._request("post", "effect/bulk", json=uris, timeout=30)
+			if rb is not None and rb.status_code == 200:
+				return rb.json()
+		except Exception as e:
+			logging.error(f"An error occurred: {e}")
+		return []
+
+	@staticmethod
 	def effect_get_information(uri=""):
 		try:
 			r = ModepController._request("get", "effect/get?uri=" + quote(uri, safe=''))
@@ -430,6 +509,85 @@ class ModepController:
 				print("Failed to retrieve patch.", r.text)
 		except Exception as e:
 			print(f"An error occurred: {e}")
+
+	@staticmethod
+	def dump_graph():
+		"""Return the LIVE in-memory graph (plugins + connections) from the mod
+		host as a pedalboard/info-compatible dict, or ``None`` on host failure.
+		Lets ``model.initialize_modep_pedalboard`` build from the running JACK
+		graph instead of the stale on-disk .ttl (custom fork endpoint; see
+		host.syn_dump_graph / webserver GraphDumpSYN)."""
+		try:
+			r = ModepController._request("get", "syn_dump_graph")
+			if r is not None and r.status_code == 200:
+				return r.json()
+		except Exception as e:
+			logging.error(f"Error dumping live graph: {e}")
+		return None
+
+	# ── Graph mutation (M4b) ──────────────────────────────────────────────
+	# Thin pass-through wrappers over the existing mod-ui graph endpoints (the
+	# same ones the web UI's desktop.js drives). Port/instance arguments are in
+	# the graph namespace ('/graph/<inst>/<symbol>', bare instance name for
+	# add/remove); the harder mapping (port-symbol↔jack-name, instance minting,
+	# self-echo guard) lives one layer up in the editor (M5), not here. Return
+	# ``None`` on success or an error string, like the other write calls.
+	@staticmethod
+	def add_effect(instance, uri, x=0.0, y=0.0):
+		"""Add plugin ``uri`` as new instance ``instance`` (bare name) at (x, y).
+		Mirrors web UI /effect/add (returns the new plugin's data on success)."""
+		try:
+			endpoint = (f"effect/add/graph/{quote(instance, safe='')}"
+						f"?uri={quote(uri, safe='')}&x={x}&y={y}")
+			r = ModepController._request("get", endpoint)
+			if r is None:
+				return "MODEP host did not respond"
+			if r.status_code == 200 and r.json():
+				return None
+			return r.text or "effect add failed"
+		except Exception as e:
+			return f"An error occurred: {e}"
+
+	@staticmethod
+	def remove_effect(instance):
+		"""Remove instance ``instance`` (bare name) and its connections."""
+		try:
+			r = ModepController._request("get", f"effect/remove/graph/{quote(instance, safe='')}")
+			if r is None:
+				return "MODEP host did not respond"
+			if r.status_code == 200 and r.json():
+				return None
+			return r.text or "effect remove failed"
+		except Exception as e:
+			return f"An error occurred: {e}"
+
+	@staticmethod
+	def connect(port_from, port_to):
+		"""Connect two ports given in graph-namespace form ('/graph/<inst>/<sym>',
+		'/graph/capture_1'). Mirrors web UI /effect/connect/<from>,<to>."""
+		try:
+			r = ModepController._request("get", f"effect/connect/{port_from},{port_to}")
+			if r is None:
+				return "MODEP host did not respond"
+			if r.status_code == 200 and r.json():
+				return None
+			return r.text or "connect failed"
+		except Exception as e:
+			return f"An error occurred: {e}"
+
+	@staticmethod
+	def disconnect(port_from, port_to):
+		"""Disconnect two ports given in graph-namespace form. Mirrors web UI
+		/effect/disconnect/<from>,<to>."""
+		try:
+			r = ModepController._request("get", f"effect/disconnect/{port_from},{port_to}")
+			if r is None:
+				return "MODEP host did not respond"
+			if r.status_code == 200 and r.json():
+				return None
+			return r.text or "disconnect failed"
+		except Exception as e:
+			return f"An error occurred: {e}"
 
 	@staticmethod
 	def set_bpm(value):

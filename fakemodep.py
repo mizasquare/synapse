@@ -38,6 +38,7 @@ class FakeModepController(Backend):
         self._pb_order = []        # pedalboard bundle paths, in bank order
         self._pb_by_path = {}      # path -> whole fixture dict
         self._effects_by_uri = {}  # plugin uri -> effect_get_information dict
+        self._catalog = []         # installed plugins (native shape) for effect_list()
         self._load_fixtures()
 
         self._current_path = self._pb_order[0]
@@ -52,6 +53,11 @@ class FakeModepController(Backend):
         for fp in paths:
             with open(fp, "rt", encoding="utf-8") as f:
                 data = json.load(f)
+            if "current_pedalboard" not in data:
+                # catalog dump (installed-effects.json): feed effect_list(), not a board
+                if "plugins" in data:
+                    self._catalog = data["plugins"]
+                continue
             path = data["current_pedalboard"]
             self._pb_by_path[path] = data
             self._pb_order.append(path)
@@ -90,7 +96,31 @@ class FakeModepController(Backend):
         if board in self._pb_by_path:
             self._current_path = board
             self._seed_current()
-        return None
+            return True
+        return False   # unknown bundle -> load failed (mirrors host verify)
+
+    def get_all_pedalboard_entries(self):
+        return [{"bundle": p, "title": self._pb_by_path[p]["pedalboard_info"].get("title", "")}
+                for p in self._pb_order]
+
+    def save_current_pedalboard(self):
+        return True   # fixtures are in-memory; an in-place save is a no-op success
+
+    def save_pedalboard_as(self, title):
+        """Clone the current board under a new title/path and switch to it —
+        mirrors the host's asNew=1 (new bundle becomes current)."""
+        import copy, re
+        sym = (re.sub('[^A-Za-z0-9]+', '_', title).strip('_')[:16]) or 'board'
+        newpath = '/fake/%s.pedalboard' % sym
+        data = copy.deepcopy(self._pb_by_path[self._current_path])
+        data['current_pedalboard'] = newpath
+        data['pedalboard_info']['title'] = title
+        self._pb_by_path[newpath] = data
+        if newpath not in self._pb_order:
+            self._pb_order.append(newpath)
+        self._current_path = newpath
+        self._seed_current()
+        return {'bundlepath': newpath, 'title': title}
 
     def set_next_pedalboard(self):
         i = self._pb_order.index(self._current_path)
@@ -103,6 +133,9 @@ class FakeModepController(Backend):
         self._seed_current()
 
     # -- Effect / parameter ----------------------------------------------------
+    def effect_list(self):
+        return self._catalog
+
     def effect_get_information(self, uri):
         return self._effects_by_uri.get(uri, {})
 
@@ -124,6 +157,71 @@ class FakeModepController(Backend):
 
     def patch_set(self, instance, uri, value):
         self._patches.setdefault(instance, {})[uri] = [value, "path"]
+        return None
+
+    # -- Live graph ------------------------------------------------------------
+    def dump_graph(self):
+        """Fixture-backed live graph: the current pedalboard's plugins +
+        connections, with in-memory bypass/param mutations overlaid so the
+        build matches what the real fork's syn_dump_graph would return."""
+        info = self.get_pedalboard_info(self._current_path)
+        plugins = []
+        for p in info.get("plugins", []):
+            inst = p["instance"]
+            ports = [{"symbol": pt["symbol"],
+                      "value": self._params.get((inst, pt["symbol"]), pt.get("value"))}
+                     for pt in p.get("ports", [])]
+            plugins.append({
+                "instance": inst,
+                "uri"     : p["uri"],
+                "bypassed": bool(self._bypass.get(inst, p.get("bypassed", False))),
+                "x"       : p.get("x", 0),
+                "y"       : p.get("y", 0),
+                "ports"   : ports,
+            })
+        return {"plugins": plugins, "connections": info.get("connections", [])}
+
+    # -- Graph mutation --------------------------------------------------------
+    # Mutate the current fixture's pedalboard_info in place so a subsequent
+    # dump_graph() (and rebuild) reflects the edit -- this is what makes the
+    # full add/connect/remove loop exercisable off device. get_pedalboard_info
+    # returns the live dict (not a copy), so these mutations persist for the
+    # session. Connection endpoints are stored bare (no '/graph/'), matching the
+    # on-disk form the real host's syn_dump_graph normalizes to.
+    @staticmethod
+    def _bare(port):
+        return port[7:] if port.startswith("/graph/") else port
+
+    def add_effect(self, instance, uri, x=0.0, y=0.0):
+        info = self.get_pedalboard_info(self._current_path)
+        if not any(p["instance"] == instance for p in info["plugins"]):
+            info["plugins"].append({
+                "instance": instance, "uri": uri, "bypassed": False,
+                "x": float(x), "y": float(y), "ports": [],
+            })
+            self._bypass[instance] = False
+        return None
+
+    def remove_effect(self, instance):
+        info = self.get_pedalboard_info(self._current_path)
+        info["plugins"] = [p for p in info["plugins"] if p["instance"] != instance]
+        info["connections"] = [c for c in info["connections"]
+                               if c["source"].split("/")[0] != instance
+                               and c["target"].split("/")[0] != instance]
+        self._bypass.pop(instance, None)
+        return None
+
+    def connect(self, port_from, port_to):
+        info = self.get_pedalboard_info(self._current_path)
+        c = {"source": self._bare(port_from), "target": self._bare(port_to)}
+        if c not in info["connections"]:
+            info["connections"].append(c)
+        return None
+
+    def disconnect(self, port_from, port_to):
+        info = self.get_pedalboard_info(self._current_path)
+        c = {"source": self._bare(port_from), "target": self._bare(port_to)}
+        info["connections"] = [x for x in info["connections"] if x != c]
         return None
 
     # -- Snapshot --------------------------------------------------------------

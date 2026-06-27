@@ -26,3 +26,6 @@ archived/
 
 # 페달보드 프리셋 — 첫 커밋(09c5308)에 백업으로 박제됨, 이후 추적 안 함
 pedal/
+
+# mock pedalboard editor — local UX prototype saves
+mock-pedalboards/

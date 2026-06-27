@@ -1235,6 +1235,16 @@ class EffectParameterGetSYN(JsonRequestHandler):
         value = SESSION.host.syn_param_get(port)
         self.write(value)
 
+class GraphDumpSYN(JsonRequestHandler):
+    # Dump the LIVE in-memory graph (plugins + connections) as pedalboard/info-
+    # compatible JSON, so a headless client (Synapse) reads the running JACK
+    # graph instead of the stale on-disk .ttl. See host.syn_dump_graph.
+    @web.asynchronous
+    @gen.engine
+
+    def get(self):
+        self.write(SESSION.host.syn_dump_graph())
+
 class EffectPatchSetSYN(JsonRequestHandler):
     @web.asynchronous
     @gen.engine
@@ -2501,6 +2511,7 @@ application = web.Application(
             (r"/effect/parameter/syn_get/*(/[A-Za-z0-9_:/]+[^/])/?", EffectParameterGetSYN),
             (r"/effect/parameter/syn_patch_set/*(/[A-Za-z0-9_:/]+[^/])/?", EffectPatchSetSYN),
             (r"/effect/parameter/syn_patch_get/*(/[A-Za-z0-9_:/]+[^/])/?", EffectPatchGetSYN),
+            (r"/syn_dump_graph/?", GraphDumpSYN),
 
             # plugin presets
             (r"/effect/preset/load/*(/[A-Za-z0-9_/]+[^/])/?", EffectPresetLoad),

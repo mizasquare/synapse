@@ -2753,6 +2753,39 @@ class Host(object):
 
         # return pluginData['ports'][symbol]
 
+    def syn_dump_graph(self):
+        """Serialize the LIVE in-memory graph (plugins + connections) in a
+        pedalboard/info-compatible shape, so a headless client (Synapse) reads
+        the *running* JACK graph instead of the stale on-disk .ttl. The plugin
+        walk mirrors snapshot_make (skip the pedalboard pseudo-plugin); ports
+        stay live because every param_set path writes pluginData['ports'].
+
+        Port/instance names are normalized to the on-disk pedalboard/info form
+        ('BBCstereo/inR', 'capture_2') by stripping the '/graph/' prefix that the
+        web/graph layer carries -- model.initialize_modep_pedalboard expects that
+        bare form (normalize_node splits on '/'; start nodes are 'capture_1' ...).
+        """
+        plugins = []
+        for instance_id, pluginData in self.plugins.items():
+            if instance_id == PEDALBOARD_INSTANCE_ID:
+                continue
+            plugins.append({
+                "instance": pluginData['instance'].replace("/graph/", "", 1),
+                "uri"     : pluginData['uri'],
+                "bypassed": pluginData['bypassed'],
+                "x"       : pluginData['x'],
+                "y"       : pluginData['y'],
+                "ports"   : [{"symbol": s, "value": v}
+                             for s, v in pluginData['ports'].items()],
+            })
+
+        def _strip(p):
+            return p[7:] if p.startswith("/graph/") else p
+        connections = [{"source": _strip(a), "target": _strip(b)}
+                       for a, b in self.connections]
+
+        return {"plugins": plugins, "connections": connections}
+
     def set_position(self, instance, x, y):
         instance_id = self.mapper.get_id_without_creating(instance)
         pluginData  = self.plugins[instance_id]

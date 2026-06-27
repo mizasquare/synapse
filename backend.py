@@ -44,7 +44,15 @@ class Backend:
         raise NotImplementedError
 
     def set_pedalboard(self, board):
-        """Load the pedalboard at bundle path ``board``."""
+        """Load the pedalboard at bundle path ``board``. Returns ``True`` if the
+        host's current pedalboard is ``board`` afterward, else ``False`` — a
+        destroy-then-reseed caller (the live editor switch) must bail on
+        ``False`` since /reset already wiped the graph."""
+        raise NotImplementedError
+
+    def get_all_pedalboard_entries(self):
+        """All pedalboards as ``[{'bundle','title'}]`` (one call, titles included).
+        For the editor's live board switcher; ``[]`` on failure."""
         raise NotImplementedError
 
     def set_next_pedalboard(self):
@@ -56,6 +64,12 @@ class Backend:
         raise NotImplementedError
 
     # -- Effect / parameter ----------------------------------------------------
+    def effect_list(self):
+        """Return every installed plugin's native mod-ui info (list of dicts, the
+        ``get_all_plugins`` shape). Normalised by ``plugincatalog`` for the editor.
+        ``[]`` on failure."""
+        raise NotImplementedError
+
     def effect_get_information(self, uri):
         """Return plugin metadata for ``uri`` (mod-ui JSON dict)."""
         raise NotImplementedError
@@ -83,6 +97,50 @@ class Backend:
     def patch_set(self, instance, uri, value):
         """Load patch ``value`` for ``uri`` on ``instance``. Return ``None`` on
         success, else an error string."""
+        raise NotImplementedError
+
+    # -- Live graph ------------------------------------------------------------
+    def dump_graph(self):
+        """Return the live in-memory graph as a pedalboard/info-compatible dict
+        ``{"plugins": [...], "connections": [...]}`` -- the *running* JACK graph,
+        not the on-disk .ttl -- or ``None`` on failure. ``plugins`` entries carry
+        ``instance``/``uri``/``bypassed``/``x``/``y``/``ports`` and connection
+        endpoints use the bare on-disk form ('BBCstereo/inR', 'capture_2')."""
+        raise NotImplementedError
+
+    # -- Graph mutation --------------------------------------------------------
+    # Port/instance arguments are in the graph namespace ('/graph/<inst>/<sym>',
+    # bare instance name for add/remove). Higher-level concerns (port-symbol
+    # resolution, instance minting, self-echo guard) belong to the caller, not
+    # here. All four return ``None`` on success, else an error string.
+    def add_effect(self, instance, uri, x=0.0, y=0.0):
+        """Add plugin ``uri`` as new instance ``instance`` (bare name) at (x, y)."""
+        raise NotImplementedError
+
+    def remove_effect(self, instance):
+        """Remove instance ``instance`` (bare name) and its connections."""
+        raise NotImplementedError
+
+    def connect(self, port_from, port_to):
+        """Connect two graph-namespace ports ('/graph/<inst>/<sym>')."""
+        raise NotImplementedError
+
+    def disconnect(self, port_from, port_to):
+        """Disconnect two graph-namespace ports ('/graph/<inst>/<sym>')."""
+        raise NotImplementedError
+
+    # -- Persist (pedalboard save) ---------------------------------------------
+    def save_current_pedalboard(self):
+        """Save the current pedalboard in place (asNew=0), serializing the live
+        host graph to its .ttl bundle. Returns ``True`` on success. Carries the
+        app-side dir==symbolify(title) guard that refuses a mismatched save."""
+        raise NotImplementedError
+
+    def save_pedalboard_as(self, title):
+        """Save the current live graph as a NEW bundle named ``title`` (asNew=1);
+        the host mints a fresh dir and switches current to it. Returns
+        ``{'bundlepath','title'}`` on success, else ``None``. Corruption-immune
+        (new dir derived from title)."""
         raise NotImplementedError
 
     # -- Snapshot --------------------------------------------------------------

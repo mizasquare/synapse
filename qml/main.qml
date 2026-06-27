@@ -23,6 +23,9 @@ Window {
     readonly property color cMuted:  "#7e8694"
     readonly property color cDim:    "#5a6270"
 
+    // dev: quit a true-fullscreen instance (no title bar to close) — mirrors the editor
+    Shortcut { sequences: ["Ctrl+Q"]; context: Qt.ApplicationShortcut; onActivated: Qt.quit() }
+
     // dev: map keyboard Z/X/C/V -> footswitch 0..3 (mouse can't chord)
     function fsKeyIndex(k) {
         if (k === Qt.Key_Z) return 0;
@@ -359,16 +362,32 @@ Window {
             Column {
                 anchors.left: parent.left; anchors.leftMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 1
+                spacing: 3
                 Text {
                     text: focusScreen.f ? (focusScreen.f.name + "  ·  " + focusScreen.f.category) : ""
                     color: cText; font.family: uiFont; font.pixelSize: 28
                 }
-                Text {
-                    visible: focusScreen.f && focusScreen.f.patches && focusScreen.f.patches.length > 0
-                    text: (focusScreen.f && focusScreen.f.patches && focusScreen.f.patches.length > 0)
-                          ? ("▦ " + focusScreen.f.patches[0].label + ": " + focusScreen.f.patches[0].value) : ""
-                    color: cGreen; font.family: uiFont; font.pixelSize: 16
+                // patch chips (NAM model / IR / cabsim) — tap to open the file picker
+                Row {
+                    spacing: 8
+                    visible: !!(focusScreen.f && focusScreen.f.patches && focusScreen.f.patches.length > 0)
+                    Repeater {
+                        model: focusScreen.f ? focusScreen.f.patches : []
+                        Rectangle {
+                            height: 24; radius: 6; width: pchTxt.width + 18
+                            color: "#1f5fd0a0"; border.width: 1; border.color: cGreen
+                            Text {
+                                id: pchTxt; anchors.centerIn: parent
+                                text: "▦ " + modelData.label + ": " + (modelData.value || "—") + "  ▾"
+                                color: cGreen; font.family: uiFont; font.pixelSize: 15
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: patchPicker.openFor(focusScreen.f.instance, modelData.uri,
+                                                               modelData.label, modelData.value || "")
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -447,6 +466,21 @@ Window {
                 }
             }
         }
+
+        // -- patch file picker (shared PatchPicker.qml; NAM model / IR / cabsim) --
+        // Opened from a patch chip; lists files via view.listPatchFiles, loads the
+        // pick via view.setPatch. Drawn last = top z over the FOCUS screen.
+        PatchPicker {
+            id: patchPicker
+            colElev: cElev; colBorder: cBorder; colText: cText; colAccent: cGreen; fontFamily: uiFont
+            property string pInstance: ""
+            property string pUri: ""
+            onPicked: (path) => view.setPatch(pInstance, pUri, path)
+            function openFor(instance, uri, label, current) {
+                pInstance = instance; pUri = uri;
+                present(view.listPatchFiles(instance, uri), label, current);
+            }
+        }
     }
 
     // ============================================================ TAP TEMPO
@@ -501,49 +535,21 @@ Window {
     }
 
     // ====================================================== PEDALBOARD EDIT
-    // Placeholder shell (screen transition only). The real editor -- add /
-    // remove / connect effects wired to the MODEP host -- is the next phase.
-    Item {
+    // The pedalboard editor, embedded from PedalboardEditorView.qml. Loaded by file URL
+    // (its own context) and only while in EDIT — so it is created fresh on each entry
+    // (re-seeding from the live board) and adds no idle cost elsewhere. Its own header
+    // hosts the "나가기" affordance (exitRequested -> back to overview).
+    Loader {
         id: editScreen
         anchors.fill: parent
-        visible: view.screen === "edit"
-
-        // top bar: back + title
-        Row {
-            id: editNav
-            x: 12; y: 12
-            spacing: 8
-            Rectangle {
-                width: 124; height: 44; radius: 8
-                color: "#1b2230"; border.width: 1; border.color: cBorder
-                Text { anchors.centerIn: parent; text: "◄ OVERVIEW"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 20 }
-                MouseArea { anchors.fill: parent; onClicked: view.goOverview() }
-            }
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "PEDALBOARD EDIT"
-                color: "#cdb6f0"; font.family: uiFont; font.pixelSize: 26
-            }
-        }
-
-        Column {
-            anchors.centerIn: parent
-            spacing: 12
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: view.boardName
-                color: cText; font.family: uiFont; font.pixelSize: 56
-            }
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: "편집 모드 — 구현 예정"
-                color: cMuted; font.family: uiFont; font.pixelSize: 30
-            }
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: "이펙트 추가 · 연결 · 삭제 (다음 단계)"
-                color: cDim; font.family: uiFont; font.pixelSize: 20
-            }
+        active: view.screen === "edit"
+        visible: active
+        source: "PedalboardEditorView.qml"
+        // On each entry, seed the editor's advanced graph from the live board.
+        onLoaded: editor.enterLive()
+        Connections {
+            target: editScreen.item
+            function onExitRequested() { view.goOverview() }
         }
     }
 

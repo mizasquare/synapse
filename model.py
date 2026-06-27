@@ -95,13 +95,14 @@ class EffectPort:
 			return new_value
 
 	def set_value(self, effect_instance: str, new_value: float):
-		print('wow')
-		"""Update parameter in MODEP, and sync only if the request succeeds."""
+		"""Update parameter in MODEP, and sync only if the request succeeds.
+		Returns the backend error string (None on success) so callers can branch."""
 		error_msg = get_backend().parameter_set(effect_instance, self.symbol, new_value)
 		if error_msg is None:  # Only update if MODEP successfully applied the change
 			self.value = new_value
 		else:
 			print(f"⚠️ Failed to update {self.name} ({self.symbol}): {error_msg}")
+		return error_msg
 
 
 @dataclass
@@ -123,12 +124,16 @@ class EffectPatch:
 			return new_patch
 
 	def set_patch(self, new_patch: str):
-		"""Load a new patch into MODEP and update UI if successful."""
+		"""Load a new patch into MODEP and update UI if successful.
+		Returns the backend error string (None on success) so the presenter can
+		branch — mirrors EffectPort.set_value. On success updates ``value`` (the
+		loaded file); ``file_path`` stays the picker's base directory."""
 		error_msg = get_backend().patch_set(self.instance, self.uri, new_patch)
 		if error_msg is None:  # Only update local data if request was successful
-			self.file_path = new_patch
+			self.value = new_patch
 		else:
 			print(f"⚠️ Failed to load patch for {self.instance}: {error_msg}")
+		return error_msg
 
 
 @dataclass
@@ -145,6 +150,11 @@ class Effect:
 	ports: Dict[str, EffectPort] = field(default_factory=dict)
 	patches: Dict[str, EffectPatch] = field(default_factory=dict)
 	monitors: Dict[str, EffectPort] = field(default_factory=dict)  # output (monitor) ports
+	# Ordered audio port SYMBOLS (not control ports) — the jack-side names the
+	# editor needs to address cables ('/graph/<inst>/<symbol>'). Filled from the
+	# plugin definition during the build; the catalog carries only ai/ao counts.
+	audio_inputs: List[str] = field(default_factory=list)
+	audio_outputs: List[str] = field(default_factory=list)
 
 @dataclass
 class Connection:
@@ -203,6 +213,12 @@ class Pedalboard:
 
 			nodes.update([source, target])
 
+		# Seed every effect instance, not just those that appear in a connection —
+		# a plugin with no cables yet (e.g. a node just added in the editor, before
+		# it's wired) must still survive ordering. Otherwise it falls out of
+		# ordered_instances and _reorder_effects silently drops a real host plugin.
+		nodes.update(effect.instance for effect in self.effects)
+
 		# Identify starting nodes (audio inputs)
 		start_nodes = [n for n in ["capture_1", "capture_2"] if n in nodes]
 		if not start_nodes:
@@ -232,9 +248,15 @@ class Pedalboard:
 		]
 
 	def _reorder_effects(self):
-		"""Reorders the effects list based on the instance order in ordered_instances."""
+		"""Reorders the effects list based on the instance order in ordered_instances.
+		Any effect not captured by the ordering (defensive — should not happen now
+		that _order_instances seeds all instances) is preserved at the end so a real
+		plugin is never silently dropped."""
 		instance_map = {effect.instance: effect for effect in self.effects}
-		self.effects = [instance_map[instance] for instance in self.ordered_instances if instance in instance_map]
+		ordered = [instance_map[i] for i in self.ordered_instances if i in instance_map]
+		seen = set(self.ordered_instances)
+		leftovers = [e for e in self.effects if e.instance not in seen]
+		self.effects = ordered + leftovers
 
 	def _get_current_snapshot_idx(self):
 		"""Fetches the current snapshot index from the pedalboard."""
@@ -285,6 +307,21 @@ def initialize_modep_pedalboard() -> Optional[Pedalboard]:
 	if not pb_data:
 		print("⚠️ Failed to retrieve pedalboard data.")
 		return None
+
+	# Prefer the LIVE in-memory graph for plugins + connections: those are the
+	# only parts that diverge from disk after a live edit (add/remove/connect).
+	# Board-level scaffolding (title/size/hardware/timeInfo/midi) is stable, so
+	# keep it from the .ttl. Fall back to disk silently if the fork lacks the
+	# syn_dump_graph endpoint or the host is unreachable. See backend.dump_graph.
+	try:
+		live = get_backend().dump_graph()
+	except Exception as e:
+		print(f"⚠️ dump_graph failed, using disk graph: {e}")
+		live = None
+	if live and live.get("plugins") is not None:
+		pb_data["plugins"] = live["plugins"]
+		pb_data["connections"] = live.get("connections", pb_data["connections"])
+
 	title = pb_data["title"]
 	width = pb_data["width"]
 	height = pb_data["height"]
@@ -326,8 +363,6 @@ def initialize_modep_pedalboard() -> Optional[Pedalboard]:
 				patch_label = param["label"]
 				file_types = param.get("fileTypes", [])
 				file_path = configs.PATCH_FILE_DIR_MAP.get(patch_uri, configs.PATCH_FILE_DIR_MAP.get("defaultpath"))
-				print(patch_uri)
-				print(file_path)
 		# Fetch currently loaded patch file (if any)
 				current_patch = get_backend().patch_get(instance_name, patch_uri)
 				if current_patch:
@@ -404,6 +439,13 @@ def initialize_modep_pedalboard() -> Optional[Pedalboard]:
 				forced_kind=forced,
 			)
 
+		# Step 6c: Audio port symbols (ordered) — the jack-side names the editor
+		# needs to wire cables. The catalog only has ai/ao counts, so capture the
+		# real symbols here while detailed_info is in hand (no extra host call).
+		audio_ports = detailed_info.get("ports", {}).get("audio", {})
+		audio_inputs = [p["symbol"] for p in audio_ports.get("input", [])]
+		audio_outputs = [p["symbol"] for p in audio_ports.get("output", [])]
+
 		# Step 7: Create the effect instance
 		effects.append(Effect(
 			instance=instance_name,
@@ -416,7 +458,9 @@ def initialize_modep_pedalboard() -> Optional[Pedalboard]:
 			y=y,
 			ports=ports,
 			patches=patches,  # ✅ Now correctly stores patch information
-			monitors=monitors
+			monitors=monitors,
+			audio_inputs=audio_inputs,
+			audio_outputs=audio_outputs
 		))
 
 	# Step 8: Create the Pedalboard instance

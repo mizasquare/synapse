@@ -19,6 +19,7 @@ from PyQt6.QtQml import QQmlApplicationEngine
 from PyQt6.QtQuick import QQuickWindow  # registers QQuickWindow so the QML root casts correctly
 
 import modepctrl
+from editor_bridge import EditorBridge
 from fakemodep import FakeModepController
 from fakehardware import FakeController
 from qtscheduler import QtScheduler
@@ -70,9 +71,14 @@ def main():
     if "--tap" in argv:
         presenter.enter_tap_tempo()  # dev: open the TAP TEMPO screen for a screenshot
 
+    editor = EditorBridge()
+    editor.set_presenter(presenter)   # EDIT screen seeds from the live/fake board
+    presenter.editor = editor         # footswitch board nav warns on unsaved editor edits
+
     engine = QQmlApplicationEngine()
     ctx = engine.rootContext()
     ctx.setContextProperty("view", view)
+    ctx.setContextProperty("editor", editor)
     ctx.setContextProperty("uiFont", ui_font)
     engine.load(QUrl.fromLocalFile(os.path.join(BASE, "qml", "main.qml")))
     if not engine.rootObjects():
