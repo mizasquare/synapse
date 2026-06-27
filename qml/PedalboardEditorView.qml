@@ -125,24 +125,32 @@ Item {
             x: 0; y: 34; width: 66; height: parent.height - 34; z: 6
             color: cPanel
             Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: "#1b2230" }
-            Column {
-                anchors.fill: parent; anchors.margins: 6; spacing: 5
-                Repeater {
-                    model: editor.rail
-                    Rectangle {
-                        width: 54; height: 44; radius: 5
-                        color: modelData.sel ? cElev : "transparent"
-                        border.width: 1; border.color: modelData.sel ? modelData.color : "#1b2230"
-                        Column {
-                            anchors.centerIn: parent; spacing: 2
-                            Rectangle { width: 8; height: 8; radius: 2; color: modelData.color
-                                        anchors.horizontalCenter: parent.horizontalCenter }
-                            Text { text: modelData.abbr; color: cText; font.family: uiFont; font.pixelSize: 14
-                                   anchors.horizontalCenter: parent.horizontalCenter }
-                            Text { text: modelData.count; color: cDim; font.family: uiFont; font.pixelSize: 11
-                                   anchors.horizontalCenter: parent.horizontalCenter }
+            // Scrollable: 16 buckets don't all fit the 446px rail (only ~9 do), so
+            // a fixed Column clipped the tail (Pitch/Amp·Cab/…/MIDI). Flick to reach them.
+            Flickable {
+                anchors.fill: parent; anchors.margins: 6
+                contentHeight: railCol.height; clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                Column {
+                    id: railCol
+                    width: parent.width; spacing: 5
+                    Repeater {
+                        model: editor.rail
+                        Rectangle {
+                            width: 54; height: 44; radius: 5
+                            color: modelData.sel ? cElev : "transparent"
+                            border.width: 1; border.color: modelData.sel ? modelData.color : "#1b2230"
+                            Column {
+                                anchors.centerIn: parent; spacing: 2
+                                Rectangle { width: 8; height: 8; radius: 2; color: modelData.color
+                                            anchors.horizontalCenter: parent.horizontalCenter }
+                                Text { text: modelData.abbr; color: cText; font.family: uiFont; font.pixelSize: 14
+                                       anchors.horizontalCenter: parent.horizontalCenter }
+                                Text { text: modelData.count; color: cDim; font.family: uiFont; font.pixelSize: 11
+                                       anchors.horizontalCenter: parent.horizontalCenter }
+                            }
+                            MouseArea { anchors.fill: parent; onClicked: editor.pickCategory(modelData.key) }
                         }
-                        MouseArea { anchors.fill: parent; onClicked: editor.pickCategory(modelData.key) }
                     }
                 }
             }
