@@ -29,6 +29,8 @@ import re
 import time
 import unicodedata
 
+import configs
+
 from PyQt6.QtCore import (QObject, QTimer, pyqtProperty as Property,
                           pyqtSignal as Signal, pyqtSlot as Slot)
 
@@ -171,6 +173,8 @@ class EditorBridge(QObject):
         self._dirty = False
         self._boards = []             # cached saved-board (mock .json) list
         self._live_boards = []        # cached live host board list [{bundle,title,current}]
+        self._scratch_default = False # NEW BOARD loaded the shared default -> SAVE must save-as
+        self._pending_new = False     # a NEW request is awaiting the dirty-confirm dialog
 
         # live wiring (None/False in the standalone mock; set when embedded in the app)
         self.presenter = None         # Presenter seam — source of truth is presenter.pedalboard
@@ -437,6 +441,8 @@ class EditorBridge(QObject):
         self.board_name = pb.title or 'Untitled'
         self.board_path = None
         self._dirty = False
+        # Loading any board clears scratch; NEW BOARD re-sets it AFTER this seed.
+        self._scratch_default = False
         self.in_mode = 'stereo' if (getattr(pb, 'audio_ins', 2) or 2) >= 2 else 'mono'
         self.sel = -1
         self.gwire_sel = None
@@ -1287,11 +1293,12 @@ class EditorBridge(QObject):
 
     @Property(bool, notify=boardsChanged)
     def boardSaved(self):
-        # Live: a current host bundle always exists, so the headline SAVE is a
-        # pure in-place overwrite and the naming panel never opens for it
-        # (asNew=1 / new-bundle only via explicit SAVE AS). Mock: needs a file.
+        # Live: a current host bundle always exists, so SAVE is an in-place
+        # overwrite — EXCEPT a freshly NEW'd scratch board (the shared default),
+        # where SAVE must open the naming panel (save-as) so we never overwrite
+        # default.pedalboard. Mock: needs a file.
         if self._live_flag:
-            return True
+            return not self._scratch_default
         return self.board_path is not None
 
     @Property('QVariantList', notify=boardsChanged)
@@ -1357,9 +1364,38 @@ class EditorBridge(QObject):
 
     @Slot(str)
     def confirmedLiveBoardSwitch(self, bundle):
-        """Dialog confirmed 'discard & switch'."""
-        if self._live_flag:
+        """Dialog confirmed 'discard & switch' — routes to NEW BOARD when the
+        pending request was a NEW (the dialog is shared)."""
+        if not self._live_flag:
+            return
+        if self._pending_new:
+            self._pending_new = False
+            self._do_new_live_board()
+        else:
             self._doLiveBoardSwitch(bundle)
+
+    @Slot()
+    def requestNewLiveBoard(self):
+        """NEW BOARD: start fresh on the empty default bundle. Goes through the
+        dirty-confirm (reusing confirmBoardSwitch) and BYPASSES requestLiveBoard
+        Switch's 'already current' no-op (default may already be current — NEW
+        must still reload it to clear the canvas)."""
+        if not self._live_flag:
+            return
+        if self._dirty:
+            self._pending_new = True
+            self.confirmBoardSwitch.emit(configs.DEFAULT_PEDALBOARD, '새 빈 보드')
+        else:
+            self._do_new_live_board()
+
+    def _do_new_live_board(self):
+        """Load the empty default bundle as a SCRATCH board. On success mark it
+        scratch so the headline SAVE is forced to save-as (never overwrites the
+        shared default.pedalboard)."""
+        if self._doLiveBoardSwitch(configs.DEFAULT_PEDALBOARD):
+            self._scratch_default = True
+            self.boardsChanged.emit()    # boardSaved flipped -> SAVE becomes save-as
+            self.toast.emit('새 보드 — 빌드 후 SAVE로 이름 지어 저장')
 
     def _doLiveBoardSwitch(self, bundle):
         """Perform the live switch through the presenter. On failure (host graph
@@ -2105,6 +2141,12 @@ class EditorBridge(QObject):
         of the snapshot, so a snapshot round-trip would revert them. Inherits the
         app+host 3-layer corruption defense (the save_pb path). Mock: write .json."""
         if self._live_flag:
+            if self._scratch_default:
+                # defense-in-depth: never in-place save over the shared default —
+                # QML routes here via doSave() which opens the naming panel; guard
+                # the direct path too.
+                self.toast.emit('새 보드 — 다른 이름으로 저장하세요')
+                return
             ok = self.presenter.save_snapshot() if self.presenter else False
             if ok:
                 self._dirty = False
@@ -2134,6 +2176,7 @@ class EditorBridge(QObject):
             if res:
                 self.board_name = res.get('title') or name
                 self._dirty = False
+                self._scratch_default = False   # now a real named bundle, not scratch
                 self.refreshBoards()         # the new bundle is now current
                 self.boardsChanged.emit()
                 self.toast.emit('새 보드로 저장됨 · %s' % self.board_name)

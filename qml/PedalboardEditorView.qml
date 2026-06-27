@@ -31,6 +31,7 @@ Item {
     property bool liveBoardsOpen: false   // live host board switcher (M6a)
     property bool snapsOpen: false        // live snapshot manager (M6c)
     property bool snapNaming: false       // snapshot save-as naming panel (M6c)
+    property bool newBoardOpen: false     // live NEW BOARD quick/advanced modal (M6d-1)
     property string pendingSwitchBundle: ""  // live switch awaiting dirty-discard confirm
     property string pendingSwitchTitle: ""
     property string pendingNewKind: ""   // "quick"/"advanced" awaiting discard confirmation
@@ -94,10 +95,14 @@ Item {
                     font.family: uiFont; font.pixelSize: 14; anchors.verticalCenter: parent.verticalCenter
                     elide: Text.ElideRight; width: 110
                 }
-                // live in-place SAVE (persists the live host graph to its .ttl bundle)
+                // NEW BOARD: start fresh on the empty default (modal: quick/advanced)
+                Pill { label: "NEW"; accent: cBlue; visible: editor.live
+                       onTap: win.newBoardOpen = true }
+                // live in-place SAVE — via doSave() so a scratch NEW board routes to
+                // save-as (naming) instead of overwriting the shared default.
                 Pill { label: editor.dirty ? "SAVE *" : "SAVE"; accent: cGreen
-                       visible: editor.live; dim: !editor.dirty
-                       onTap: editor.saveBoard() }
+                       visible: editor.live; dim: !(editor.dirty || !editor.boardSaved)
+                       onTap: win.doSave() }
                 // live snapshot manager (change / save / save-as)
                 Pill { label: "SNAP"; accent: cPurple; visible: editor.live
                        onTap: win.snapsOpen = true }
@@ -1014,8 +1019,9 @@ Item {
                     // save actions for the live (current) board
                     Flow {
                         width: parent.width; spacing: 8
-                        WideBtn { label: editor.dirty ? "저장 *" : "저장"; accent: cGreen; dim: !editor.dirty
-                                  onTap: { if (editor.dirty) editor.saveBoard() } }
+                        WideBtn { label: editor.dirty ? "저장 *" : "저장"; accent: cGreen
+                                  dim: !(editor.dirty || !editor.boardSaved)
+                                  onTap: win.doSave() }
                         WideBtn { label: "다른 이름으로 저장"; accent: cGreen
                                   onTap: win.namingMode = "saveas" }
                     }
@@ -1196,6 +1202,35 @@ Item {
                         WideBtn { label: "취소"; accent: cBorder; onTap: win.snapNaming = false }
                         WideBtn { label: "저장"; accent: cPurple; dim: snapNameField.text.trim().length === 0
                                   onTap: if (snapNameField.text.trim().length) { editor.saveSnapshotNamed(snapNameField.text); win.snapNaming = false; win.snapsOpen = false } }
+                    }
+                }
+            }
+        }
+
+        // -------- NEW BOARD modal (live, M6d-1): quick / advanced --------
+        // ADVANCED loads the empty default bundle as a scratch board (SAVE forced
+        // to save-as). QUICK is deferred until live-quick lands (M6d-4).
+        Item {
+            visible: win.newBoardOpen; anchors.fill: parent; z: 84
+            MouseArea { anchors.fill: parent; onClicked: win.newBoardOpen = false }
+            Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.6 }
+            Rectangle {
+                width: 420; height: 196; radius: 10; anchors.centerIn: parent
+                color: cPanel; border.width: 1; border.color: cBlue
+                MouseArea { anchors.fill: parent }
+                Column {
+                    anchors.fill: parent; anchors.margins: 16; spacing: 12
+                    Text { text: "새 보드"; color: cText; font.family: uiFont; font.pixelSize: 18 }
+                    Text { width: parent.width; wrapMode: Text.WordWrap
+                           text: "빈 보드에서 시작합니다. 저장 시 이름을 정해 새 보드로 저장돼요(기존 보드 안전)."
+                           color: cMuted; font.family: uiFont; font.pixelSize: 14 }
+                    Row {
+                        anchors.right: parent.right; spacing: 8
+                        WideBtn { label: "취소"; accent: cBorder; onTap: win.newBoardOpen = false }
+                        WideBtn { label: "퀵 (곧)"; accent: cBorder; dim: true
+                                  onTap: { win.toastText = "라이브 퀵 보드는 곧 지원 (M6d-4)"; toastTimer.restart() } }
+                        WideBtn { label: "어드밴스드"; accent: cOrange
+                                  onTap: { win.newBoardOpen = false; editor.requestNewLiveBoard() } }
                     }
                 }
             }
