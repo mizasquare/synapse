@@ -9,11 +9,12 @@ A PyQt6 port of the Claude Design "Pedalboard Editor" mock. Two modes share one 
              target edge. Supports fan/merge (⊕), feedback (z⁻¹, DFS back-edge), per-cable
              delete, MIDI/CV cables.
 
-BAKE (evolve): drag the evolve slider in QUICK → the board is "baked" into ADVANCED as
-explicit cables (serial fx chain + taps/sources). One-way: you cannot return to QUICK.
+MODE: QUICK (serial chain, geometry=routing) vs ADVANCED (free graph) is a VIEW of the
+same board, determined by routing shape — a representable board opens QUICK, else ADVANCED
+(M6d). toggleLiveMode flips the view (bidirectional); a transient modeFlash effect plays
+(→ADVANCED "powerful", →QUICK "smart"). There is no one-way bake/evolve.
 
-History: structural edits push an undo snapshot (cap 30); undo/redo restore it. Bake and
-New clear history.
+History: structural edits push an undo snapshot (cap 30); undo/redo restore it. New clears.
 
 Mirrors the repo's qtview.py pattern: one QObject, data + flags as notified properties, QML
 owns the visual tokens. Routing math is a faithful port of the design's pb_logic.
@@ -136,7 +137,7 @@ class EditorBridge(QObject):
     changed = Signal()        # full rebuild (rail / fly / nodes / inspector / status / mode / advanced)
     wiresChanged = Signal()   # wires + chips/ports only (live during node drag — no node recreate)
     toast = Signal(str)       # transient message for demo feedback
-    evolveFlash = Signal()    # tell QML to play the EVOLVING animation
+    modeFlash = Signal(str)   # transient mode-transition effect ('advanced'=powerful / 'quick'=smart)
     spawnFly = Signal(str, str, float, float, float, float)  # name,color,fromX,fromY,toX,toY
     boardsChanged = Signal()  # saved-board list / current name / dirty changed
     confirmBoardSwitch = Signal(str, str)  # (bundle, title) — dirty live switch needs confirm
@@ -163,8 +164,6 @@ class EditorBridge(QObject):
         self.gwires = []              # advanced cables: {id, frm, to}  port keys "nid:side:type:idx"
         self.gwire_sel = None         # selected cable id
         self.conn = None              # radial connection state
-        self._evolving_flag = False
-        self.evolve_prog = 0.0
         self._fly_id = -1             # node currently flying in (hidden until it lands)
         self._undo = []
         self._redo = []
@@ -937,33 +936,6 @@ class EditorBridge(QObject):
                 return (float(gx), float(gy))
         return (float(cx - w / 2), float(cy - h / 2))
 
-    # ------------------------------------------------------------- bake / evolve
-    def _bake_from_quick(self):
-        src = sorted(self.nodes, key=lambda n: n['x'])
-        gnodes = [{'id': n['id'], 'uri': n['uri'], 'x': n['x'], 'y': n['y'],
-                   'bypass': n['bypass'], 'vals': dict(n['vals'])} for n in src]
-        # Single source of truth: derive wires from _quick_wire_keys (on self.nodes,
-        # still populated here) so bake and the classifier can't diverge. Then drop
-        # the quick working set — bake reuses the same ids, so leaving self.nodes
-        # would let the unified _node() resolve a gnode id to its stale quick twin
-        # (_do_evolve clears undo, so quick->advanced is intentionally one-way).
-        pairs = self._quick_wire_keys()
-        self.gnodes = gnodes
-        self.nodes = []
-        self.gwires = [{'id': self._new_wid(), 'frm': f, 'to': t} for (f, t) in sorted(pairs)]
-        self.mode = 'advanced'
-        self.sel = -1
-        self.conn = None
-        self._dirty = True
-
-    def _do_evolve(self):
-        self._bake_from_quick()
-        self._evolving_flag = False
-        self.evolve_prog = 0.0
-        self._undo = []
-        self._redo = []
-        self._rebuild()
-
     # ----------------------------------------------------------------- undo/redo
     def _snapshot(self):
         return {
@@ -1346,19 +1318,6 @@ class EditorBridge(QObject):
     def gWireDelY(self):
         return float(self._mid_of[self.gwire_sel][1]) if self.gWireDel else 0.0
 
-    # evolve + history
-    @Property(float, notify=changed)
-    def evolveProg(self):
-        return self.evolve_prog
-
-    @Property(bool, notify=changed)
-    def evolveReady(self):
-        return self.evolve_prog >= 0.92
-
-    @Property(bool, notify=changed)
-    def evolving(self):
-        return self._evolving_flag
-
     @Property(bool, notify=changed)
     def canUndo(self):
         return len(self._undo) > 0
@@ -1737,12 +1696,15 @@ class EditorBridge(QObject):
             if not self._live_quick_enabled:
                 self.toast.emit('라이브 퀵 비활성')
                 return
-            if not self._project_to_quick():
+            if self._project_to_quick():
+                self.modeFlash.emit('quick')        # -> QUICK: "smart"
+            else:
                 self.toast.emit('이 보드는 QUICK 표현 불가 — 어드밴스드 유지')
         else:
             pb = self._live_pb()
             if pb is not None:
-                self._seed_from_pedalboard(pb)   # quick -> advanced: rebuild from host
+                self._seed_from_pedalboard(pb)       # quick -> advanced: rebuild from host
+                self.modeFlash.emit('advanced')      # -> ADVANCED: "powerful"
 
     def _project_to_quick(self):
         """Inverse of bake: build the quick working set (self.nodes) from the live
@@ -2240,27 +2202,7 @@ class EditorBridge(QObject):
         self.gwire_sel = None
         self._rebuild()
 
-    # ----------------------------------------------------------- evolve / history
-    @Slot(float)
-    def evolveSet(self, prog):
-        self.evolve_prog = max(0.0, min(1.0, prog))
-        self.changed.emit()
-
-    @Slot()
-    def evolveRelease(self):
-        if self.mode != 'quick':
-            self.evolve_prog = 0.0
-            self.changed.emit()
-            return
-        if self.evolve_prog >= 0.92:
-            self._evolving_flag = True
-            self.evolveFlash.emit()
-            self.changed.emit()
-            QTimer.singleShot(780, self._do_evolve)
-        else:
-            self.evolve_prog = 0.0
-            self.changed.emit()
-
+    # ----------------------------------------------------------------- history
     @Slot()
     def undo(self):
         if not self._undo:

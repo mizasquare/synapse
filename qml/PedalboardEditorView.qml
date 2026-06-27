@@ -59,7 +59,7 @@ Item {
         // a switch actually completed (clean tap OR confirmed discard) -> close the
         // switcher overlay so both paths land on the editor consistently.
         function onBoardSwitched() { win.liveBoardsOpen = false }
-        function onEvolveFlash() { flashAnim.restart() }
+        function onModeFlash(dir) { flash.toAdvanced = (dir === "advanced"); flashAnim.restart() }
         function onSpawnFly(name, color, fromX, fromY, toX, toY) {
             flyName.text = name; flyGhost.accent = color
             flyGhost.x = fromX; flyGhost.y = fromY; flyGhost.visible = true
@@ -315,68 +315,6 @@ Item {
                     }
                 }
 
-                // -------- EVOLVE pull-tab (top-right): pull the handle inward to bake --------
-                Item {
-                    id: evolve
-                    visible: !editor.empty
-                    anchors.fill: parent
-                    property real ox: width - 6      // dock center — handle pokes from the right edge, near top
-                    property real oy: 24
-                    property real maxDist: 200
-                    readonly property real cx: evKnob.x + 18
-                    readonly property real cy: evKnob.y + 18
-                    readonly property real prog: Math.min(1, Math.hypot(cx - ox, cy - oy) / maxDist)
-                    readonly property bool ready: prog >= 0.92
-                    property bool pulling: false
-
-                    // rubber band from dock to handle while pulling
-                    Shape {
-                        anchors.fill: parent; visible: evolve.pulling
-                        ShapePath {
-                            strokeColor: evolve.ready ? cOrange : cBlue; strokeWidth: 3; fillColor: "transparent"
-                            capStyle: ShapePath.RoundCap
-                            startX: evolve.ox; startY: evolve.oy
-                            PathLine { x: evolve.cx; y: evolve.cy }
-                        }
-                    }
-                    // dock socket
-                    Rectangle {
-                        x: evolve.ox - 13; y: evolve.oy - 13; width: 26; height: 26; radius: 13
-                        color: "#10141d"; border.width: 1; border.color: "#232c3e"
-                    }
-                    // idle hint (left of the dock)
-                    Text {
-                        visible: !evolve.pulling
-                        anchors.right: parent.right; anchors.rightMargin: 34; y: evolve.oy - 8
-                        text: "당겨서 진화"; color: cDim; font.family: uiFont; font.pixelSize: 13
-                    }
-                    // live hint near the handle
-                    Text {
-                        visible: evolve.pulling
-                        x: Math.max(8, evolve.cx - width - 12); y: evolve.cy - 8
-                        text: evolve.ready ? "놓으면 ADVANCED 진화 (되돌릴 수 없음)" : "더 당겨…"
-                        color: evolve.ready ? "#ffb59a" : cDim; font.family: uiFont; font.pixelSize: 13
-                    }
-                    // the handle
-                    Rectangle {
-                        id: evKnob
-                        x: evolve.ox - 18; y: evolve.oy - 18; width: 36; height: 36; radius: 18
-                        color: evolve.ready ? "#e8694a" : "#5a78c0"
-                        border.width: 1; border.color: evolve.ready ? "#ff8a6a" : "#88a6e6"
-                        Text { anchors.centerIn: parent; text: ">>"; color: "#fff"; font.family: uiFont; font.pixelSize: 16 }
-                        MouseArea {
-                            anchors.fill: parent
-                            drag.target: evKnob; drag.axis: Drag.XAndYAxis
-                            drag.minimumX: 40; drag.maximumX: evolve.ox - 18
-                            drag.minimumY: evolve.oy - 18; drag.maximumY: canvas.height - 54
-                            onPressed: evolve.pulling = true
-                            onPositionChanged: if (drag.active) editor.evolveSet(evolve.prog)
-                            onReleased: { evolve.pulling = false; editor.evolveRelease(); snapX.restart(); snapY.restart() }
-                        }
-                        NumberAnimation { id: snapX; target: evKnob; property: "x"; to: evolve.ox - 18; duration: 200; easing.type: Easing.OutCubic }
-                        NumberAnimation { id: snapY; target: evKnob; property: "y"; to: evolve.oy - 18; duration: 200; easing.type: Easing.OutCubic }
-                    }
-                }
             }
 
             // ================= ADVANCED MODE =================
@@ -1240,15 +1178,19 @@ Item {
             }
         }
 
-        // EVOLVING flash overlay
+        // mode-transition flash: → ADVANCED feels "powerful" (orange ⚡),
+        // → QUICK feels "smart" (green ✦). Driven by editor.modeFlash(dir).
         Rectangle {
-            id: flash; anchors.fill: parent; color: cBlue; opacity: 0; z: 200; visible: opacity > 0
-            Text { anchors.centerIn: parent; text: "EVOLVING  ▸  ADVANCED"; color: "#eaf2ff"
-                   font.family: uiFont; font.pixelSize: 30 }
+            id: flash; anchors.fill: parent; opacity: 0; z: 200; visible: opacity > 0
+            property bool toAdvanced: true
+            color: toAdvanced ? cOrange : cGreen
+            Text { anchors.centerIn: parent
+                   text: flash.toAdvanced ? "⚡  POWERFUL  ▸  ADVANCED" : "✦  SMART  ▸  QUICK"
+                   color: "#0e1118"; font.family: uiFont; font.pixelSize: 30 }
             SequentialAnimation {
                 id: flashAnim
-                NumberAnimation { target: flash; property: "opacity"; from: 0; to: 0.55; duration: 200 }
-                NumberAnimation { target: flash; property: "opacity"; to: 0; duration: 560 }
+                NumberAnimation { target: flash; property: "opacity"; from: 0; to: 0.5; duration: 180 }
+                NumberAnimation { target: flash; property: "opacity"; to: 0; duration: 620 }
             }
         }
     }
