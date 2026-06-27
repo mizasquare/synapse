@@ -9,6 +9,7 @@ import time
 
 import json
 import os
+import configs
 from configs import LOCAL_STORAGE
 
 # Footswitch mode ids. 0-2 are the press-driven modes cycled by modechange();
@@ -285,6 +286,34 @@ class Presenter:
         if patch is not None:
             patch.value = patch_file  # 캐시만 갱신 (set_patch는 host로 쓰므로 호출 안 함)
         self.view.update_patch_display(instance, patch_uri, patch_file)
+
+    def list_patch_files(self, instance, patch_uri):
+        """패치(NAM/IR/캐비닛) URI에 매핑된 user-files 디렉터리를 재귀 스캔해 선택 가능한
+        파일을 [{label, path}]로 반환. label = base_dir 기준 상대경로(중첩 폴더가
+        'Marshall JCM2000/foo.nam'처럼 읽힘). 패치가 fileTypes를 선언하면 확장자로
+        걸러냄(대소문자 무시). qtview·editor_bridge 공용 단일 소스."""
+        base = configs.PATCH_FILE_DIR_MAP.get(
+            patch_uri, configs.PATCH_FILE_DIR_MAP.get("defaultpath"))
+        if not base or not os.path.isdir(base):
+            return []
+        # fileTypes는 확장자가 아니라 카테고리명('nammodel'…) → 확장자로 변환.
+        # 매핑에 없는 카테고리는 exts에 기여 안 함 → 필터 없이 디렉터리 전체.
+        exts = []
+        effect = self.pedalboard.get_effect_by_instance(instance) if self.pedalboard else None
+        patch = effect.patches.get(patch_uri) if effect else None
+        for t in (patch.file_types if patch else []):
+            exts += configs.PATCH_FILE_TYPE_EXTS.get(str(t).lower(), [])
+        out = []
+        for root, _dirs, files in os.walk(base):
+            for fn in files:
+                if fn.startswith("."):           # skip dotfiles / OS junk
+                    continue
+                if exts and os.path.splitext(fn)[1].lower() not in exts:
+                    continue
+                full = os.path.join(root, fn)
+                out.append({"label": os.path.relpath(full, base), "path": full})
+        out.sort(key=lambda e: e["label"].lower())
+        return out
 
     def apply_external_connection(self, connected, source, target):
         """외부(웹/HMI)에서 바뀐 배선을 모델 connections 에 직접 반영(디스크/host 미조회).

@@ -124,12 +124,16 @@ class EffectPatch:
 			return new_patch
 
 	def set_patch(self, new_patch: str):
-		"""Load a new patch into MODEP and update UI if successful."""
+		"""Load a new patch into MODEP and update UI if successful.
+		Returns the backend error string (None on success) so the presenter can
+		branch — mirrors EffectPort.set_value. On success updates ``value`` (the
+		loaded file); ``file_path`` stays the picker's base directory."""
 		error_msg = get_backend().patch_set(self.instance, self.uri, new_patch)
 		if error_msg is None:  # Only update local data if request was successful
-			self.file_path = new_patch
+			self.value = new_patch
 		else:
 			print(f"⚠️ Failed to load patch for {self.instance}: {error_msg}")
+		return error_msg
 
 
 @dataclass
@@ -327,8 +331,6 @@ def initialize_modep_pedalboard() -> Optional[Pedalboard]:
 				patch_label = param["label"]
 				file_types = param.get("fileTypes", [])
 				file_path = configs.PATCH_FILE_DIR_MAP.get(patch_uri, configs.PATCH_FILE_DIR_MAP.get("defaultpath"))
-				print(patch_uri)
-				print(file_path)
 		# Fetch currently loaded patch file (if any)
 				current_patch = get_backend().patch_get(instance_name, patch_uri)
 				if current_patch:

@@ -362,16 +362,32 @@ Window {
             Column {
                 anchors.left: parent.left; anchors.leftMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 1
+                spacing: 3
                 Text {
                     text: focusScreen.f ? (focusScreen.f.name + "  ·  " + focusScreen.f.category) : ""
                     color: cText; font.family: uiFont; font.pixelSize: 28
                 }
-                Text {
-                    visible: focusScreen.f && focusScreen.f.patches && focusScreen.f.patches.length > 0
-                    text: (focusScreen.f && focusScreen.f.patches && focusScreen.f.patches.length > 0)
-                          ? ("▦ " + focusScreen.f.patches[0].label + ": " + focusScreen.f.patches[0].value) : ""
-                    color: cGreen; font.family: uiFont; font.pixelSize: 16
+                // patch chips (NAM model / IR / cabsim) — tap to open the file picker
+                Row {
+                    spacing: 8
+                    visible: !!(focusScreen.f && focusScreen.f.patches && focusScreen.f.patches.length > 0)
+                    Repeater {
+                        model: focusScreen.f ? focusScreen.f.patches : []
+                        Rectangle {
+                            height: 24; radius: 6; width: pchTxt.width + 18
+                            color: "#1f5fd0a0"; border.width: 1; border.color: cGreen
+                            Text {
+                                id: pchTxt; anchors.centerIn: parent
+                                text: "▦ " + modelData.label + ": " + (modelData.value || "—") + "  ▾"
+                                color: cGreen; font.family: uiFont; font.pixelSize: 15
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: patchPicker.open(focusScreen.f.instance, modelData.uri,
+                                                            modelData.label, modelData.value || "")
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -447,6 +463,107 @@ Window {
                 Repeater {
                     model: focusScreen.f ? focusScreen.f.monitors : []
                     MonitorWidget { m: modelData }
+                }
+            }
+        }
+
+        // -- patch file picker (modal overlay; NAM model / IR / cabsim) --
+        // Opened from a patch chip; lists files under the URI's user-files dir
+        // (view.listPatchFiles), loads on tap (view.setPatch). Drawn last = top z.
+        Rectangle {
+            id: patchPicker
+            anchors.fill: parent
+            visible: false
+            color: "#e60a0d14"
+            property string pInstance: ""
+            property string pUri: ""
+            property string pLabel: ""
+            property string pCurrent: ""   // basename of the loaded file (for highlight)
+            property var files: []
+            function open(instance, uri, label, current) {
+                pInstance = instance; pUri = uri; pLabel = label || "PATCH"; pCurrent = current;
+                files = view.listPatchFiles(instance, uri);
+                visible = true;
+            }
+            MouseArea { anchors.fill: parent; onClicked: patchPicker.visible = false } // tap-out closes
+            Rectangle {
+                anchors.centerIn: parent
+                width: parent.width - 72; height: parent.height - 48
+                radius: 12; color: cElev; border.width: 1; border.color: cBorder
+                MouseArea { anchors.fill: parent } // swallow taps inside the panel
+                Column {
+                    anchors.fill: parent; anchors.margins: 14; spacing: 8
+                    Row {
+                        width: parent.width
+                        Text {
+                            width: parent.width - 60
+                            text: patchPicker.pLabel + " 선택  (" + patchPicker.files.length + ")"
+                            color: cGreen; font.family: uiFont; font.pixelSize: 22
+                            elide: Text.ElideRight
+                        }
+                        Rectangle {
+                            width: 52; height: 36; radius: 8; color: "#2c3648"
+                            Text { anchors.centerIn: parent; text: "✕"; color: cText; font.family: uiFont; font.pixelSize: 20 }
+                            MouseArea { anchors.fill: parent; onClicked: patchPicker.visible = false }
+                        }
+                    }
+                    // file list + draggable scrollbar (hundreds of files -> tap/drag
+                    // the right rail to jump quickly; thumb follows flick via binding)
+                    Item {
+                        width: parent.width; height: parent.height - 48
+                        ListView {
+                            id: fileList
+                            anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
+                            width: parent.width - (sbTrack.visible ? 20 : 0)
+                            clip: true; model: patchPicker.files
+                            boundsBehavior: Flickable.StopAtBounds
+                            delegate: Rectangle {
+                                width: ListView.view ? ListView.view.width : 0; height: 46
+                                property bool isCur: (("" + modelData.label).split("/").pop() === patchPicker.pCurrent)
+                                color: isCur ? "#2e5fd0a0" : "transparent"
+                                Text {
+                                    anchors.left: parent.left; anchors.leftMargin: 10
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: parent.width - 20
+                                    text: modelData.label; color: isCur ? cGreen : cText
+                                    font.family: uiFont; font.pixelSize: 18; elide: Text.ElideMiddle
+                                }
+                                Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: "#1b2230" }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: {
+                                        view.setPatch(patchPicker.pInstance, patchPicker.pUri, modelData.path);
+                                        patchPicker.visible = false;
+                                    }
+                                }
+                            }
+                        }
+                        Rectangle {
+                            id: sbTrack
+                            visible: fileList.contentHeight > fileList.height
+                            anchors { right: parent.right; top: parent.top; bottom: parent.bottom }
+                            width: 14; radius: 7; color: "#141a24"
+                            function scrollTo(my) {
+                                var usable = sbTrack.height - sbThumb.height;
+                                if (usable <= 0) return;
+                                var top = Math.max(0, Math.min(usable, my - sbThumb.height / 2));
+                                fileList.contentY = (top / usable) * (fileList.contentHeight - fileList.height);
+                            }
+                            Rectangle {
+                                id: sbThumb
+                                x: 0; width: parent.width; radius: 7
+                                color: sbArea.pressed ? cGreen : "#3a4458"
+                                height: Math.max(40, sbTrack.height * fileList.visibleArea.heightRatio)
+                                y: fileList.visibleArea.yPosition * sbTrack.height   // follows flick; never set imperatively
+                            }
+                            MouseArea {
+                                id: sbArea
+                                anchors.fill: parent
+                                onPressed: (mouse) => sbTrack.scrollTo(mouse.y)
+                                onPositionChanged: (mouse) => { if (pressed) sbTrack.scrollTo(mouse.y) }
+                            }
+                        }
+                    }
                 }
             }
         }

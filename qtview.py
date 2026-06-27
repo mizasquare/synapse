@@ -244,6 +244,22 @@ class QtView(QObject):
         if self.presenter:
             self.presenter.parameter_changed(instance, ":bypass", on)
 
+    @Slot(str, str, result="QVariantList")
+    def listPatchFiles(self, instance, uri):
+        """Picker UI -> list selectable patch files for this URI ([{label,path}]).
+        Discrete (not drag) so no throttle. Delegates to the presenter scan."""
+        if not self.presenter:
+            return []
+        return self.presenter.list_patch_files(instance, uri)
+
+    @Slot(str, str, str)
+    def setPatch(self, instance, uri, path):
+        """Picker chose a file -> load it on the host (NAM model / IR / cabsim).
+        Routes through presenter.patch_changed, which writes via EffectPatch and
+        calls back update_patch_display on success."""
+        if self.presenter:
+            self.presenter.patch_changed(instance, uri, path)
+
     @Slot()
     def focusPrev(self):
         self._focus_step(-1)
@@ -338,7 +354,18 @@ class QtView(QObject):
                 break
 
     def update_patch_display(self, instance, uri, file_path):
-        pass  # IR/NAM file picker -- deferred (phase-1 비목표)
+        # A patch file was loaded (by us via setPatch, or externally via the
+        # reverse channel). Patches aren't drag-owned (discrete pick), so unlike
+        # knobs a full focus rebind is safe: mutate the cached value in place and
+        # emit dataChanged. NO host re-fetch (we already know the new file).
+        if not self._focus or self._focus.get("instance") != instance:
+            return
+        base = os.path.basename(file_path) if file_path else ""
+        for pt in self._focus.get("patches", []):
+            if pt.get("uri") == uri:
+                pt["value"] = base
+                break
+        self.dataChanged.emit()
 
     def update_bpm_display(self, bpm):
         self._bpm = ("%g" % bpm) if isinstance(bpm, (int, float)) else str(bpm)
@@ -453,7 +480,8 @@ class QtView(QObject):
         cat = d.get("effect_category")
         cat = cat[0] if isinstance(cat, (list, tuple)) and cat else (cat or "")
         ins, outs = self._routing_for(inst)
-        patches = [{"label": pt.get("patch_label", ""), "value": self._patch_str(pt.get("patch_value"))}
+        patches = [{"label": pt.get("patch_label", ""), "value": self._patch_str(pt.get("patch_value")),
+                    "uri": pt.get("patch_uri", "")}
                    for pt in d.get("patches", [])]
         return {"instance": inst, "name": d.get("effect_name", inst), "category": cat,
                 "bypassed": bool(d.get("effect_bypassed")), "knobs": knobs, "monitors": monitors,
