@@ -230,11 +230,15 @@ class EditorBridge(QObject):
         return node
 
     def _node(self, nid):
+        # str-normalized (QML may pass a string nid) and the unified lookup for
+        # the live working set: exactly ONE of nodes/gnodes is non-empty in live
+        # (advanced uses gnodes, M6d live-quick uses nodes), so nodes-first then
+        # gnodes resolves correctly without the id-collision that _gnode dodged.
         for n in self.nodes:
-            if n['id'] == nid:
+            if str(n['id']) == str(nid):
                 return n
         for n in self.gnodes:
-            if n['id'] == nid:
+            if str(n['id']) == str(nid):
                 return n
         return None
 
@@ -243,6 +247,16 @@ class EditorBridge(QObject):
             if str(n['id']) == str(nid):
                 return n
         return None
+
+    def _assert_single_ws(self):
+        """In live, exactly one working set (self.nodes OR self.gnodes) is
+        non-empty — they share _new_id(), so coexistence reintroduces the id
+        collision _node() now relies on being absent. Logs rather than crashes
+        (defensive; should never fire). Most valuable once M6d live-quick
+        populates self.nodes alongside the gid↔inst maps."""
+        if self._live_flag and self.nodes and self.gnodes:
+            print('⚠️ live working-set invariant violated: nodes=%d gnodes=%d both non-empty'
+                  % (len(self.nodes), len(self.gnodes)))
 
     # ===================================================== live wiring (app embed)
     def set_presenter(self, presenter):
@@ -276,7 +290,7 @@ class EditorBridge(QObject):
         """Live MODEP instance string for a gnode id (None in mock / unknown)."""
         if not self._live_flag:
             return None
-        n = self._gnode(nid)
+        n = self._node(nid)
         return n.get('inst') if n else None
 
     def _live_view(self):
@@ -348,7 +362,7 @@ class EditorBridge(QObject):
         gid = self._gid_by_inst.get(base)
         if gid is None:
             return None
-        n = self._gnode(gid)
+        n = self._node(gid)
         # ClaudeCanEdit is audio-only; MIDI/CV symbol typing is a later milestone.
         return '%d:%s:audio:%d' % (gid, side, self._audio_idx(n, side, sym))
 
@@ -379,7 +393,7 @@ class EditorBridge(QObject):
             return '/graph/capture_%d' % (idx + 1)
         if nid == 'OUT':
             return '/graph/playback_%d' % (idx + 1)
-        n = self._gnode(int(nid)) if nid.lstrip('-').isdigit() else None
+        n = self._node(int(nid)) if nid.lstrip('-').isdigit() else None
         if not n or not n.get('inst'):
             return None
         syms = n.get('aout') if side == 'out' else n.get('ain')
@@ -488,6 +502,7 @@ class EditorBridge(QObject):
                 wires.append({'id': self._new_wid(), 'frm': frm, 'to': to})
         self.gwires = wires
 
+        self._assert_single_ws()
         self._rebuild()
         self.boardsChanged.emit()
 
@@ -685,20 +700,28 @@ class EditorBridge(QObject):
             return ['IN:out:audio:%d' % i for i in range(2 if self.in_mode == 'stereo' else 1)]
         if nid == 'OUT':
             return []
-        n = self._gnode(nid)
+        n = self._node(nid)
         if not n:
             return []
-        return ['%s:out:audio:%d' % (nid, i) for i in range(self.by_uri[n['uri']]['ao'])]
+        # Prefer the node's real host audio-out symbols (live); fall back to the
+        # catalog count when symbols aren't loaded (mock gnodes). Using catalog
+        # counts when host symbols exist risks idx >= len(syms) -> endpoint None
+        # -> dropped wires (shared with the advanced wiring path).
+        syms = n.get('aout')
+        count = len(syms) if syms is not None else self.by_uri[n['uri']]['ao']
+        return ['%s:out:audio:%d' % (nid, i) for i in range(count)]
 
     def _audio_ins(self, nid):
         if nid == 'OUT':
             return ['OUT:in:audio:0', 'OUT:in:audio:1']
         if nid == 'IN':
             return []
-        n = self._gnode(nid)
+        n = self._node(nid)
         if not n:
             return []
-        return ['%s:in:audio:%d' % (nid, i) for i in range(self.by_uri[n['uri']]['ai'])]
+        syms = n.get('ain')
+        count = len(syms) if syms is not None else self.by_uri[n['uri']]['ai']
+        return ['%s:in:audio:%d' % (nid, i) for i in range(count)]
 
     def _connect_audio(self, from_id, to_id, out):
         fo, ti = self._audio_outs(from_id), self._audio_ins(to_id)
@@ -814,6 +837,11 @@ class EditorBridge(QObject):
         gnodes = [{'id': n['id'], 'uri': n['uri'], 'x': n['x'], 'y': n['y'],
                    'bypass': n['bypass'], 'vals': dict(n['vals'])} for n in src]
         self.gnodes = gnodes
+        # Drop the quick working set once baked to advanced — bake reuses the same
+        # ids, so leaving self.nodes populated would let the unified _node() resolve
+        # a gnode id to its stale quick twin. (_do_evolve clears undo, so quick->
+        # advanced is intentionally one-way; nothing to preserve.)
+        self.nodes = []
         wires = []
         fx = [n for n in gnodes if self.by_uri[n['uri']]['ai'] > 0 and self.by_uri[n['uri']]['ao'] > 0]
         prev = 'IN'
