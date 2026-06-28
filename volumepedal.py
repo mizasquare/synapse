@@ -4,8 +4,8 @@ from hardwares.ADS1115 import ADS1115
 
 # Initialize ADS1115
 ADS = ADS1115(1, 0x49)
-ADS.setGain(ADS.PGA_2_048V)
-ADS.setDataRate(ADS.DR_860SPS)
+ADS.setGain(ADS.PGA_4_096V)  # FSR +-4.096V: 25K TRS 분배기 상단(~2.36V)이 2.048V를 넘어 클리핑되는 것 방지
+ADS.setDataRate(ADS.DR_128SPS)  # 페달엔 860SPS가 과함. 느릴수록 내부평균으로 노이즈↓·입력임피던스↑ (50ms 루프에 7.8ms 변환은 여유)
 
 # Find the "GAAD67" MIDI port
 midi_port_name = "GAAD67"
@@ -27,7 +27,10 @@ CC_VOLUME = 7  # Master Volume
 CC_EXPR = 11  # Expression
 
 
-def map_value(value, in_min=1638, in_max=29490, out_min=0, out_max=127):
+# NOTE: 게인을 ±2.048V→±4.096V로 올리면서 같은 전압이 카운트 절반으로 읽힘 →
+#       기존 캘리브레이션(1638/29490)을 절반으로 스케일해 일관성만 맞춰둔 임시값.
+#       TODO(현장): 페달 꽂고 힐~토 실측 스윕으로 in_min/in_max 재캘리브레이션 필요. docs/hardware.md 참고.
+def map_value(value, in_min=819, in_max=14745, out_min=0, out_max=127):
     """Maps 16-bit ADS1115 range to 7-bit MIDI CC range with dead zones."""
     if value < in_min:
         return out_min
