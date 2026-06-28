@@ -31,6 +31,7 @@ import modepctrl
 from configs import SOCKET_PATH
 from editor_bridge import EditorBridge
 from hardwares import fsledctrl
+from levelmeter import LevelMeter
 from monitorfeed import MonitorFeed
 from presenter import Presenter
 from qtscheduler import QtScheduler
@@ -132,7 +133,7 @@ def main():
 
     # Built only after the host answers (see _bring_up). Held here so aboutToQuit
     # cleanup can reach them whether or not bring-up has run yet.
-    rt = {"presenter": None, "hardware": None, "sock": None, "feed": None}
+    rt = {"presenter": None, "hardware": None, "sock": None, "feed": None, "meter": None}
 
     def _bring_up():
         # GUI thread (marshalled from the wait thread) once MODEP is ready: build
@@ -149,7 +150,12 @@ def main():
         # Live monitor feed: passive mod-ui websocket -> output_set -> meters.
         # SYNAPSE_NOFEED=1 disables it (isolation lever while debugging the feed).
         feed = None if os.environ.get("SYNAPSE_NOFEED") else MonitorFeed(presenter.update_monitor, scheduler)
-        rt.update(presenter=presenter, hardware=hardware, sock=sock, feed=feed)
+        # OVERVIEW IN/OUT level meter: own JACK client tapping capture/playback.
+        # SYNAPSE_NOMETER=1 disables it (isolation lever). Stays silent if JACK is absent.
+        meter = None if os.environ.get("SYNAPSE_NOMETER") else LevelMeter()
+        if meter and meter.ok:
+            view.set_level_source(meter)
+        rt.update(presenter=presenter, hardware=hardware, sock=sock, feed=feed, meter=meter)
         view.goOverview()                            # splash -> overview
 
     def _wait_then_bring_up():
@@ -163,6 +169,8 @@ def main():
             rt["presenter"].stop_footswitch_polling()
         if rt["feed"]:
             rt["feed"].stop()
+        if rt["meter"]:
+            rt["meter"].stop()
         if rt["hardware"]:
             try:
                 rt["hardware"].cleanup()

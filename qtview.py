@@ -71,6 +71,7 @@ _LED_BLUE, _LED_GREEN, _LED_RED, _LED_OFF = "#3b6fe0", "#5fd0a0", "#e6402e", "#2
 class QtView(QObject):
     dataChanged = Signal()
     monitorUpdated = Signal(str, float, float, str)  # (symbol, norm, value, display): per-meter live update
+    levelUpdated = Signal('QVariant')                # overview IN/OUT JACK level meter (dict payload)
     toastRequested = Signal(str)                     # transient on-screen message
     boardsChanged = Signal()                         # overview board-manager list changed
 
@@ -101,6 +102,14 @@ class QtView(QObject):
         self._param_timer = QTimer(self)
         self._param_timer.setInterval(self.PARAM_THROTTLE_MS)
         self._param_timer.timeout.connect(self._flush_params)
+
+        # OVERVIEW level meter: a JACK-tapping source (levelmeter.LevelMeter) is
+        # polled on the GUI thread ~30 Hz and pushed to the IN/OUT nodes via
+        # levelUpdated. No source -> timer never starts (off-device dev is silent).
+        self._level_src = None
+        self._level_timer = QTimer(self)
+        self._level_timer.setInterval(33)
+        self._level_timer.timeout.connect(self._emit_levels)
 
     def set_presenter(self, presenter):
         self.presenter = presenter
@@ -383,6 +392,36 @@ class QtView(QObject):
                                 else ("%g %s" % (value, m.get("unit", ""))).strip())
                 self.monitorUpdated.emit(symbol, m["norm"], value, m["display"])
                 break
+
+    # ----------------------------------------------- OVERVIEW level meter
+    def set_level_source(self, src):
+        """Attach a JACK level source (levelmeter.LevelMeter) and start polling.
+
+        Called from qt_main once the host is up. With no source the timer never
+        runs, so off-device dev (no JACK) simply shows no level on the IN/OUT nodes.
+        """
+        self._level_src = src
+        if src is not None:
+            self._level_timer.start()
+
+    def _emit_levels(self):
+        src = self._level_src
+        if src is None:
+            return
+        snap = src.snapshot()
+        if not snap:
+            return
+        # Linear amplitude -> the same -60..0 dB mapping the focus-card meters use.
+        def pack(amp, peak):
+            return (self._norm(amp, 0.0, 1.0, "meter"),
+                    self._norm(peak, 0.0, 1.0, "meter"),
+                    self._meter_display(peak, 0.0, 1.0))
+        in_n, in_p, in_db = pack(snap["in_amp"], snap["in_peak_amp"])
+        out_n, out_p, out_db = pack(snap["out_amp"], snap["out_peak_amp"])
+        self.levelUpdated.emit({
+            "inNorm": in_n, "inPeak": in_p, "inDb": in_db,
+            "outNorm": out_n, "outPeak": out_p, "outDb": out_db,
+        })
 
     def update_patch_display(self, instance, uri, file_path):
         # A patch file was loaded (by us via setPatch, or externally via the

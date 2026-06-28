@@ -217,7 +217,47 @@ Window {
                                                  : (modelData.selected ? cGreen : cBorder)
                     opacity: (!modelData.isIo && !modelData.on) ? 0.55 : 1.0
 
+                    // IN/OUT nodes double as live level meters: the app taps JACK
+                    // directly (levelmeter.py) and pushes via view.levelUpdated.
+                    // Fill rises from the bottom (live peak, since last frame); a
+                    // thin tick marks the 5s window peak (its dB shows as the sub).
+                    Item {
+                        id: ioMeter
+                        anchors.fill: parent
+                        anchors.margins: 4
+                        visible: modelData.isIo
+                        property real liveNorm: 0
+                        property real peakNorm: 0
+                        property string dbText: ""
+                        Connections {
+                            target: view
+                            function onLevelUpdated(p) {
+                                if (modelData.id === "IN") {
+                                    ioMeter.liveNorm = p.inNorm; ioMeter.peakNorm = p.inPeak; ioMeter.dbText = p.inDb
+                                } else if (modelData.id === "OUT") {
+                                    ioMeter.liveNorm = p.outNorm; ioMeter.peakNorm = p.outPeak; ioMeter.dbText = p.outDb
+                                }
+                            }
+                        }
+                        Rectangle {        // live level fill
+                            anchors.left: parent.left; anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            radius: 6
+                            height: parent.height * Math.max(0, Math.min(1, ioMeter.liveNorm))
+                            color: ioMeter.liveNorm > 0.92 ? "#e6724a" : cGreen
+                            opacity: 0.22
+                            Behavior on height { NumberAnimation { duration: 80 } }
+                        }
+                        Rectangle {        // 5s peak-hold tick
+                            anchors.left: parent.left; anchors.right: parent.right
+                            height: 2; color: cGreen
+                            visible: ioMeter.peakNorm > 0.001
+                            y: (parent.height - 2) * (1 - Math.max(0, Math.min(1, ioMeter.peakNorm)))
+                        }
+                    }
+
                     Column {
+                        z: 1
                         anchors.centerIn: parent
                         width: parent.width - 14
                         spacing: 1
@@ -235,7 +275,9 @@ Window {
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter
                             visible: modelData.sub !== ""
-                            text: modelData.sub
+                            // IN/OUT nodes show their live 5s-peak dB once audio flows,
+                            // else the static role label (GUITAR / STEREO).
+                            text: (modelData.isIo && ioMeter.dbText !== "") ? ioMeter.dbText : modelData.sub
                             color: "#6f8a82"
                             font.family: uiFont
                             font.pixelSize: 13
