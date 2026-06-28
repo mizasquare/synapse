@@ -640,7 +640,7 @@ class ModepController:
 # MODEP host through `get_backend()` instead of naming `ModepController`
 # directly. That lets an off-device entry point (e.g. qt_app.py)
 # `set_backend(fake)` to serve fixtures with no Pi hardware. The default is
-# `ModepController` itself, so the on-device (Kivy/Pi) path is byte-for-byte
+# `ModepController` itself, so the on-device (Pi) path is byte-for-byte
 # unchanged — same staticmethods, no extra indirection. Same inject-at-the-seam
 # pattern as scheduler.py.
 _backend = None

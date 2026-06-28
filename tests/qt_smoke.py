@@ -5,11 +5,11 @@ Validates the Qt render + touch path on this Pi. Runs both windowed (under the
 current labwc compositor) and on eglfs (no compositor), unchanged.
 
 Windowed (under the running desktop):
-    /home/miza/synapse-venv/bin/python qt_smoke.py
+    /home/miza/synapse-venv/bin/python tests/qt_smoke.py
 
 No-compositor (eglfs) — run over SSH so you keep a shell while the GUI is down:
     sudo systemctl stop lightdm
-    QT_QPA_PLATFORM=eglfs /home/miza/synapse-venv/bin/python qt_smoke.py
+    QT_QPA_PLATFORM=eglfs /home/miza/synapse-venv/bin/python tests/qt_smoke.py
     # ...tap around the touchscreen, then tap QUIT (or press Esc)...
     sudo systemctl start lightdm
     # if touch is dead under eglfs, retry with QT_QPA_EGLFS_NO_LIBINPUT=1 prepended

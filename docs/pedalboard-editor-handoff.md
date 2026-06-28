@@ -18,7 +18,7 @@
 
 - 라이브 mod-ui 호스트(`http://localhost:80`)의 `/effect/list` + `/effect/get?uri=` 응답을 그대로 덤프.
 - 즉 **실제 파이에 설치되어 동작 중인 72개 이펙터**의 메타/포트가 손실 없이 들어있다. 가짜 샘플 아님.
-- 재생성: 파이에서 `python3 dump_effects.py` (플러그인 추가/삭제 시 다시 돌리면 갱신).
+- 재생성: 파이의 레포 루트에서 `python3 tools/dump_effects.py` (플러그인 추가/삭제 시 다시 돌리면 갱신).
 - 덤프 시 다음만 정리했다(목업에 무의미·과대):
   - `gui.iconTemplate` / `gui.stylesheet` / `gui.javascript` / `gui.documentation` → `"<dropped: N chars>"` 마커로 치환.
   - `gui.screenshot` / `gui.thumbnail` / `gui.resourcesDirectory` → 파이 절대경로 대신 **basename만** 남김.

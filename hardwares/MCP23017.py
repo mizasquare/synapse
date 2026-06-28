@@ -56,7 +56,7 @@ class MCP23017(object):
         self.address = address
         self.num_gpios = num_gpios
         # Serialises every runtime I2C access (input/output/currentVal/read_bank_a)
-        # so the background footswitch-poll thread and the Kivy main thread (LED
+        # so the background footswitch-poll thread and the Qt GUI main thread (LED
         # writes) can never interleave transactions on the shared bus.
         self._lock = threading.Lock()
 

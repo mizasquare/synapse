@@ -1,7 +1,13 @@
+import os
+import sys
+
+# tools/ live one level below the repo root; put the root on the path so the
+# flat live packages (hardwares, ...) import whatever directory we're run from.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from hardwares.ADS1115 import ADS1115
 from hardwares.MCP23017 import MCP23017
 import time
-import os
 
 ADS = ADS1115(1, 0x49)
 ADS.setGain(ADS.PGA_2_048V)

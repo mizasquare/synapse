@@ -3,12 +3,12 @@
 Decouples the presenter from the Pi-only I2C stack (MCP23017 over smbus2). The
 presenter depends only on the small ``HardwareController`` surface below; the
 on-device implementation is ``hardwares.fsledctrl.Controller`` (real I2C), wired
-in by default. Running off device (the Windows PySide6 mock) means injecting a
+in by default. Running off device (the Windows PyQt6 mock) means injecting a
 ``FakeController`` -- see ``fakehardware`` and ``presenter.Presenter(hardware=...)``.
 
-Selection is **explicit at the entry point**, not auto-detected: ``app.py``
-(Kivy/Pi) builds the real controller and fails loud if the hardware is faulty,
-while ``qt_app.py`` injects the fake. We deliberately do NOT silently fall back
+Selection is **explicit at the entry point**, not auto-detected: ``qt_main.py``
+(the Pi entry) builds the real controller and fails loud if the hardware is
+faulty, while ``qt_app.py`` injects the fake. We deliberately do NOT silently fall back
 to a dummy on I2C errors -- on a live stage box a dead footswitch must surface,
 not pass silently. (Missing I2C *libraries* off-device is a separate, import-time
 condition handled by simply injecting the fake there.)

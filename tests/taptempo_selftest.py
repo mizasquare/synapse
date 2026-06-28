@@ -1,11 +1,18 @@
 """Headless self-test for taptempo.TapTempoEngine (no Qt, no hardware).
 
-Run:  .venv\\Scripts\\python taptempo_selftest.py     (or:  py taptempo_selftest.py)
+Run:  .venv\\Scripts\\python tests/taptempo_selftest.py  (or:  py tests/taptempo_selftest.py)
 
 A synchronous fake scheduler (records the single metronome interval) plus a
 manually-advanced clock make BPM math, snapping, the stale-gap reset and the
 metronome LED plan all deterministic.
 """
+
+import os
+import sys
+
+# tests/ live one level below the repo root; put the root on the path so the
+# flat live modules (taptempo, ...) import whatever directory we're run from.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from taptempo import TapTempoEngine, beat_plan
 

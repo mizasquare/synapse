@@ -197,7 +197,7 @@ class Presenter:
             else:
                 print(error_msg)
 
-    # ── 역방향 채널 (mod-ui notify_synapsin → /tmp/synapsin.sock → app.py → 여기) ──
+    # ── 역방향 채널 (mod-ui notify_synapsin → /tmp/synapsin.sock → qt_main.py → 여기) ──
     # 웹UI/HMI 등 앱 바깥에서 일어난 변화를 desync 없이 앱 화면에 반영한다.
     # 수신 전용: host로 절대 되쏘지 않는다(피드백 루프 방지).
     def handle_reverse_event(self, message):
@@ -339,8 +339,8 @@ class Presenter:
 
         The focused effect may not exist in the new board, and even a same-named
         plugin is a different instance with severed connections -- so the FOCUS
-        card would dangle. Guarded (getattr) so a view without goOverview (the
-        Kivy rollback) is a no-op rather than a crash."""
+        card would dangle. Guarded (getattr) so a view that doesn't expose
+        goOverview is a no-op rather than a crash."""
         go = getattr(self.view, "goOverview", None)
         if callable(go):
             go()
@@ -359,7 +359,7 @@ class Presenter:
 
     def _notify(self, text):
         """Transient on-screen message (toast). Guarded so a view without
-        show_toast (the Kivy rollback) just logs instead of crashing."""
+        show_toast just logs instead of crashing."""
         print(text)
         toast = getattr(self.view, "show_toast", None)
         if callable(toast):
