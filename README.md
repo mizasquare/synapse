@@ -23,11 +23,12 @@ Synapse replaces that with a **purpose-built touchscreen front end** and wires i
 **analog I/O** so it behaves like a real stomp-box:
 
 - Browse / switch **pedalboards** and **snapshots** from the touchscreen.
-- **4 footswitches** with multiple modes (pedalboard navigation, parameter assignment,
-  snapshot assignment).
+- **4 footswitches** with multiple modes (pedalboard navigation, STOMP effect toggles,
+  BANK board select, tap tempo).
 - **8 ring LEDs** (4 × red/blue pairs) around the footswitches for state feedback.
 - **2 pedals** (volume + expression potentiometers) mapped to MIDI CC.
-- On-screen **plugin parameter** editing, **bypass** toggles, a **tuner**, and **BPM/transport** control.
+- On-screen **plugin parameter** editing, **bypass** toggles, a **tuner**, real-time
+  **level meters**, **BPM/transport** control, and a touch **pedalboard editor**.
 - On-demand launch of the original MODEP **web UI** for deeper editing.
 
 ---
@@ -53,44 +54,69 @@ See [`REFERENCES.md`](REFERENCES.md) for the full live-system reference.
 
 ## Architecture
 
-Synapse follows a **Model–View–Presenter**-ish split, talking to MODEP over its local HTTP API:
+Synapse follows a **Model–View–Presenter**-ish split. The logic layers are toolkit- and
+host-agnostic: they reach MODEP and the I²C hardware only through small **object seams**, so
+the same `Presenter` runs on the Pi (real host + real hardware) and on a dev PC (fakes
+injected at the seams — no separate UI fork).
 
 ```
-                         touchscreen / footswitches / pedals
-                                        │
-        ┌───────────────────────────────┼───────────────────────────────┐
-        │                                ▼                                │
-   view.py / view_widgets.py  ◄──►  presenter.py  ◄──►  modepctrl.py      │
-   (Kivy UI, on-screen        (app logic, state,    (ModepController:     │
-    controls, popups)          footswitch polling,   HTTP client + the    │
-        ▲                       hardware glue)        pedalboard model)    │
-        │                                                    │            │
-        │                                                    ▼            │
-   app.py  (Kivy App entry + reverse-channel socket)    mod-ui / mod-host │
-        ▲                                                  (MODEP)        │
-        │                                                    │            │
-        └──────────── /tmp/synapsin.sock (unix dgram) ◄──────┘            │
-              reverse channel: web UI / HMI changes → app sync            │
-        └─────────────────────────────────────────────────────────────────┘
+              touchscreen / footswitches / pedals
+                              │
+   ┌───────────────────────────┼─────────────────────────────────┐
+   │   qml/  ◄──────────►  qtview.py · editor_bridge.py           │
+   │ (PyQt6+QML UI)        (QML↔presenter bridges: `view`,`editor`)│
+   │                                │                             │
+   │                                ▼                             │
+   │                          presenter.py                        │
+   │             (app logic · footswitch poll @100Hz · modes ·    │
+   │              snapshot/board state · LED feedback)            │
+   │                     │                       │                │
+   │          backend.py seam            hardware.py seam         │
+   │          ├ modepctrl  (HTTP, real)  ├ hardwares/fsledctrl(I²C)│
+   │          └ fakemodep  (fixtures)    └ fakehardware (no-op)    │
+   │                     │                                        │
+   │                     ▼                                        │
+   │            mod-ui / mod-host  (MODEP)                        │
+   └───────────────────┬──────────────────────────────────────────┘
+                       │  /tmp/synapsin.sock  (reverse channel)
+                       ▼  web-UI / HMI edits → presenter stays in sync
 ```
 
-- **`app.py`** — Kivy `App` entry point. Also binds a unix-datagram socket
-  (`/tmp/synapsin.sock`) and forwards MODEP's reverse-channel messages to the presenter, so
-  changes made in the web UI or via HMI stay in sync with the touchscreen.
-- **`presenter.py`** — application logic: footswitch polling (background thread @100 Hz),
-  footswitch modes, snapshot/pedalboard state, LED feedback, and the bridge to hardware.
-- **`modepctrl.py`** — `ModepController`, an HTTP client for mod-ui, plus the in-memory
-  pedalboard/plugin data model. `TESTMODE` can point it at a remote MODEP for off-device dev.
-- **`hardwares/`** — low-level I²C drivers (`MCP23017`, `ADS1115`, `Adafruit_I2C`) and
-  `fsledctrl` (footswitch + LED controller).
-- **`mywidget/` / `view_widgets.py`** — custom Kivy widgets (buttons, labels, sliders,
-  toggles, file/save-as popups).
+- **Entry points** — `qt_main.py` (on-device: real `ModepController` over HTTP + real I²C
+  `fsledctrl`, binds the reverse socket, starts the monitor feed + level meter) and
+  `qt_app.py` (off-device dev: fakes injected; `--shot` / `--focus` / `--real`).
+  `app.py` is the **legacy Kivy entry**, kept only for rollback.
+- **`presenter.py`** — toolkit-agnostic application logic: footswitch polling (background
+  thread @100 Hz), footswitch modes, snapshot/pedalboard state, LED feedback, and
+  reverse-channel handling.
+- **`model.py` / `plugincatalog.py`** — the pedalboard domain model + assembler (in-app
+  proxy of the host: effects, ports, `EffectPort.widget_kind`) and the live plugin-catalog
+  normaliser.
+- **`backend.py`** — the **host seam**: the `Backend` surface the logic depends on. Real =
+  `modepctrl.ModepController` (HTTP to mod-ui/mod-host); fake = `fakemodep` (fixtures).
+  Swapped via `modepctrl.get_backend` / `set_backend`.
+- **`hardware.py`** — the **control seam**: the `HardwareController` surface (footswitches +
+  ring LEDs). Real = `hardwares/fsledctrl.Controller` (MCP23017 over I²C); fake =
+  `fakehardware`. Selection is explicit at the entry point, never auto-fallback — a dead
+  footswitch on a live stage box must surface, not pass silently.
+- **`qtview.py` / `editor_bridge.py` / `qtscheduler.py`** — the Qt view: the `view` and
+  `editor` QML context-property bridges, plus the GUI-thread scheduler (`QtScheduler`, the
+  Qt-event-loop implementation of the `scheduler.Scheduler` seam).
+- **`qml/`** — the UI: `main.qml` (overview, focus/inspector, footswitch strip, tap-tempo,
+  board manager), `ControlWidget.qml` (knob/toggle/trigger/enum), `MonitorWidget.qml`
+  (output-port meters + tuner), `PatchPicker.qml` (NAM/IR/cabsim file picker),
+  `PedalboardEditorView.qml` (EDIT screen).
+- **`monitorfeed.py` / `levelmeter.py`** — live value feeds: a passive mod-ui websocket
+  listener (output/monitor ports → focus-card meters) and an own JACK client tapping
+  capture/playback (overview IN/OUT level meters).
+- **`taptempo.py`** — tap-tempo engine (timing math + LED metronome, no GUI/hardware imports).
 - **`volumepedal.py`** — a **standalone** process (not imported by the app) that polls the
   two pedals on the ADS1115 and emits MIDI CC to the `GAAD67` port.
 
 ### Footswitch modes
-`presenter.footswitch_mode`: `0` = pedalboard navigation · `1` = parameter assign ·
-`2` = pedalboard-snapshot assign.
+`presenter.footswitch_mode`: `0` = pedalboard navigation · `1` = STOMP (4 category-filtered
+effects → FS0–3) · `2` = BANK (the active bank's first 4 boards → FS0–3) · `3` = web UI ·
+`4` = tap tempo.
 
 ---
 
@@ -98,23 +124,38 @@ Synapse follows a **Model–View–Presenter**-ish split, talking to MODEP over 
 
 ```
 synapse/
-├── app.py              # Kivy App entry + reverse-channel socket listener
-├── view.py             # top-level Kivy UI (bezel, layout)
-├── view_widgets.py     # composite UI widgets (patch file, param slider, toggles)
-├── presenter.py        # application logic, state, footswitch polling, HW glue
-├── modepctrl.py        # ModepController (mod-ui HTTP client) + pedalboard model
-├── tunerpopup.py       # tuner popup UI
+├── qt_main.py          # on-device entry: PyQt6+QML, real MODEP + real I²C, reverse socket
+├── qt_app.py           # off-device dev entry: fake backend + fake hardware (--shot/--focus/--real)
+├── qtview.py           # QtView — QML↔presenter bridge (`view` context property)
+├── editor_bridge.py    # EditorBridge — pedalboard EDIT-screen brain (`editor` context property)
+├── qtscheduler.py      # QtScheduler — GUI-thread scheduler on the Qt event loop
+├── presenter.py        # application logic, state, footswitch polling, mode handling
+├── model.py            # pedalboard domain model + assembler (in-app host proxy)
+├── plugincatalog.py    # live plugin-catalog normaliser
+├── backend.py          # Backend seam (host) — real = modepctrl, fake = fakemodep
+├── modepctrl.py        # ModepController — mod-ui/mod-host HTTP client (real backend)
+├── fakemodep.py        # in-memory MODEP backend for off-device dev
+├── hardware.py         # HardwareController seam (footswitch/LED)
+├── fakehardware.py     # no-op footswitch/LED controller for off-device dev
+├── scheduler.py        # Scheduler seam — event-loop timer abstraction
+├── monitorfeed.py      # passive mod-ui websocket → output-port meters
+├── levelmeter.py       # own JACK client → overview IN/OUT level meters
+├── taptempo.py         # tap-tempo engine (timing + LED metronome)
+├── tunerpopup.py       # tuner pitch detection
 ├── volumepedal.py      # standalone pedal → MIDI CC bridge (separate process)
 ├── configs.py          # paths, scale factor, fonts, socket path
 ├── utils.py            # helpers
-├── run_synapsepy.sh    # launch script (activate venv → python app.py)
-├── hardwares/          # I²C drivers + footswitch/LED controller
-├── mywidget/           # custom Kivy widgets
+├── run_synapsepy.sh    # launch script (activate venv → python qt_main.py)
+├── qml/                # QML UI (main · ControlWidget · MonitorWidget · PatchPicker · PedalboardEditorView)
+├── hardwares/          # I²C drivers (MCP23017, ADS1115, Adafruit_I2C) + fsledctrl (footswitch/LED)
+├── fixtures/           # off-device dev fixtures (fake-backend JSON)
+├── resources/          # images, fonts (VT323), icons
 ├── mod-tweaks/         # patched mod-ui source + deploy.sh (see below)
-├── resources/          # images, fonts, icons
-├── docs/               # design / diagnosis notes
+├── docs/               # design / diagnosis / roadmap notes
 ├── REFERENCES.md       # external + live-system references
-└── *test.py            # ADStest / hwitest / test — hardware & scratch scripts
+└── (legacy — rollback only, not on the Qt path)
+    app.py · view.py · view_widgets.py · mywidget/   # Kivy app
+    archived/ · under_vsersion1/                     # older snapshots
 ```
 
 ---
@@ -139,8 +180,10 @@ Kivy entry [`app.py`](app.py) + `gcamp6s-venv` are kept for rollback.)
 
 **Off-device development:** the Qt mock [`qt_app.py`](qt_app.py) runs headless on a PC with a
 fake backend + fake hardware injected at the seams — see [`requirements-dev.txt`](requirements-dev.txt).
-(Alternatively, `ModepController.TESTMODE = True` in [`modepctrl.py`](modepctrl.py) aims the HTTP
-client at a remote MODEP.) Hardware-dependent paths (the I²C devices, the unix socket) expect the real box.
+`--shot out.png` renders one frame and quits; `--real` aims the (read-only) backend at the live
+MODEP host to screenshot the actual loaded board. (Alternatively, `ModepController.TESTMODE = True`
+in [`modepctrl.py`](modepctrl.py) aims the HTTP client at a remote MODEP.) Hardware-dependent
+paths (the I²C devices, the unix socket) expect the real box.
 
 ---
 
@@ -179,3 +222,5 @@ Custom endpoints added by the patches (see [`REFERENCES.md`](REFERENCES.md) for 
 - **Naming refactor** — converge the code on *Synapse* (app) vs *GCaMP6s* (box).
 - Dead web-UI path (`open_webui`/`close_webui` + the X11 `xdotool` call) is slated for removal in
   [`docs/qt-roadmap.md`](docs/qt-roadmap.md) Tier 3 (unused on the Qt path; obsoleted by the compositor bypass).
+</content>
+</invoke>
