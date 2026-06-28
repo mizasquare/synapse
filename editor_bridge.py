@@ -29,6 +29,7 @@ import math
 import os
 import random
 import re
+import threading
 import unicodedata
 
 import configs
@@ -461,14 +462,6 @@ class EditorBridge(QObject):
         """The MODEP backend (host seam) when embedded in the app; None in mock."""
         return getattr(self.presenter, 'backend', None) if self.presenter else None
 
-    def _fetch_audio_syms(self, uri):
-        """Ordered (audio_in, audio_out) port symbols for a plugin uri, fetched
-        from the host's plugin definition (cached server-side). ([], []) on miss."""
-        be = self._backend()
-        info = be.effect_get_information(uri) if be else None
-        ap = (info or {}).get('ports', {}).get('audio', {})
-        return ([p['symbol'] for p in ap.get('input', [])],
-                [p['symbol'] for p in ap.get('output', [])])
 
     def _mint_instance(self, uri):
         """Pick a fresh bare instance name for a new live node. web_add adopts the
@@ -765,6 +758,7 @@ class EditorBridge(QObject):
                 'inPins': 0 if is_branch else p['ai'], 'outPins': 0 if is_branch else p['ao'],
                 'badge': badge, 'badgeColor': badge_color, 'hasBadge': bool(badge),
                 'flying': n['id'] == self._fly_id,
+                'pending': bool(n.get('pending')),
             })
         return out
 
@@ -1203,6 +1197,7 @@ class EditorBridge(QObject):
                 'hasIn': has_in, 'hasOut': has_out,
                 'edgeInGlow': cand('in', has_in), 'edgeOutGlow': cand('out', has_out),
                 'flying': node['id'] == self._fly_id,
+                'pending': bool(node.get('pending')),
             })
         return out
 
@@ -1688,22 +1683,14 @@ class EditorBridge(QObject):
             return
         p = self.by_uri[uri]
         tx, ty = self._free_spot(self.mode, uri)
-        if self.mode == 'advanced' and self._live_flag:
-            # Live: push to the host FIRST, only mirror the node on success — so a
-            # rejected add never leaves a phantom on the canvas (no rollback path).
-            node = self._live_add_node(uri, tx, ty)
-            if node is None:
-                return
-            self._touch()
-        elif self.mode == 'quick' and self._live_flag:
-            # Live quick: host-first add at the chain end, then reconcile wires it
-            # into the serial chain (old last->OUT becomes last->new, new->OUT).
-            node = self._live_add_quick(uri)
-            if node is None:
-                return
-            self._reconcile_live_quick()
-            self._touch()
-        elif self.mode == 'advanced':
+        if self._live_flag:
+            # Live: add asynchronously. Plugin instantiation can be slow (FFT/spectral
+            # plugins take seconds), so a synchronous host call would freeze the UI.
+            # A dimmed ghost node lands immediately; _on_add_done confirms it — or
+            # drops it on a host rejection — when the background add returns.
+            self._begin_live_add(uri, tx, ty)
+            return
+        if self.mode == 'advanced':
             self._push_hist()
             node = {'id': self._new_id(), 'uri': uri, 'x': tx, 'y': ty,
                     'bypass': False, 'vals': {c['sym']: c['def'] for c in p.get('ctl', []) if c['w'] != 'bypass'}}
@@ -1718,28 +1705,76 @@ class EditorBridge(QObject):
         # fly in from off-screen (palette side) to the chosen slot
         self.spawnFly.emit(p['name'], bcol(p['bucket']), -NODEW - 16.0, ty, tx, ty)
 
-    def _live_add_node(self, uri, tx, ty):
-        """Mint an instance, add it on the host, and build the matching gnode
-        (with audio port symbols + gid↔inst mapping). None on backend failure."""
+    def _run_bg(self, work, done):
+        """Run work() off the GUI thread; deliver done(result) back on the GUI
+        thread (via the presenter's scheduler — same marshalling the reverse-socket
+        loop uses). Keeps slow host mutations from freezing the UI. Falls back to a
+        synchronous call when no scheduler is wired (off-device unit tests)."""
+        sched = getattr(self.presenter, 'scheduler', None)
+        if sched is None:
+            done(work())
+            return
+
+        def runner():
+            try:
+                res = work()
+            except Exception as e:                       # noqa: BLE001
+                res = 'An error occurred: %s' % e
+            sched.schedule_once(lambda dt: done(res))
+        threading.Thread(target=runner, daemon=True, name='editor-add').start()
+
+    def _begin_live_add(self, uri, tx, ty):
+        """Drop a dimmed PENDING ghost node immediately and fire the host add in the
+        background. Audio port symbols come from the catalog (ains/aouts) — no extra
+        host fetch. _on_add_done confirms or removes the ghost when the add returns."""
         be = self._backend()
         if not be:
             self.toast.emit('백엔드 없음 — 추가 불가')
-            return None
-        inst = self._mint_instance(uri)
-        err = be.add_effect(inst, uri, tx, ty)
-        if err is not None:
-            self.toast.emit('추가 실패: %s' % err)
-            return None
-        gid = self._new_id()
-        ain, aout = self._fetch_audio_syms(uri)
+            return
         p = self.by_uri[uri]
-        node = {'id': gid, 'uri': uri, 'inst': inst, 'x': tx, 'y': ty, 'bypass': False,
-                'ain': ain, 'aout': aout,
+        inst = self._mint_instance(uri)
+        gid = self._new_id()
+        quick = (self.mode == 'quick')
+        if quick:
+            x, y = max([n['x'] for n in self.nodes], default=80) + 150, CANVAS_H / 2 - 30
+        else:
+            x, y = tx, ty
+        node = {'id': gid, 'uri': uri, 'inst': inst, 'x': x, 'y': y, 'bypass': False,
+                'pending': True, 'inAdapt': 'auto', 'mergeAdapt': 'auto',
+                'ain': list(p.get('ains') or []), 'aout': list(p.get('aouts') or []),
                 'vals': {c['sym']: c['def'] for c in p.get('ctl', []) if c['w'] != 'bypass'}}
-        self.gnodes.append(node)
+        (self.nodes if quick else self.gnodes).append(node)
         self._gid_by_inst[inst] = gid
         self._inst_by_gid[gid] = inst
-        return node
+        self.sel = gid
+        self._fly_id = gid
+        self.fly_bucket = None
+        self._touch()
+        self._rebuild()
+        self.spawnFly.emit(p['name'], bcol(p['bucket']), -NODEW - 16.0, y, x, y)
+        self._run_bg(lambda: be.add_effect(inst, uri, x, y),
+                     lambda err: self._on_add_done(gid, inst, quick, err))
+
+    def _on_add_done(self, gid, inst, quick, err):
+        """Background add returned. err is None => the host has the instance: confirm
+        the ghost (and, in quick mode, wire it into the chain now that it really
+        exists). Otherwise drop the ghost and surface the reason."""
+        bucket = self.nodes if quick else self.gnodes
+        node = next((n for n in bucket if n['id'] == gid), None)
+        if err is not None:
+            bucket[:] = [n for n in bucket if n['id'] != gid]
+            self._gid_by_inst.pop(inst, None)
+            self._inst_by_gid.pop(gid, None)
+            if self.sel == gid:
+                self.sel = -1
+            self.toast.emit('추가 실패: %s' % err)
+            self._rebuild()
+            return
+        if node is not None:
+            node.pop('pending', None)
+        if quick:
+            self._reconcile_live_quick()
+        self._rebuild()
 
     # ------------------------------------------------ live QUICK mode (M6d-3)
     @Slot()
@@ -1839,29 +1874,6 @@ class EditorBridge(QObject):
         self._touch()
         self._rebuild()
 
-    def _live_add_quick(self, uri):
-        """Mint + add a plugin on the host and append it to the right end of the
-        quick chain. The caller reconciles to wire it in. None on host failure."""
-        be = self._backend()
-        if not be:
-            self.toast.emit('백엔드 없음 — 추가 불가')
-            return None
-        inst = self._mint_instance(uri)
-        err = be.add_effect(inst, uri, 0, 0)
-        if err is not None:
-            self.toast.emit('추가 실패: %s' % err)
-            return None
-        gid = self._new_id()
-        ain, aout = self._fetch_audio_syms(uri)
-        p = self.by_uri[uri]
-        maxx = max([n['x'] for n in self.nodes], default=80)
-        node = {'id': gid, 'uri': uri, 'inst': inst, 'x': maxx + 150, 'y': CANVAS_H / 2 - 30,
-                'bypass': False, 'ain': ain, 'aout': aout, 'inAdapt': 'auto', 'mergeAdapt': 'auto',
-                'vals': {c['sym']: c['def'] for c in p.get('ctl', []) if c['w'] != 'bypass'}}
-        self.nodes.append(node)
-        self._gid_by_inst[inst] = gid
-        self._inst_by_gid[gid] = inst
-        return node
 
     @Slot()
     def clearFly(self):

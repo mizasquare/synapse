@@ -539,12 +539,15 @@ class ModepController:
 		try:
 			endpoint = (f"effect/add/graph/{quote(instance, safe='')}"
 						f"?uri={quote(uri, safe='')}&x={x}&y={y}")
-			r = ModepController._request("get", endpoint)
+			# Generous timeout: some plugins (FFT/spectral) take seconds to
+			# instantiate on the host. The editor calls this off the GUI thread,
+			# so waiting here never freezes the UI.
+			r = ModepController._request("get", endpoint, timeout=60)
 			if r is None:
 				return "MODEP host did not respond"
 			if r.status_code == 200 and r.json():
 				return None
-			return r.text or "effect add failed"
+			return "host rejected the add"
 		except Exception as e:
 			return f"An error occurred: {e}"
 

@@ -254,7 +254,7 @@ Item {
                         id: nd
                         x: modelData.x; y: modelData.y; width: 124; height: 52; radius: 7
                         color: "#161b26"; border.width: 2; border.color: modelData.border
-                        opacity: modelData.flying ? 0 : (modelData.bypass ? 0.55 : 1.0)
+                        opacity: modelData.flying ? 0 : (modelData.pending ? 0.4 : (modelData.bypass ? 0.55 : 1.0))
                         property bool dragged: false
 
                         Column {
@@ -428,7 +428,7 @@ Item {
                         id: gn
                         x: modelData.x; y: modelData.y; width: 124; height: modelData.h; radius: 7
                         color: "#161b26"; border.width: 2; border.color: modelData.border
-                        opacity: modelData.flying ? 0 : (modelData.bypass ? 0.55 : 1.0)
+                        opacity: modelData.flying ? 0 : (modelData.pending ? 0.4 : (modelData.bypass ? 0.55 : 1.0))
                         property bool dragged: false
 
                         Column {
