@@ -23,6 +23,7 @@ import glob
 import json
 import os
 
+import configs
 from backend import Backend
 
 
@@ -40,6 +41,7 @@ class FakeModepController(Backend):
         self._effects_by_uri = {}  # plugin uri -> effect_get_information dict
         self._catalog = []         # installed plugins (native shape) for effect_list()
         self._load_fixtures()
+        self._seed_default_board()
 
         self._current_path = self._pb_order[0]
         self._seed_current()
@@ -63,6 +65,35 @@ class FakeModepController(Backend):
             self._pb_order.append(path)
             # effect metadata is keyed by uri and may be shared across boards
             self._effects_by_uri.update(data.get("effects", {}))
+
+    def _seed_default_board(self):
+        """Synthesize the empty ``default.pedalboard`` the real host always ships.
+
+        The editor's NEW BOARD always loads ``configs.DEFAULT_PEDALBOARD`` as a
+        scratch board (editor_bridge._do_new_live_board), so without it
+        set_pedalboard() fails and NEW silently aborts off device. Registered in
+        ``_pb_by_path`` (so set_pedalboard finds it) but deliberately NOT in
+        ``_pb_order`` -- the host hides default from board lists, and so must the
+        fake (get_all_pedalboard_entries walks _pb_order).
+
+        Built by cloning a loaded fixture and emptying the graph, so every
+        structural field the pedalboard builder indexes directly (``width``,
+        ``height``, ``timeInfo.bpmCC``/``rollingCC``, ...) is present -- a
+        hand-authored dict would miss them (model.initialize_modep_pedalboard)."""
+        import copy
+        path = configs.DEFAULT_PEDALBOARD
+        if path in self._pb_by_path:
+            return
+        data = copy.deepcopy(self._pb_by_path[self._pb_order[0]])
+        data["current_pedalboard"] = path
+        info = data["pedalboard_info"]
+        info["title"] = "Default"
+        info["plugins"] = []
+        info["connections"] = []
+        data["snapshots"] = {}
+        data["snapshot_current_idx"] = 0
+        data["patches"] = {}
+        self._pb_by_path[path] = data
 
     def _seed_current(self):
         """(Re)build mutable state from the current pedalboard fixture. Called
