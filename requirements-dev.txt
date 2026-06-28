@@ -1,4 +1,4 @@
-# Off-device development deps for the Windows PyQt6 + QML mock (qt_app.py).
+# Off-device development deps for the Windows PyQt6 + QML mock (qt_dev.py).
 # These are NOT the Pi runtime deps (PyQt6, smbus2, mido, ...) — those live in
 # the box's synapse-venv (see REFERENCES.md). This file is just enough to run
 # the mock with fake backend + fake hardware on a dev machine.
@@ -13,7 +13,7 @@
 #   py -m venv .venv
 #   .venv\Scripts\python -m pip install -r requirements-dev.txt
 # Run the mock:
-#   .venv\Scripts\python qt_main.py
+#   .venv\Scripts\python qt_dev.py
 
 PyQt6==6.4.2      # Qt Quick (QML) + PyQt6 GUI toolkit binding
 PyQt6-Qt6==6.4.2  # Qt runtime; pin to match the Pi (binding's dep is unpinned >=)

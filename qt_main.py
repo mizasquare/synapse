@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """On-device entry: PyQt6 + QML driving the REAL MODEP host and REAL I2C hardware.
 
-The Raspberry Pi entry point. Unlike ``qt_app.py`` (off-device dev: fake backend
+The Raspberry Pi entry point. Unlike ``qt_dev.py`` (off-device dev: fake backend
 + fake hardware), this injects NO fakes -- the ``Presenter`` defaults to the real
 MODEP host (``ModepController``, HTTP to localhost) and the footswitch/LED
 controller is the real I2C ``fsledctrl.Controller``. It also binds the reverse-

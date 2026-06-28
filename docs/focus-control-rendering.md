@@ -254,7 +254,7 @@ focus = {
 ## 10. 구현 진행 (계층1, 2026-06-25)
 
 **완료 — 분류만으로(플러그인 하드코딩 없이) 전 타입 렌더, 오프디바이스 PNG 검증.**
-`qt_app.py --shot --focus WidgetLab` (offscreen+software 백엔드, 라이브 앱 무관)로
+`qt_dev.py --shot --focus WidgetLab` (offscreen+software 백엔드, 라이브 앱 무관)로
 쇼케이스 카드 확인: 컨트롤 6종(knob/knob_int/knob_log/toggle/trigger/enum) +
 모니터 4종(meter/clip/numeric/gauge) 전부 distinct 렌더.
 
@@ -269,7 +269,7 @@ focus = {
 
 폴리시 완료: 로그노브 norm/역매핑, 정수 스냅, 토글/트리거/enum 중복 값라벨 제거.
 
-**실보드 검증 (qt_app.py `--real`, 라이브 mod-host에 read-only HTTP, 라이브 앱 무관).**
+**실보드 검증 (qt_dev.py `--real`, 라이브 mod-host에 read-only HTTP, 라이브 앱 무관).**
 현재 보드 `clean 0`(Noisegate/3BandEQ/modmeter×2/AIDA-X/CabinetLoader/CfgStereo) 렌더 확인.
 실데이터가 잠복 버그 2개를 드러내 수정:
 - `model.py` 빌더 `if current_value:` → `is not None`. 값 0 컨트롤(0 dB 게인, reset 트리거)이 버려지던 것 수정(EQ 6노브 다 표시).

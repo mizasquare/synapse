@@ -6,8 +6,8 @@ desktop dev). The on-device entry is ``qt_main.py`` (real ``ModepController`` +
 real I2C ``fsledctrl``); this file deliberately injects fakes only.
 
 Run:
-    python qt_app.py                 # interactive window (fake backend + hardware)
-    python qt_app.py --shot out.png  # render one frame, save, quit
+    python qt_dev.py                 # interactive window (fake backend + hardware)
+    python qt_dev.py --shot out.png  # render one frame, save, quit
 """
 
 import os
@@ -40,6 +40,14 @@ def main():
         j = argv.index("--focus")
         if j + 1 < len(argv):
             focus_inst = argv[j + 1]  # dev: open FOCUS on this effect for a screenshot
+
+    # Device-pixel parity: the Pi runs eglfs at devicePixelRatio=1, so 800x480
+    # logical == 800x480 physical. A dev desktop with display scaling (e.g. 150%)
+    # would otherwise inflate the same window to 1200x720 and skew every layout
+    # judgement. Force DPR=1 so the mock matches the box pixel-for-pixel. Must be
+    # set before QGuiApplication is constructed; setdefault lets an explicit
+    # override (QT_ENABLE_HIGHDPI_SCALING=1) still win for hi-dpi spot checks.
+    os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "0")
 
     app = QGuiApplication(argv)
 
@@ -82,7 +90,7 @@ def main():
     ctx.setContextProperty("uiFont", ui_font)
     engine.load(QUrl.fromLocalFile(os.path.join(BASE, "qml", "main.qml")))
     if not engine.rootObjects():
-        print("[qt_app] QML failed to load")
+        print("[qt_dev] QML failed to load")
         return 1
 
     # Stop the footswitch poll thread cleanly on quit. Harmless now (FakeController
@@ -122,7 +130,7 @@ def main():
                 p = "%s-f%d%s" % (base, n["i"], ext)
                 img = win.grabWindow()
                 img.save(p)
-                print("[qt_app] frame %s (%dx%d)" % (p, img.width(), img.height()))
+                print("[qt_dev] frame %s (%dx%d)" % (p, img.width(), img.height()))
                 if n["i"] >= 3:
                     app.quit()
 
@@ -134,10 +142,10 @@ def main():
             try:
                 img = win.grabWindow()
                 ok = img.save(shot)
-                print("[qt_app] screenshot %s -> %s (%dx%d)" % (
+                print("[qt_dev] screenshot %s -> %s (%dx%d)" % (
                     "ok" if ok else "FAILED", shot, img.width(), img.height()))
             except Exception as e:
-                print("[qt_app] grab failed:", e)
+                print("[qt_dev] grab failed:", e)
             finally:
                 app.quit()
 
