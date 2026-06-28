@@ -89,19 +89,27 @@ Item {
     }
 
     // --- on/off toggle ---
+    // `on` seeds from the model but is owned locally after a tap (like the knob's
+    // dispNorm): update_parameter_display syncs the model silently (no emit), so a
+    // pure m.value binding would never flip. The next full rebuild re-seeds it.
     Component {
         id: toggleC
         Rectangle {
+            id: tgl
             width: 84; height: 44; radius: 22
             property bool on: root.m ? root.m.value >= 0.5 : false
             color: on ? root.cGreen : "#2c3648"
             Text {
-                anchors.centerIn: parent; text: parent.on ? "ON" : "OFF"
-                color: parent.on ? "#0e1118" : "#9aa3b2"; font.family: uiFont; font.pixelSize: 16
+                anchors.centerIn: parent; text: tgl.on ? "ON" : "OFF"
+                color: tgl.on ? "#0e1118" : "#9aa3b2"; font.family: uiFont; font.pixelSize: 16
             }
             MouseArea {
                 anchors.fill: parent
-                onClicked: if (root.m) view.setParameter(root.instance, root.m.symbol, parent.on ? 0 : 1)
+                onClicked: {
+                    if (!root.m) return
+                    tgl.on = !tgl.on                 // optimistic flip (breaks the seed binding)
+                    view.setParameter(root.instance, root.m.symbol, tgl.on ? 1 : 0)
+                }
             }
         }
     }
@@ -124,12 +132,23 @@ Item {
     }
 
     // --- enumeration selector (tap to cycle) ---
+    // curVal is locally owned after a tap (same reason as the toggle: the model
+    // syncs silently). label derives from it so the readout updates immediately.
     Component {
         id: enumC
         Rectangle {
+            id: enr
             width: 100; height: 84; radius: 8
             color: root.cElev; border.width: 1; border.color: root.cBorder
-            Text { anchors.centerIn: parent; text: root.m ? root.m.display : ""
+            property real curVal: root.m ? root.m.value : 0
+            property string label: {
+                if (!root.m) return ""
+                var opts = root.m.options || []
+                for (var k = 0; k < opts.length; k++)
+                    if (Math.abs(opts[k].value - enr.curVal) < 1e-6) return opts[k].label
+                return root.m.display
+            }
+            Text { anchors.centerIn: parent; text: enr.label
                    color: root.cText; font.family: uiFont; font.pixelSize: 18 }
             Text { anchors.bottom: parent.bottom; anchors.bottomMargin: 4
                    anchors.horizontalCenter: parent.horizontalCenter; text: "▾"
@@ -140,8 +159,9 @@ Item {
                     if (!root.m || !root.m.options || root.m.options.length === 0) return
                     var i = 0
                     for (var k = 0; k < root.m.options.length; k++)
-                        if (Math.abs(root.m.options[k].value - root.m.value) < 1e-6) { i = k; break }
+                        if (Math.abs(root.m.options[k].value - enr.curVal) < 1e-6) { i = k; break }
                     var nx = root.m.options[(i + 1) % root.m.options.length]
+                    enr.curVal = nx.value           // optimistic advance (breaks the seed binding)
                     view.setParameter(root.instance, root.m.symbol, nx.value)
                 }
             }
