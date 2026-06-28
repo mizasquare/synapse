@@ -96,6 +96,11 @@ Window {
         anchors.fill: parent
         visible: view.screen === "overview"
         property bool boardsOpen: false   // board-manager overlay
+        property bool bankOpen: false     // bank-selector overlay (placeholder)
+        property bool hubOpen: false      // settings / system hub overlay
+        property string hubLeaf: "menu"   // hub content: "menu" | "config" | "banks" | "system"
+        property bool sysConfirm: false   // system: an action is armed, awaiting 2nd tap
+        property string sysAction: ""     // "shutdown" | "reboot"
 
         // -- Tier-1 glance header (~120px): board name + snapshot --
         Item {
@@ -145,6 +150,12 @@ Window {
                                     onClicked: { view.refreshBoards(); overviewScreen.boardsOpen = true } }
                     }
                     Rectangle {
+                        width: 70; height: 38; radius: 8
+                        color: "#162033"; border.width: 1; border.color: "#3b6fe0"
+                        Text { anchors.centerIn: parent; text: "BANK"; color: "#9cc2ff"; font.family: uiFont; font.pixelSize: 19 }
+                        MouseArea { anchors.fill: parent; onClicked: overviewScreen.bankOpen = true }
+                    }
+                    Rectangle {
                         width: 72; height: 38; radius: 8
                         color: "#1b2230"; border.width: 1; border.color: cBorder
                         Text { anchors.centerIn: parent; text: "SAVE"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 19 }
@@ -161,6 +172,12 @@ Window {
                         color: "#241b2e"; border.width: 1; border.color: "#54407a"
                         Text { anchors.centerIn: parent; text: "EDIT"; color: "#cdb6f0"; font.family: uiFont; font.pixelSize: 19 }
                         MouseArea { anchors.fill: parent; onClicked: view.enterEdit() }
+                    }
+                    Rectangle {
+                        width: 66; height: 38; radius: 8
+                        color: "#1b2230"; border.width: 1; border.color: cBorder
+                        Text { anchors.centerIn: parent; text: "MENU"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 19 }
+                        MouseArea { anchors.fill: parent; onClicked: { overviewScreen.hubLeaf = "menu"; overviewScreen.hubOpen = true } }
                     }
                 }
             }
@@ -406,6 +423,140 @@ Window {
                                    text: "호스트 보드 목록 없음"; color: cDim
                                    font.family: uiFont; font.pixelSize: 17; topPadding: 20 }
                         }
+                    }
+                }
+            }
+        }
+
+        // -------- bank selector (overlay, placeholder) --------
+        Item {
+            visible: overviewScreen.bankOpen; anchors.fill: parent; z: 90
+            MouseArea { anchors.fill: parent; onClicked: overviewScreen.bankOpen = false }
+            Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.6 }
+            Rectangle {
+                width: 560; height: 280; radius: 12; anchors.centerIn: parent
+                color: cPanel; border.width: 1; border.color: cBorder
+                MouseArea { anchors.fill: parent }   // swallow clicks
+                Column {
+                    anchors.fill: parent; anchors.margins: 18; spacing: 12
+                    Item {
+                        width: parent.width; height: 30
+                        Text { text: "뱅크 선택"; color: cText; font.family: uiFont; font.pixelSize: 24
+                               anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
+                        Text { text: "✕"; color: cMuted; font.pixelSize: 24
+                               anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                               MouseArea { anchors.fill: parent; onClicked: overviewScreen.bankOpen = false } }
+                    }
+                    Text { text: "뱅크 기능 준비 중.\n곧 여기에서 뱅크(보드 묶음)를 전환하게 됩니다."
+                           color: cDim; font.family: uiFont; font.pixelSize: 18
+                           wrapMode: Text.WordWrap; width: parent.width }
+                }
+            }
+        }
+
+        // -------- settings / system hub (overlay) --------
+        Item {
+            visible: overviewScreen.hubOpen; anchors.fill: parent; z: 95
+            MouseArea { anchors.fill: parent
+                        onClicked: { overviewScreen.hubOpen = false; overviewScreen.sysConfirm = false } }
+            Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.6 }
+            Rectangle {
+                width: 560; height: 420; radius: 12; anchors.centerIn: parent
+                color: cPanel; border.width: 1; border.color: cBorder
+                MouseArea { anchors.fill: parent }   // swallow clicks
+                Column {
+                    anchors.fill: parent; anchors.margins: 18; spacing: 14
+                    // header (back + title + close)
+                    Item {
+                        width: parent.width; height: 30
+                        Text { visible: overviewScreen.hubLeaf !== "menu"
+                               text: "< 뒤로"; color: cMuted; font.family: uiFont; font.pixelSize: 20
+                               anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                               MouseArea { anchors.fill: parent
+                                           onClicked: { overviewScreen.hubLeaf = "menu"; overviewScreen.sysConfirm = false } } }
+                        Text { text: overviewScreen.hubLeaf === "system" ? "시스템"
+                                     : overviewScreen.hubLeaf === "config" ? "설정"
+                                     : overviewScreen.hubLeaf === "banks" ? "뱅크 관리" : "설정 / 시스템"
+                               color: cText; font.family: uiFont; font.pixelSize: 24
+                               anchors.horizontalCenter: parent.horizontalCenter
+                               anchors.verticalCenter: parent.verticalCenter }
+                        Text { text: "✕"; color: cMuted; font.pixelSize: 24
+                               anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                               MouseArea { anchors.fill: parent
+                                           onClicked: { overviewScreen.hubOpen = false; overviewScreen.sysConfirm = false } } }
+                    }
+                    // ---- menu ----
+                    Column {
+                        visible: overviewScreen.hubLeaf === "menu"
+                        width: parent.width; spacing: 10
+                        Repeater {
+                            model: [ {k:"config", t:"설정 (CONFIG)",   s:"탭템포·풋스위치 등 — 준비 중"},
+                                     {k:"banks",  t:"뱅크 관리 (BANKS)", s:"뱅크 생성/편집 — 준비 중"},
+                                     {k:"system", t:"시스템 (SYSTEM)",  s:"안전 종료 · 재부팅"} ]
+                            Rectangle {
+                                width: parent.width; height: 64; radius: 8
+                                color: "#161b26"; border.width: 1; border.color: cBorder
+                                Column {
+                                    anchors.left: parent.left; anchors.leftMargin: 14
+                                    anchors.verticalCenter: parent.verticalCenter; spacing: 3
+                                    Text { text: modelData.t; color: cText; font.family: uiFont; font.pixelSize: 20 }
+                                    Text { text: modelData.s; color: cDim;  font.family: uiFont; font.pixelSize: 15 }
+                                }
+                                Text { text: ">"; color: cMuted; font.pixelSize: 24
+                                       anchors.right: parent.right; anchors.rightMargin: 16
+                                       anchors.verticalCenter: parent.verticalCenter }
+                                MouseArea { anchors.fill: parent
+                                            onClicked: { overviewScreen.hubLeaf = modelData.k; overviewScreen.sysConfirm = false } }
+                            }
+                        }
+                    }
+                    // ---- config placeholder ----
+                    Text { visible: overviewScreen.hubLeaf === "config"
+                           text: "설정 화면 준비 중.\n하드코딩된 옵션들(탭템포 스냅 그리드, 풋스위치 콤보 등)이\n여기로 들어올 예정입니다. (docs/config-todo.md)"
+                           color: cDim; font.family: uiFont; font.pixelSize: 17
+                           wrapMode: Text.WordWrap; width: parent.width }
+                    // ---- banks placeholder ----
+                    Text { visible: overviewScreen.hubLeaf === "banks"
+                           text: "뱅크 관리 준비 중.\n뱅크 생성/편집과 보드 할당이 여기로 들어옵니다."
+                           color: cDim; font.family: uiFont; font.pixelSize: 17
+                           wrapMode: Text.WordWrap; width: parent.width }
+                    // ---- system (real: shutdown / reboot, 2-tap confirm) ----
+                    Column {
+                        visible: overviewScreen.hubLeaf === "system"
+                        width: parent.width; spacing: 14
+                        Text { text: "장치를 안전하게 종료/재부팅합니다.\n전원을 그냥 뽑으면 SD 카드가 손상될 수 있습니다."
+                               color: cDim; font.family: uiFont; font.pixelSize: 16
+                               wrapMode: Text.WordWrap; width: parent.width }
+                        Row {
+                            spacing: 14
+                            Rectangle {
+                                width: 220; height: 70; radius: 8
+                                color: "#2a1416"; border.width: 1; border.color: "#7a3b3b"
+                                Text { anchors.centerIn: parent
+                                       text: (overviewScreen.sysConfirm && overviewScreen.sysAction === "shutdown") ? "정말 종료?" : "안전 종료"
+                                       color: "#ffb3b3"; font.family: uiFont; font.pixelSize: 23 }
+                                MouseArea { anchors.fill: parent
+                                    onClicked: {
+                                        if (overviewScreen.sysConfirm && overviewScreen.sysAction === "shutdown") view.systemShutdown();
+                                        else { overviewScreen.sysAction = "shutdown"; overviewScreen.sysConfirm = true; }
+                                    } }
+                            }
+                            Rectangle {
+                                width: 220; height: 70; radius: 8
+                                color: "#1b2230"; border.width: 1; border.color: cBorder
+                                Text { anchors.centerIn: parent
+                                       text: (overviewScreen.sysConfirm && overviewScreen.sysAction === "reboot") ? "정말 재부팅?" : "재부팅"
+                                       color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 23 }
+                                MouseArea { anchors.fill: parent
+                                    onClicked: {
+                                        if (overviewScreen.sysConfirm && overviewScreen.sysAction === "reboot") view.systemReboot();
+                                        else { overviewScreen.sysAction = "reboot"; overviewScreen.sysConfirm = true; }
+                                    } }
+                            }
+                        }
+                        Text { visible: overviewScreen.sysConfirm
+                               text: "한 번 더 누르면 실행됩니다. (취소: 패널 밖을 탭)"
+                               color: cMuted; font.family: uiFont; font.pixelSize: 15 }
                     }
                 }
             }
