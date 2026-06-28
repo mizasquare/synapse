@@ -1,10 +1,9 @@
-"""Scheduler backed by the Qt event loop (PySide6).
+"""Scheduler backed by the Qt event loop (PyQt6).
 
-Off-device counterpart to ``scheduler.KivyScheduler``: the presenter and hardware
+The concrete ``scheduler.Scheduler`` implementation: the presenter and hardware
 layer depend only on ``scheduler.Scheduler``, so the Qt entry point injects this.
 ``schedule_once`` is safe to call from a background thread (the footswitch poll
-loop) -- it marshals the work onto the GUI thread via a queued signal, mirroring
-KivyScheduler's thread-safety.
+loop) -- it marshals the work onto the GUI thread via a queued signal.
 """
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal as Signal, Qt, QCoreApplication, QThread

@@ -11,7 +11,7 @@ time signature's beats-per-bar (``bpb``) -- MODEP transport tracks no denominato
 so the meter class keys off the beat count alone.
 
 Pure logic + an injected ``scheduler.Scheduler`` and clock => unit-testable
-headless (see ``taptempo_selftest.py``): pass a fake scheduler that records the
+headless (see ``tests/taptempo_selftest.py``): pass a fake scheduler that records the
 interval and a controllable clock to assert BPM/snap/reset deterministically.
 """
 

@@ -9,9 +9,9 @@ controller — no laptop or phone needed to play.
 - **GCaMP6s** — the whole finished multi-effects box (the product).
 - **Synapse** — this repo: the PyQt6 + QML app that drives MODEP from the box's touchscreen.
 
-> Naming note: the codebase still carries the old name in places (the legacy Kivy entry —
-> `GCaMP6sApp` class in [`app.py`](app.py), kept for rollback). The intended
-> end state is **Synapse = app**, **GCaMP6s = box**; a rename refactor is on the roadmap.
+> Naming note: the codebase still carries the old name in places (e.g. the `GAAD67` /
+> `GCaMP6s` identifiers in the MIDI/host wiring). The intended end state is
+> **Synapse = app**, **GCaMP6s = box**; a rename refactor is on the roadmap.
 
 ---
 
@@ -85,7 +85,8 @@ injected at the seams — no separate UI fork).
 - **Entry points** — `qt_main.py` (on-device: real `ModepController` over HTTP + real I²C
   `fsledctrl`, binds the reverse socket, starts the monitor feed + level meter) and
   `qt_app.py` (off-device dev: fakes injected; `--shot` / `--focus` / `--real`).
-  `app.py` is the **legacy Kivy entry**, kept only for rollback.
+  (The legacy Kivy app was removed; the Qt entries are the only path. For rollback,
+  `run_synapsepy.sh.kivy-bak` + git history hold the old entry.)
 - **`presenter.py`** — toolkit-agnostic application logic: footswitch polling (background
   thread @100 Hz), footswitch modes, snapshot/pedalboard state, LED feedback, and
   reverse-channel handling.
@@ -141,7 +142,6 @@ synapse/
 ├── monitorfeed.py      # passive mod-ui websocket → output-port meters
 ├── levelmeter.py       # own JACK client → overview IN/OUT level meters
 ├── taptempo.py         # tap-tempo engine (timing + LED metronome)
-├── tunerpopup.py       # tuner pitch detection
 ├── volumepedal.py      # standalone pedal → MIDI CC bridge (separate process)
 ├── configs.py          # paths, scale factor, fonts, socket path
 ├── utils.py            # helpers
@@ -151,10 +151,11 @@ synapse/
 ├── fixtures/           # off-device dev fixtures (fake-backend JSON)
 ├── resources/          # images, fonts (VT323), icons
 ├── mod-tweaks/         # patched mod-ui source + deploy.sh (see below)
+├── tests/              # qt_smoke · taptempo_selftest · stress_add_test (run from repo root)
+├── tools/              # dev/bring-up scripts: dump_effects · hwitest · ADStest · test (wvkbd toggle)
 ├── docs/               # design / diagnosis / roadmap notes
 ├── REFERENCES.md       # external + live-system references
-└── (legacy — rollback only, not on the Qt path)
-    app.py · view.py · view_widgets.py · mywidget/   # Kivy app
+└── (untracked snapshots, not on the Qt path)
     archived/ · under_vsersion1/                     # older snapshots
 ```
 

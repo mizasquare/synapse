@@ -5,14 +5,13 @@ The Raspberry Pi entry point. Unlike ``qt_app.py`` (off-device dev: fake backend
 + fake hardware), this injects NO fakes -- the ``Presenter`` defaults to the real
 MODEP host (``ModepController``, HTTP to localhost) and the footswitch/LED
 controller is the real I2C ``fsledctrl.Controller``. It also binds the reverse-
-channel socket (``/tmp/synapsin.sock``) so web-UI / HMI changes stay in sync,
-mirroring ``app.py`` (the Kivy entry).
+channel socket (``/tmp/synapsin.sock``) so web-UI / HMI changes stay in sync.
 
 Fails loud if the host or hardware is absent -- a dead footswitch must surface on
 a live stage box, never be silently faked.
 
-Run (the Kivy app must NOT be running -- only one process may bind the socket or
-hold the I2C bus):
+Run (only one Synapse process may run at a time -- it alone binds the socket and
+holds the I2C bus):
     python qt_main.py
 """
 import logging
@@ -78,7 +77,7 @@ def _wait_for_modep(interval=0.5, log_every=10.0):
 
 def _start_reverse_listener(scheduler, presenter):
     """Bind ``/tmp/synapsin.sock`` and forward mod-ui's reverse-channel datagrams
-    to the presenter on the GUI thread (mirrors ``app.py``'s Kivy listener)."""
+    to the presenter on the GUI thread (the reverse-channel → GUI-thread handoff)."""
     try:
         os.unlink(SOCKET_PATH)
     except OSError:

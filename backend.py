@@ -4,7 +4,7 @@ Decouples the logic layers (presenter, the model classes, the pedalboard
 builder) from *how* the MODEP host is reached. Those layers depend only on the
 ``Backend`` surface below; the on-device implementation is ``modepctrl``'s
 ``ModepController`` (HTTP to mod-host/mod-ui), wired in by default. Running off
-device (e.g. the Windows PySide6 mock) means injecting a different ``Backend``
+device (e.g. the Windows PyQt6 mock) means injecting a different ``Backend``
 that serves fixtures -- see ``modepctrl.set_backend`` and ``fakemodep``.
 
 The fake is injected at this *object seam*; the mod-host/mod-ui wire protocol

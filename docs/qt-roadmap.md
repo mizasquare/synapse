@@ -247,7 +247,7 @@ FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이
 - [x] **노드 라벨 겹침 ✅(2026-06-25, 커밋 `b06dbad`)** — 단순 elide 대신 **스네이크 그리드**로 개편(행당 4노드
       170×72, 라벨 2줄 wrap+elide, 세로스크롤 Flickable). 6이펙트 박스겹침0. ★Pi 라이브 육안검증만 추후.
 - [ ] **`[undefined]→bool` 경고** — [`main.qml:307`](../qml/main.qml) FOCUS 패치 visible 바인딩, 무해. `!!(...)`로 정리.
-- [ ] **docstring 'PySide6' 잔존** — [`qtview.py:1`](../qtview.py) 등 코드는 PyQt6인데 도크스트링은 PySide6. (경위는 FINISHED §2.)
+- [x] **docstring 'PySide6' 잔존 ✅(2026-06-28)** — 코드는 PyQt6인데 도크스트링만 PySide6였음. `fakehardware`·`backend`·`hardware`·`qtscheduler` 정정 완료(레포 정리 작업 중). FINISHED §2의 역사 기록만 의도적으로 보존.
 - [x] **untracked 파일 커밋 ✅(2026-06-25, 커밋 `1074b5e`)** — `qt_smoke.py`(스모크앱, 보존)·`requirements.txt`
       (Kivy 베이스라인 insurance로 보존) 둘 다 커밋. Qt 런타임 deps 별도 핀은 `requirements-dev.txt`(PyQt6 6.4.2)가 담당.
 - [ ] **`EffectPort.set_value` 잉여 인자** — [`modepctrl.py:457`](../modepctrl.py) 안 쓰는 `effect_instance`를 받음(self.instance 있음). 무해, 시그니처 정리.

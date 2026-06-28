@@ -9,7 +9,8 @@
 gui 항목 중 절대경로(파이 한정) / 대용량 템플릿 문자열은 목업에 불필요하므로
 basename 또는 길이 마커로 치환한다. 포트 데이터는 손실 없이 보존.
 
-사용법:  python3 dump_effects.py [--host http://localhost:80] [--out fixtures/installed-effects.json]
+사용법:  python3 tools/dump_effects.py [--host http://localhost:80] [--out fixtures/installed-effects.json]
+        (레포 루트에서 실행 — 기본 --out 경로 fixtures/...가 CWD 기준이므로)
 """
 import argparse
 import json

@@ -1,6 +1,6 @@
 """Off-device footswitch/LED controller: a console-logging no-op.
 
-Implements ``hardware.HardwareController`` with no I2C, for the Windows PySide6
+Implements ``hardware.HardwareController`` with no I2C, for the Windows PyQt6
 mock. Footswitches are keyboard-driven (Z/X/C/V via QtView.footswitchKey ->
 set_switch); LED operations log to the console so you can see what the box would
 light. Injected explicitly via

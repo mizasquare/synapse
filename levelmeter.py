@@ -2,7 +2,7 @@
 
 The Qt app keeps no JACK client of its own (all audio control is HTTP to the MODEP
 host), so this owns a dedicated ``jack.Client("SynapseMeter")`` purely to *read*
-signal level -- the precedent is the old Kivy tuner (``tunerpopup.py``), which
+signal level -- the precedent was the old Kivy tuner (since removed), which
 likewise spun up its own client to pull capture buffers.
 
 Taps are JACK fan-out connections, so they are non-destructive to the live graph:
