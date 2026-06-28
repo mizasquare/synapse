@@ -396,6 +396,25 @@ class Presenter:
             return None
         return self.pedalboard
 
+    def overview_board_entries(self):
+        """Board list for the overview board manager: ``[{bundle,title,current}]``,
+        default.pedalboard excluded (modepctrl filters it). Current board flagged."""
+        cur = ((self.pedalboard.current_pb_path if self.pedalboard else "") or "").rstrip("/")
+        return [{"bundle": e["bundle"], "title": e.get("title", "") or e["bundle"],
+                 "current": e["bundle"].rstrip("/") == cur}
+                for e in (self.backend.get_all_pedalboard_entries() or [])]
+
+    def overview_switch_board(self, bundle):
+        """Switch to ``bundle`` from the overview board manager. No-op if it's
+        already current (avoids a needless graph-wiping /reset). Same footswitch
+        discipline as prev/next (remember/restore snapshot, return to overview);
+        warns on unsaved editor edits since /reset discards them."""
+        cur = ((self.pedalboard.current_pb_path if self.pedalboard else "") or "").rstrip("/")
+        if bundle.rstrip("/") == cur:
+            return
+        self._warn_if_editor_dirty()
+        self._go_to_pedalboard(bundle)
+
     def save_current_board(self):
         """Save the current pedalboard in place (asNew=0) for the live editor.
         ALWAYS refresh afterward and adopt the host's current path/title: a

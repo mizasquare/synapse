@@ -95,6 +95,7 @@ Window {
         id: overviewScreen
         anchors.fill: parent
         visible: view.screen === "overview"
+        property bool boardsOpen: false   // board-manager overlay
 
         // -- Tier-1 glance header (~120px): board name + snapshot --
         Item {
@@ -136,6 +137,13 @@ Window {
                 Row {
                     anchors.right: parent.right
                     spacing: 6
+                    Rectangle {
+                        width: 92; height: 38; radius: 8
+                        color: "#162033"; border.width: 1; border.color: "#3b6fe0"
+                        Text { anchors.centerIn: parent; text: "BOARDS"; color: "#9cc2ff"; font.family: uiFont; font.pixelSize: 19 }
+                        MouseArea { anchors.fill: parent
+                                    onClicked: { view.refreshBoards(); overviewScreen.boardsOpen = true } }
+                    }
                     Rectangle {
                         width: 72; height: 38; radius: 8
                         color: "#1b2230"; border.width: 1; border.color: cBorder
@@ -295,6 +303,66 @@ Window {
                             anchors.verticalCenter: parent.verticalCenter
                             Text { text: modelData.label; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 20 }
                             Text { text: modelData.sub; color: modelData.led; font.family: uiFont; font.pixelSize: 15 }
+                        }
+                    }
+                }
+            }
+        }
+        // -------- board manager (overlay) --------
+        Item {
+            visible: overviewScreen.boardsOpen; anchors.fill: parent; z: 90
+            MouseArea { anchors.fill: parent; onClicked: overviewScreen.boardsOpen = false }
+            Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.6 }
+            Rectangle {
+                width: 560; height: 420; radius: 12; anchors.centerIn: parent
+                color: cPanel; border.width: 1; border.color: cBorder
+                MouseArea { anchors.fill: parent }   // swallow clicks (don't close on panel tap)
+                Column {
+                    anchors.fill: parent; anchors.margins: 18; spacing: 12
+                    Item {
+                        width: parent.width; height: 30
+                        Text { text: "보드 전환"; color: cText; font.family: uiFont; font.pixelSize: 24
+                               anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
+                        Text { text: "✕"; color: cMuted; font.pixelSize: 24
+                               anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                               MouseArea { anchors.fill: parent; onClicked: overviewScreen.boardsOpen = false } }
+                    }
+                    Text { text: "호스트 보드 (" + view.boardList.length + ")"; color: cDim
+                           font.family: uiFont; font.pixelSize: 16 }
+                    Flickable {
+                        width: parent.width; height: 324; contentHeight: bcol.height; clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        Column {
+                            id: bcol; width: parent.width; spacing: 7
+                            Repeater {
+                                model: view.boardList
+                                Rectangle {
+                                    width: bcol.width; height: 50; radius: 7
+                                    color: modelData.current ? cElev : "#161b26"
+                                    border.width: 1; border.color: modelData.current ? "#3b6fe0" : cBorder
+                                    Row {
+                                        anchors.fill: parent; anchors.margins: 10; spacing: 10
+                                        Text {
+                                            width: parent.width - 110; anchors.verticalCenter: parent.verticalCenter
+                                            text: (modelData.current ? "● " : "") + modelData.title
+                                            color: modelData.current ? "#9cc2ff" : cText
+                                            font.family: uiFont; font.pixelSize: 19; elide: Text.ElideRight
+                                        }
+                                        Rectangle {
+                                            width: 84; height: 34; radius: 7; anchors.verticalCenter: parent.verticalCenter
+                                            color: modelData.current ? "transparent" : "#162033"
+                                            border.width: 1; border.color: modelData.current ? cBorder : "#3b6fe0"
+                                            Text { anchors.centerIn: parent; text: modelData.current ? "현재" : "전환"
+                                                   color: modelData.current ? cMuted : "#9cc2ff"; font.family: uiFont; font.pixelSize: 17 }
+                                            MouseArea { anchors.fill: parent; enabled: !modelData.current
+                                                        onClicked: { view.switchBoard(modelData.bundle); overviewScreen.boardsOpen = false } }
+                                        }
+                                    }
+                                }
+                            }
+                            Text { visible: view.boardList.length === 0
+                                   text: "호스트 보드 목록 없음"; color: cDim
+                                   font.family: uiFont; font.pixelSize: 17; topPadding: 20 }
                         }
                     }
                 }

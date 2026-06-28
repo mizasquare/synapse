@@ -72,6 +72,7 @@ class QtView(QObject):
     dataChanged = Signal()
     monitorUpdated = Signal(str, float, float, str)  # (symbol, norm, value, display): per-meter live update
     toastRequested = Signal(str)                     # transient on-screen message
+    boardsChanged = Signal()                         # overview board-manager list changed
 
     PARAM_THROTTLE_MS = 40   # max ~25 host writes/s during a knob drag
 
@@ -89,6 +90,7 @@ class QtView(QObject):
         self._screen = "overview"   # "booting" | "overview" | "focus" | "taptempo" | "edit"
         self._focus = {}            # FOCUS payload for QML
         self._tap = {}              # TAP TEMPO payload for QML ({bpb, klass})
+        self._board_list = []       # overview board-manager entries [{bundle,title,current}]
 
         # Parameter-write throttle: a knob drag fires setParameter on every
         # positionChanged (~60/s), each a blocking HTTP POST on the GUI thread.
@@ -158,6 +160,10 @@ class QtView(QObject):
     def footswitches(self):
         return self._foot
 
+    @Property("QVariantList", notify=boardsChanged)
+    def boardList(self):
+        return self._board_list
+
     # ------------------------------------------ QML -> presenter (slots)
     @Slot(str)
     def selectNode(self, instance):
@@ -221,6 +227,21 @@ class QtView(QObject):
         """Switch to the pedalboard EDIT screen (placeholder for now)."""
         self._screen = "edit"
         self.dataChanged.emit()
+
+    @Slot()
+    def refreshBoards(self):
+        """Populate the overview board-manager list from the live host (call when
+        the manager opens so it's fresh, not stale). default.pedalboard excluded."""
+        if self.presenter:
+            self._board_list = self.presenter.overview_board_entries()
+            self.boardsChanged.emit()
+
+    @Slot(str)
+    def switchBoard(self, bundle):
+        """Overview board manager picked a board -> switch to it (footswitch
+        discipline; no-op if it is already current)."""
+        if self.presenter:
+            self.presenter.overview_switch_board(bundle)
 
     @Slot(str, str, float)
     def setParameter(self, instance, symbol, value):

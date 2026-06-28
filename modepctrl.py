@@ -34,10 +34,14 @@ class ModepController:
 
 	@staticmethod
 	def get_all_pedalboards():
+		# Excludes default.pedalboard (the empty scratch template): it's never a
+		# user-selectable board, so footswitch NAVIGATE must skip it (matches the
+		# editor's board switcher).
 		try:
 			r = ModepController._request("get", "pedalboard/list")
 			if r is not None:
-				return [i["bundle"] for i in r.json()]
+				default = ModepController.DEFAULT_PEDALBOARD.rstrip("/")
+				return [i["bundle"] for i in r.json() if i["bundle"].rstrip("/") != default]
 
 		except Exception as e:
 			logging.error(f"Error fetching pedalboards: {e}")
@@ -96,13 +100,15 @@ class ModepController:
 	def get_all_pedalboard_entries():
 		"""All pedalboards as ``[{'bundle','title'}]`` in a single GET — the
 		pedalboard/list handler already includes titles, so this avoids a
-		per-board get_pedalboard_info fan-out. For the editor's live board
-		switcher (M6a). Empty list on host error."""
+		per-board get_pedalboard_info fan-out. For the editor's live board switcher
+		(M6a) and the overview board manager. Excludes default.pedalboard (empty
+		scratch template — not user-selectable). Empty list on host error."""
 		try:
 			r = ModepController._request("get", "pedalboard/list")
 			if r is not None:
+				default = ModepController.DEFAULT_PEDALBOARD.rstrip("/")
 				return [{"bundle": i["bundle"], "title": i.get("title", "")}
-						for i in r.json()]
+						for i in r.json() if i["bundle"].rstrip("/") != default]
 		except Exception as e:
 			logging.error(f"Error fetching pedalboard entries: {e}")
 		return []
