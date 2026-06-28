@@ -14,8 +14,10 @@ so the QML knob owns its visual during interaction without flicker.
 Visual tokens (colors/fonts) live in QML; this bridge passes data + flags only.
 """
 
+import logging
 import os
 import random
+import subprocess
 
 from PyQt6.QtCore import QObject, QTimer, pyqtProperty as Property, pyqtSignal as Signal, pyqtSlot as Slot
 
@@ -236,6 +238,34 @@ class QtView(QObject):
         """Switch to the pedalboard EDIT screen (loads PedalboardEditorView via the editor bridge)."""
         self._screen = "edit"
         self.dataChanged.emit()
+
+    # ── system power (real; the box is a standalone unit — pulling power risks SD
+    #    corruption, so the UI offers a safe shutdown/reboot). Tries the session
+    #    path (systemctl, works via logind/polkit) then falls back to sudo. ──
+    @Slot()
+    def systemShutdown(self):
+        """Safely power the device off (confirmed in the UI before this is called)."""
+        self._system_power("poweroff", ["shutdown", "-h", "now"], "종료")
+
+    @Slot()
+    def systemReboot(self):
+        """Safely reboot the device (confirmed in the UI before this is called)."""
+        self._system_power("reboot", ["reboot"], "재부팅")
+
+    def _system_power(self, systemctl_verb, shutdown_args, label):
+        log = logging.getLogger(__name__)
+        log.warning("system %s requested via UI", label)
+        for cmd in (["systemctl", systemctl_verb], ["sudo"] + shutdown_args):
+            try:
+                # A successful command takes the machine down, so this won't return;
+                # a permission/availability failure returns non-zero fast -> try next.
+                result = subprocess.run(cmd, timeout=15)
+                if result.returncode == 0:
+                    return
+                log.warning("%s exited %s, trying next", cmd, result.returncode)
+            except Exception as exc:  # FileNotFoundError, TimeoutExpired, ...
+                log.warning("%s failed: %s", cmd, exc)
+        self.toastRequested.emit(f"{label} 실패 — 권한 확인 필요 (sudo/polkit)")
 
     @Slot()
     def refreshBoards(self):
