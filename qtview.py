@@ -233,7 +233,7 @@ class QtView(QObject):
 
     @Slot()
     def enterEdit(self):
-        """Switch to the pedalboard EDIT screen (placeholder for now)."""
+        """Switch to the pedalboard EDIT screen (loads PedalboardEditorView via the editor bridge)."""
         self._screen = "edit"
         self.dataChanged.emit()
 
