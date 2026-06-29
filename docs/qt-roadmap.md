@@ -127,8 +127,12 @@ FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이
       `presenter.bank_manager_*`(드래프트 + `_commit_banks`가 저장+mode2 재바인딩) · `qtview` `bankList`/`boardCatalog` +
       슬롯들 · `qml/main.qml` `bankMgr` 오버레이. 이름은 책상 물리키보드 전제(wvkbd 안 뜸) → 새 뱅크 기본값 = 날짜-시간.
       `fakemodep`도 인메모리 뱅크 구현(데스크톱 테스트). 남은 것: **라이브러리(전체 보드) 순서 정렬**은 별개로 미구현.
-- [ ] **UNDO/REDO/SHUF 라이브** — 에디터 크롬에 버튼은 있으나 라이브 미배선. 스냅샷-restore desync 때문에
-      **역연산(diff-and-apply) 시퀀스**로 재표현 필요 — 약간 까다로움.
+- [x] **UNDO/REDO 제거 ✅(2026-06-29)** — 웹 UI(mod-ui)에도 없는 기능(프론트엔드의 "undo"는
+      잭 연결 실패 롤백 주석뿐). 라이브엔 애초에 미배선(스냅샷 스택은 디스크-편집 경로 전용)이라
+      스냅샷-restore desync를 감수하고 유지할 가치가 없어 **버튼+백엔드 기계 전부 제거**
+      (`editor_bridge`의 `_undo/_redo/_snapshot/_push_hist/_restore/canUndo/canRedo/undo/redo`,
+      `PedalboardEditorView.qml` UNDO/REDO Pill). 구조 편집의 `_push_hist()`는 더티 추적
+      `_touch()`로 치환. (SHUF는 dev `demoScramble` 데모로 잔존.)
 - [ ] **이펙터 프리셋 적용** — M7으로 프리셋 **이름/uri**까지 노출되면, `/effect/preset/load` 엔드포인트 래퍼 추가해
       실제 적용. (지금은 카탈로그가 개수만 → M7이 이름 공급, 적용은 별도 작은 후속.)
 

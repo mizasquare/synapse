@@ -66,7 +66,7 @@ Item {
         id: screen
         y: 0; width: 800; height: 480; color: cScreen; clip: true
 
-        // -------- slim header: mode label + undo/redo + status --------
+        // -------- slim header: mode label + status --------
         Item {
             id: header
             width: parent.width; height: 34; z: 9
@@ -102,10 +102,6 @@ Item {
                 // live snapshot manager (change / save / save-as)
                 Pill { label: "SNAP"; accent: cPurple; visible: editor.live
                        onTap: win.snapsOpen = true }
-                Pill { label: "UNDO"; accent: cBorder; visible: !editor.live; dim: !editor.canUndo
-                       onTap: if (editor.canUndo) editor.undo() }
-                Pill { label: "REDO"; accent: cBorder; visible: !editor.live; dim: !editor.canRedo
-                       onTap: if (editor.canRedo) editor.redo() }
                 Pill { label: "SHUF"; accent: cGreen; visible: !editor.live; dim: editor.advanced
                        onTap: if (!editor.advanced) editor.demoScramble() }
             }

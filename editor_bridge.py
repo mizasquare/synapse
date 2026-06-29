@@ -14,8 +14,6 @@ same board, determined by routing shape — a representable board opens QUICK, e
 (M6d). toggleLiveMode flips the view (bidirectional); a transient modeFlash effect plays
 (→ADVANCED "powerful", →QUICK "smart"). There is no one-way bake/evolve.
 
-History: structural edits push an undo snapshot (cap 30); undo/redo restore it. New clears.
-
 Mirrors the repo's qtview.py pattern: one QObject, data + flags as notified properties, QML
 owns the visual tokens. Routing math is a faithful port of the design's pb_logic.
 
@@ -168,8 +166,6 @@ class EditorBridge(QObject):
         self.gwire_sel = None         # selected cable id
         self.conn = None              # radial connection state
         self._fly_id = -1             # node currently flying in (hidden until it lands)
-        self._undo = []
-        self._redo = []
         self.board_name = 'Untitled'
         self._dirty = False
         self._live_boards = []        # cached live host board list [{bundle,title,current}]
@@ -496,8 +492,6 @@ class EditorBridge(QObject):
         self.gwire_sel = None
         self.conn = None
         self._fly_id = -1
-        self._undo = []
-        self._redo = []
         # Drop the standalone-mock quick chain (bluesbreaker/GxCompressor/…). Those
         # nodes get ids 1..N that COLLIDE with the live gnode ids, and _node()
         # searches self.nodes first — so without this the inspector for live gnode
@@ -982,31 +976,6 @@ class EditorBridge(QObject):
                 return (float(gx), float(gy))
         return (float(cx - w / 2), float(cy - h / 2))
 
-    # ----------------------------------------------------------------- undo/redo
-    def _snapshot(self):
-        return {
-            'mode': self.mode, 'in_mode': self.in_mode,
-            'nodes': [dict(n, vals=dict(n['vals'])) for n in self.nodes],
-            'gnodes': [dict(n, vals=dict(n['vals'])) for n in self.gnodes],
-            'gwires': [dict(w) for w in self.gwires],
-        }
-
-    def _push_hist(self):
-        self._undo.append(self._snapshot())
-        self._undo = self._undo[-30:]
-        self._redo = []
-        self._touch()
-
-    def _restore(self, snap):
-        self.mode = snap['mode']
-        self.in_mode = snap['in_mode']
-        self.nodes = [dict(n, vals=dict(n['vals'])) for n in snap['nodes']]
-        self.gnodes = [dict(n, vals=dict(n['vals'])) for n in snap['gnodes']]
-        self.gwires = [dict(w) for w in snap['gwires']]
-        self.sel = -1
-        self.gwire_sel = None
-        self.conn = None
-
     # ============================================================ inspector
     def _build_inspector(self):
         self._knobs = []
@@ -1365,14 +1334,6 @@ class EditorBridge(QObject):
     def gWireDelY(self):
         return float(self._mid_of[self.gwire_sel][1]) if self.gWireDel else 0.0
 
-    @Property(bool, notify=changed)
-    def canUndo(self):
-        return len(self._undo) > 0
-
-    @Property(bool, notify=changed)
-    def canRedo(self):
-        return len(self._redo) > 0
-
     # board lifecycle
     @Property(str, notify=boardsChanged)
     def boardName(self):
@@ -1691,12 +1652,12 @@ class EditorBridge(QObject):
             self._begin_live_add(uri, tx, ty)
             return
         if self.mode == 'advanced':
-            self._push_hist()
+            self._touch()
             node = {'id': self._new_id(), 'uri': uri, 'x': tx, 'y': ty,
                     'bypass': False, 'vals': {c['sym']: c['def'] for c in p.get('ctl', []) if c['w'] != 'bypass'}}
             self.gnodes.append(node)
         else:
-            self._push_hist()
+            self._touch()
             node = self._add(uri, tx, ty)
         self.sel = node['id']
         self._fly_id = node['id']
@@ -1918,7 +1879,7 @@ class EditorBridge(QObject):
             self._touch()
             return
         if over_trash:
-            self._push_hist()
+            self._touch()
             self.nodes = [m for m in self.nodes if m['id'] != nid]
             if self.sel == nid:
                 self.sel = -1
@@ -1962,7 +1923,7 @@ class EditorBridge(QObject):
                     self._gid_by_inst.pop(inst, None)
                     self._inst_by_gid.pop(nid, None)
             else:
-                self._push_hist()
+                self._touch()
             sid = str(nid)
             self.gnodes = [m for m in self.gnodes if str(m['id']) != sid]
             self.gwires = [w for w in self.gwires
@@ -2218,7 +2179,7 @@ class EditorBridge(QObject):
         fid, tid, typ = str(out_sel['node']), str(in_sel['node']), src_sel['type']
         be = self._backend() if self._live_flag else None
         if not be:
-            self._push_hist()
+            self._touch()
         have = {(w['frm'], w['to']) for w in self.gwires}
         added = False
         for o, i in pairs:
@@ -2267,26 +2228,9 @@ class EditorBridge(QObject):
                     return
             self._touch()
         else:
-            self._push_hist()
+            self._touch()
         self.gwires = [x for x in self.gwires if x['id'] != self.gwire_sel]
         self.gwire_sel = None
-        self._rebuild()
-
-    # ----------------------------------------------------------------- history
-    @Slot()
-    def undo(self):
-        if not self._undo:
-            return
-        self._redo.append(self._snapshot())
-        self._restore(self._undo.pop())
-        self._rebuild()
-
-    @Slot()
-    def redo(self):
-        if not self._redo:
-            return
-        self._undo.append(self._snapshot())
-        self._restore(self._redo.pop())
         self._rebuild()
 
     # ---------------------------------------------------- board lifecycle (Phase 2)
