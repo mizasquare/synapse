@@ -295,24 +295,24 @@ class Pedalboard:
 		)
 
 
-def initialize_modep_pedalboard() -> Optional[Pedalboard]:
-	#todo: tell modep to load the last pedalboard and snapshot
-	#some parameters are desynced with the current pedalboard and pb data retrived from saved pedalboard
-	"""Fetches the current pedalboard, retrieves all effect details, and constructs a Pedalboard object."""
-	# Step 1: Get the current pedalboard bundle path
-	pb_path = get_backend().get_current_pedalboard()
+def _fetch_and_merge_graph() -> Tuple[Optional[str], Optional[dict]]:
+	"""Fetch the current pedalboard bundle + its on-disk info, then overlay the
+	LIVE in-memory graph on top.
 
-	# Step 2: Retrieve the pedalboard details
+	Prefer the LIVE in-memory graph for plugins + connections: those are the only
+	parts that diverge from disk after a live edit (add/remove/connect).
+	Board-level scaffolding (title/size/hardware/timeInfo/midi) is stable, so keep
+	it from the .ttl. Fall back to disk silently if the fork lacks the
+	syn_dump_graph endpoint or the host is unreachable. See backend.dump_graph.
+
+	Returns (pb_path, pb_data); pb_data is None if info retrieval failed.
+	"""
+	pb_path = get_backend().get_current_pedalboard()
 	pb_data = get_backend().get_pedalboard_info(pb_path)
 	if not pb_data:
 		print("⚠️ Failed to retrieve pedalboard data.")
-		return None
+		return pb_path, None
 
-	# Prefer the LIVE in-memory graph for plugins + connections: those are the
-	# only parts that diverge from disk after a live edit (add/remove/connect).
-	# Board-level scaffolding (title/size/hardware/timeInfo/midi) is stable, so
-	# keep it from the .ttl. Fall back to disk silently if the fork lacks the
-	# syn_dump_graph endpoint or the host is unreachable. See backend.dump_graph.
 	try:
 		live = get_backend().dump_graph()
 	except Exception as e:
@@ -320,165 +320,215 @@ def initialize_modep_pedalboard() -> Optional[Pedalboard]:
 		live = None
 	if live and live.get("plugins") is not None:
 		pb_data["plugins"] = live["plugins"]
-		pb_data["connections"] = live.get("connections", pb_data["connections"])
+		pb_data["connections"] = live.get("connections", pb_data.get("connections", []))
+	return pb_path, pb_data
 
-	title = pb_data["title"]
-	width = pb_data["width"]
-	height = pb_data["height"]
-	bpm = pb_data.get("timeInfo", {}).get("bpm", 120.0)
-	bpb = pb_data.get("timeInfo", {}).get("bpb", 4)
-	midi_separated_mode = pb_data.get("midi_separated_mode", False)
-	midi_loopback = pb_data.get("midi_loopback", False)
-	connections = [Connection(conn["source"], conn["target"]) for conn in pb_data["connections"]]
 
-	# Step 3: Extract MIDI CC mappings
-	midi_cc_mappings = {
-		"bpm": (pb_data["timeInfo"]["bpmCC"]["channel"], pb_data["timeInfo"]["bpmCC"]["control"]),
-		"rolling": (pb_data["timeInfo"]["rollingCC"]["channel"], pb_data["timeInfo"]["rollingCC"]["control"]),
-	}
+def _parse_midi_cc_mappings(time_info: dict) -> Dict[str, Tuple[int, int]]:
+	"""(channel, control) for the transport CCs that exist. An absent CC block is
+	skipped rather than KeyError-ing the whole board load."""
+	mappings: Dict[str, Tuple[int, int]] = {}
+	for key, cc_key in (("bpm", "bpmCC"), ("rolling", "rollingCC")):
+		cc = time_info.get(cc_key)
+		if cc and "channel" in cc and "control" in cc:
+			mappings[key] = (cc["channel"], cc["control"])
+	return mappings
 
-	effects = []
-	for effect_data in pb_data["plugins"]:
-		instance_name = effect_data["instance"]
-		effect_uri = effect_data["uri"]
-		bypassed = effect_data["bypassed"]
-		x, y = effect_data["x"], effect_data["y"]
 
-		# Step 4: Fetch detailed effect properties
-		detailed_info = get_backend().effect_get_information(effect_uri)
-		if not detailed_info:
-			print(f"⚠️ Failed to retrieve details for {effect_uri}")
+def _make_effect_info_fetcher():
+	"""Returns a get_effect_information(uri) that memoises per URI for the span of
+	one board load — a board that uses the same plugin twice would otherwise hit
+	the host (a serial socket round-trip) once per instance. Caches misses (None)
+	too, so a broken plugin isn't re-queried."""
+	cache: Dict[str, Optional[dict]] = {}
+
+	def fetch(uri: str) -> Optional[dict]:
+		if uri not in cache:
+			cache[uri] = get_backend().effect_get_information(uri)
+		return cache[uri]
+
+	return fetch
+
+
+def _build_input_ports(instance_name: str, effect_data: dict, detailed_info: dict) -> Dict[str, EffectPort]:
+	"""Map the pedalboard's current control values onto the plugin's port defs."""
+	detailed_ports = detailed_info.get("ports", {}).get("control", {}).get("input", [])
+	by_symbol = {p["symbol"]: p for p in detailed_ports}
+
+	ports: Dict[str, EffectPort] = {}
+	for port_data in effect_data.get("ports", []):
+		symbol = port_data["symbol"]
+		current_value = port_data.get("value")
+		# keep value-0 controls (0 dB gains, reset triggers, off toggles); only a
+		# genuinely absent value is skipped.
+		if current_value is None:
 			continue
-
-		patches = {}
-		ports = {}
-		monitors = {}
-
-
-
-		# 🔥 Step 5: Identify if the effect has **patch parameters** (`parameters` section)
-		for param in detailed_info.get("parameters", []):
-			if param.get("valid"):
-				patch_uri = param["uri"]
-				patch_label = param["label"]
-				file_types = param.get("fileTypes", [])
-				file_path = configs.PATCH_FILE_DIR_MAP.get(patch_uri, configs.PATCH_FILE_DIR_MAP.get("defaultpath"))
-		# Fetch currently loaded patch file (if any)
-				current_patch = get_backend().patch_get(instance_name, patch_uri)
-				if current_patch:
-					patch_value = current_patch[0]
-					patch_property = current_patch[1]
-				else:
-					patch_value, patch_property = "", ""
-				# Store the patch in the effect
-				patches[patch_uri] = EffectPatch(
-					instance=instance_name,
-					uri=patch_uri,
-					label=patch_label,
-					file_types=file_types,
-					file_path=file_path,
-					value=patch_value,
-					property=patch_property
-				)
-
-		# Step 6: Map pedalboard's current parameter values to retrieved properties
-		for port_data in effect_data["ports"]:
-			symbol = port_data["symbol"]
-			current_value = port_data["value"]
-			if current_value is not None:  # keep value-0 controls (0 dB gains, reset triggers, off toggles)
-				# Find detailed port info
-				detailed_ports = detailed_info.get("ports", {}).get("control", {}).get("input", [])
-				matching_port = next((p for p in detailed_ports if p["symbol"] == symbol), None)
-				if matching_port:
-					is_toggle = "toggled" in matching_port.get("properties", [])
-
-					ports[symbol] = EffectPort(
-						instance=instance_name,
-						name=matching_port["name"],
-						symbol=symbol,
-						value=current_value,
-						min_value=matching_port["ranges"]["minimum"],
-						max_value=matching_port["ranges"]["maximum"],
-						default_value=matching_port["ranges"]["default"],
-						units=matching_port["units"]["symbol"],
-						is_toggle=is_toggle,
-						port_properties=matching_port.get("properties", []),
-						range_steps=matching_port.get("rangeSteps"),
-						scale_points=matching_port.get("scalePoints")
-					)
-
-
-		# Step 6b: Monitor (output control) ports — only those the plugin flags
-		# streamable (gui.monitoredOutputs), looked up in ports.control.output.
-		# Atom ports (e.g. modspectre 'notify') aren't in control.output, so they
-		# fall through here = tier-3 skip automatically.
-		mon_syms = detailed_info.get("gui", {}).get("monitoredOutputs", []) or []
-		out_ports = detailed_info.get("ports", {}).get("control", {}).get("output", [])
-		out_by_sym = {p["symbol"]: p for p in out_ports}
-		for sym in mon_syms:
-			mp = out_by_sym.get(sym)
-			if not mp:
-				continue
-			forced = MONITOR_WIDGET_OVERRIDES.get((effect_uri, sym))
-			if forced == "skip":
-				continue
-			rng = mp.get("ranges", {})
-			monitors[sym] = EffectPort(
-				instance=instance_name,
-				name=mp.get("name", sym),
-				symbol=sym,
-				value=rng.get("default", 0.0),   # seed; live value arrives via the feed (increment 2)
-				min_value=rng.get("minimum"),
-				max_value=rng.get("maximum"),
-				default_value=rng.get("default"),
-				units=(mp.get("units") or {}).get("symbol", ""),
-				port_properties=mp.get("properties", []),
-				range_steps=mp.get("rangeSteps"),
-				scale_points=mp.get("scalePoints"),
-				is_output=True,
-				forced_kind=forced,
-			)
-
-		# Step 6c: Audio port symbols (ordered) — the jack-side names the editor
-		# needs to wire cables. The catalog only has ai/ao counts, so capture the
-		# real symbols here while detailed_info is in hand (no extra host call).
-		audio_ports = detailed_info.get("ports", {}).get("audio", {})
-		audio_inputs = [p["symbol"] for p in audio_ports.get("input", [])]
-		audio_outputs = [p["symbol"] for p in audio_ports.get("output", [])]
-
-		# Step 7: Create the effect instance
-		effects.append(Effect(
+		mp = by_symbol.get(symbol)
+		if not mp:
+			continue
+		ranges = mp.get("ranges", {})
+		props = mp.get("properties", [])
+		ports[symbol] = EffectPort(
 			instance=instance_name,
-			uri=effect_uri,
-			name=detailed_info.get("name", instance_name),
-			bypassed=bypassed,
-			category=detailed_info.get("category", "Unknown"),
-			brand=detailed_info.get("brand", "Unknown"),
-			x=x,
-			y=y,
-			ports=ports,
-			patches=patches,  # ✅ Now correctly stores patch information
-			monitors=monitors,
-			audio_inputs=audio_inputs,
-			audio_outputs=audio_outputs
-		))
+			name=mp.get("name", symbol),
+			symbol=symbol,
+			value=current_value,
+			min_value=ranges.get("minimum"),
+			max_value=ranges.get("maximum"),
+			default_value=ranges.get("default"),
+			units=(mp.get("units") or {}).get("symbol", ""),
+			is_toggle="toggled" in props,
+			port_properties=props,
+			range_steps=mp.get("rangeSteps"),
+			scale_points=mp.get("scalePoints"),
+		)
+	return ports
 
-	# Step 8: Create the Pedalboard instance
+
+def _build_monitors(instance_name: str, effect_uri: str, detailed_info: dict) -> Dict[str, EffectPort]:
+	"""Monitor (output control) ports — only those the plugin flags streamable
+	(gui.monitoredOutputs), looked up in ports.control.output. Atom ports (e.g.
+	modspectre 'notify') aren't in control.output, so they fall through here =
+	tier-3 skip automatically."""
+	mon_syms = detailed_info.get("gui", {}).get("monitoredOutputs", []) or []
+	out_ports = detailed_info.get("ports", {}).get("control", {}).get("output", [])
+	out_by_sym = {p["symbol"]: p for p in out_ports}
+
+	monitors: Dict[str, EffectPort] = {}
+	for sym in mon_syms:
+		mp = out_by_sym.get(sym)
+		if not mp:
+			continue
+		forced = MONITOR_WIDGET_OVERRIDES.get((effect_uri, sym))
+		if forced == "skip":
+			continue
+		rng = mp.get("ranges", {})
+		monitors[sym] = EffectPort(
+			instance=instance_name,
+			name=mp.get("name", sym),
+			symbol=sym,
+			value=rng.get("default", 0.0),   # seed; live value arrives via the feed (increment 2)
+			min_value=rng.get("minimum"),
+			max_value=rng.get("maximum"),
+			default_value=rng.get("default"),
+			units=(mp.get("units") or {}).get("symbol", ""),
+			port_properties=mp.get("properties", []),
+			range_steps=mp.get("rangeSteps"),
+			scale_points=mp.get("scalePoints"),
+			is_output=True,
+			forced_kind=forced,
+		)
+	return monitors
+
+
+def _build_audio_ports(detailed_info: dict) -> Tuple[List[str], List[str]]:
+	"""Audio port symbols (ordered) — the jack-side names the editor needs to wire
+	cables. The catalog only has ai/ao counts, so capture the real symbols here
+	while detailed_info is in hand (no extra host call)."""
+	audio_ports = detailed_info.get("ports", {}).get("audio", {})
+	return (
+		[p["symbol"] for p in audio_ports.get("input", [])],
+		[p["symbol"] for p in audio_ports.get("output", [])],
+	)
+
+
+def _build_patches(instance_name: str, detailed_info: dict) -> Dict[str, EffectPatch]:
+	"""Patch-file parameters (NAM models, IR files, ...), from the plugin's
+	`parameters` section. Does a patch_get host call per valid parameter to read
+	the file currently loaded into that instance."""
+	patches: Dict[str, EffectPatch] = {}
+	for param in detailed_info.get("parameters", []):
+		if not param.get("valid"):
+			continue
+		patch_uri = param["uri"]
+		file_path = configs.PATCH_FILE_DIR_MAP.get(
+			patch_uri, configs.PATCH_FILE_DIR_MAP.get("defaultpath"))
+		current_patch = get_backend().patch_get(instance_name, patch_uri)
+		if current_patch:
+			patch_value, patch_property = current_patch[0], current_patch[1]
+		else:
+			patch_value, patch_property = "", ""
+		patches[patch_uri] = EffectPatch(
+			instance=instance_name,
+			uri=patch_uri,
+			label=param["label"],
+			file_types=param.get("fileTypes", []),
+			file_path=file_path,
+			value=patch_value,
+			property=patch_property,
+		)
+	return patches
+
+
+def _build_effect(effect_data: dict, get_effect_info) -> Optional[Effect]:
+	"""Build one Effect from its graph entry + the plugin's LV2 definition.
+
+	Returns None (after logging) if the host can't describe the plugin, so the
+	caller decides how to handle the gap — note this DROPS the plugin from the
+	board, desyncing the editor view from the live graph, hence the loud log.
+	"""
+	instance_name = effect_data["instance"]
+	effect_uri = effect_data["uri"]
+
+	detailed_info = get_effect_info(effect_uri)
+	if not detailed_info:
+		print(f"⚠️ Failed to retrieve details for {effect_uri} — dropping instance "
+			  f"'{instance_name}' from the board (editor view will desync).")
+		return None
+
+	audio_inputs, audio_outputs = _build_audio_ports(detailed_info)
+	return Effect(
+		instance=instance_name,
+		uri=effect_uri,
+		name=detailed_info.get("name", instance_name),
+		bypassed=effect_data.get("bypassed", False),
+		category=detailed_info.get("category", "Unknown"),
+		brand=detailed_info.get("brand", "Unknown"),
+		x=effect_data.get("x", 0.0),
+		y=effect_data.get("y", 0.0),
+		ports=_build_input_ports(instance_name, effect_data, detailed_info),
+		patches=_build_patches(instance_name, detailed_info),
+		monitors=_build_monitors(instance_name, effect_uri, detailed_info),
+		audio_inputs=audio_inputs,
+		audio_outputs=audio_outputs,
+	)
+
+
+def initialize_modep_pedalboard() -> Optional[Pedalboard]:
+	#todo: tell modep to load the last pedalboard and snapshot
+	#some parameters are desynced with the current pedalboard and pb data retrived from saved pedalboard
+	"""Fetches the current pedalboard, retrieves all effect details, and constructs a Pedalboard object."""
+	pb_path, pb_data = _fetch_and_merge_graph()
+	if pb_data is None:
+		return None
+
+	time_info = pb_data.get("timeInfo", {})
+	hardware = pb_data.get("hardware", {})
+	connections = [Connection(c["source"], c["target"]) for c in pb_data.get("connections", [])]
+
+	get_effect_info = _make_effect_info_fetcher()
+	effects = []
+	for effect_data in pb_data.get("plugins", []):
+		effect = _build_effect(effect_data, get_effect_info)
+		if effect is not None:
+			effects.append(effect)
+
 	return Pedalboard(
-		title=title,
+		title=pb_data.get("title", "Untitled"),
 		current_pb_path=pb_path,
-		width=width,
-		height=height,
-		bpm=bpm, bpb=bpb,
-		midi_separated_mode=midi_separated_mode,
-		midi_loopback=midi_loopback,
-		midi_cc_mappings=midi_cc_mappings,
+		width=pb_data.get("width", 0),
+		height=pb_data.get("height", 0),
+		bpm=time_info.get("bpm", 120.0),
+		bpb=time_info.get("bpb", 4),
+		midi_separated_mode=pb_data.get("midi_separated_mode", False),
+		midi_loopback=pb_data.get("midi_loopback", False),
+		midi_cc_mappings=_parse_midi_cc_mappings(time_info),
 		effects=effects,
 		connections=connections,
-		audio_ins=pb_data["hardware"]["audio_ins"],
-		audio_outs=pb_data["hardware"]["audio_outs"],
-		cv_ins=pb_data["hardware"]["cv_ins"],
-		cv_outs=pb_data["hardware"]["cv_outs"]
+		audio_ins=hardware.get("audio_ins", 2),
+		audio_outs=hardware.get("audio_outs", 2),
+		cv_ins=hardware.get("cv_ins", 0),
+		cv_outs=hardware.get("cv_outs", 0),
 	)
 
 
