@@ -13,7 +13,7 @@
 ## 1. 결과 (무엇이 됐나)
 
 - **MVP 유지, 뷰만 교체.** presenter 로직 의미 불변, view(Kivy)만 QML+`QtView` 브리지로 교체.
-- **엔트리 2개.** `qt_app.py` = 오프디바이스 개발(가짜 백엔드/하드웨어 + 픽스처 + Z/X/C/V 키보드 풋스위치),
+- **엔트리 2개.** `qt_dev.py`(구 `qt_app.py`) = 오프디바이스 개발(가짜 백엔드/하드웨어 + 픽스처 + Z/X/C/V 키보드 풋스위치),
   `qt_main.py` = 온디바이스(실물 `ModepController` HTTP + 실물 `fsledctrl` I²C + 역방향 소켓 `/tmp/synapsin.sock`).
 - **화면 3종 동작.** OVERVIEW(노드 그래프+풋스위치 스트립), FOCUS(노브/바이패스/IN·OUT 라우팅), TAP TEMPO.
 - **autostart 전환됨**(커밋 `dfd42c6`): `~/run_synapsepy.sh` → `synapse-venv` + `qt_main.py`.

@@ -84,7 +84,7 @@ injected at the seams — no separate UI fork).
 
 - **Entry points** — `qt_main.py` (on-device: real `ModepController` over HTTP + real I²C
   `fsledctrl`, binds the reverse socket, starts the monitor feed + level meter) and
-  `qt_app.py` (off-device dev: fakes injected; `--shot` / `--focus` / `--real`).
+  `qt_dev.py` (off-device dev: fakes injected; `--shot` / `--focus` / `--real`).
   (The legacy Kivy app was removed; the Qt entries are the only path. For rollback,
   `run_synapsepy.sh.kivy-bak` + git history hold the old entry.)
 - **`presenter.py`** — toolkit-agnostic application logic: footswitch polling (background
@@ -126,7 +126,7 @@ effects → FS0–3) · `2` = BANK (the active bank's first 4 boards → FS0–3
 ```
 synapse/
 ├── qt_main.py          # on-device entry: PyQt6+QML, real MODEP + real I²C, reverse socket
-├── qt_app.py           # off-device dev entry: fake backend + fake hardware (--shot/--focus/--real)
+├── qt_dev.py           # off-device dev entry: fake backend + fake hardware (--shot/--focus/--real)
 ├── qtview.py           # QtView — QML↔presenter bridge (`view` context property)
 ├── editor_bridge.py    # EditorBridge — pedalboard EDIT-screen brain (`editor` context property)
 ├── qtscheduler.py      # QtScheduler — GUI-thread scheduler on the Qt event loop
@@ -179,7 +179,7 @@ The repo's [`run_synapsepy.sh`](run_synapsepy.sh) is a copy of the device's orig
 script; paths (`/home/miza/...`, the `synapse-venv` virtualenv) are device-specific. (The old
 Kivy entry [`app.py`](app.py) + `gcamp6s-venv` are kept for rollback.)
 
-**Off-device development:** the Qt mock [`qt_app.py`](qt_app.py) runs headless on a PC with a
+**Off-device development:** the Qt mock [`qt_dev.py`](qt_dev.py) runs headless on a PC with a
 fake backend + fake hardware injected at the seams — see [`requirements-dev.txt`](requirements-dev.txt).
 `--shot out.png` renders one frame and quits; `--real` aims the (read-only) backend at the live
 MODEP host to screenshot the actual loaded board. (Alternatively, `ModepController.TESTMODE = True`

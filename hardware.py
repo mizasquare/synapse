@@ -8,7 +8,7 @@ in by default. Running off device (the Windows PyQt6 mock) means injecting a
 
 Selection is **explicit at the entry point**, not auto-detected: ``qt_main.py``
 (the Pi entry) builds the real controller and fails loud if the hardware is
-faulty, while ``qt_app.py`` injects the fake. We deliberately do NOT silently fall back
+faulty, while ``qt_dev.py`` injects the fake. We deliberately do NOT silently fall back
 to a dummy on I2C errors -- on a live stage box a dead footswitch must surface,
 not pass silently. (Missing I2C *libraries* off-device is a separate, import-time
 condition handled by simply injecting the fake there.)

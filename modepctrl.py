@@ -669,7 +669,7 @@ class ModepController:
 # ── Backend seam ─────────────────────────────────────────────────────────────
 # The model classes and the pedalboard builder (now in `model.py`) reach the
 # MODEP host through `get_backend()` instead of naming `ModepController`
-# directly. That lets an off-device entry point (e.g. qt_app.py)
+# directly. That lets an off-device entry point (e.g. qt_dev.py)
 # `set_backend(fake)` to serve fixtures with no Pi hardware. The default is
 # `ModepController` itself, so the on-device (Pi) path is byte-for-byte
 # unchanged — same staticmethods, no extra indirection. Same inject-at-the-seam
