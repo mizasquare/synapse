@@ -44,6 +44,16 @@ class FakeModepController(Backend):
         self._current_path = self._pb_order[0]
         self._seed_current()
 
+        # In-memory user banks (mirrors the host's banks.json list). Seed one bank
+        # holding the fixture boards so the bank manager + mode-2 have something to
+        # show off-device; the bank manager mutates this via save_banks.
+        self._banks = [{
+            "title": "My first Bank",
+            "pedalboards": [{"bundle": p,
+                             "title": self._pb_by_path[p]["pedalboard_info"].get("title", "")}
+                            for p in self._pb_order],
+        }]
+
     # -- fixture loading -------------------------------------------------------
     def _load_fixtures(self):
         paths = sorted(glob.glob(os.path.join(self._fixtures_dir, "*.json")))
@@ -131,6 +141,21 @@ class FakeModepController(Backend):
         i = self._pb_order.index(self._current_path)
         self._current_path = self._pb_order[(i - 1) % len(self._pb_order)]
         self._seed_current()
+
+    def get_bank_pedalboard_entries(self, bank_id=0):
+        if 0 <= bank_id < len(self._banks):
+            return [{"bundle": p["bundle"], "title": p.get("title", "")}
+                    for p in self._banks[bank_id].get("pedalboards", [])]
+        return []
+
+    def get_banks(self):
+        import copy
+        return copy.deepcopy(self._banks)
+
+    def save_banks(self, banks):
+        import copy
+        self._banks = copy.deepcopy(banks)
+        return True
 
     # -- Effect / parameter ----------------------------------------------------
     def effect_list(self):

@@ -63,6 +63,22 @@ class Backend:
         """Switch to the previous pedalboard in the current bank."""
         raise NotImplementedError
 
+    def get_bank_pedalboard_entries(self, bank_id):
+        """Bank ``bank_id``'s pedalboards as ``[{'bundle','title'}]`` for the
+        mode-2 footswitch strip. ``[]`` if no such bank / it's empty / failure."""
+        raise NotImplementedError
+
+    def get_banks(self):
+        """All user banks as ``[{'title','pedalboards':[{'bundle','title'}]}]``
+        (the host's bank list). Read side of the bank manager; ``[]`` on failure."""
+        raise NotImplementedError
+
+    def save_banks(self, banks):
+        """Replace the host's whole user bank list with ``banks`` (the full
+        ``[{'title','pedalboards':[{'bundle','title'}]}]`` list, not a delta).
+        Returns ``True`` on success."""
+        raise NotImplementedError
+
     # -- Effect / parameter ----------------------------------------------------
     def effect_list(self):
         """Return every installed plugin's native mod-ui info (list of dicts, the
