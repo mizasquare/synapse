@@ -76,6 +76,37 @@ class ModepController:
 		return []
 
 	@staticmethod
+	def get_banks():
+		"""All user banks as ``[{'title', 'pedalboards':[{'bundle','title'}]}]``
+		(the GET banks/ list, normalised to bundle+title — the host enriches each
+		board with full info we don't need here). ``[]`` on host error. This is the
+		read side of the bank manager; the write side is save_banks."""
+		try:
+			r = ModepController._request("get", "banks/")
+			if r is not None and r.status_code == 200:
+				return [{"title": b.get("title", ""),
+						 "pedalboards": [{"bundle": p["bundle"], "title": p.get("title", "")}
+										 for p in b.get("pedalboards", [])]}
+						for b in r.json()]
+		except Exception as e:
+			logging.error(f"Error fetching banks: {e}")
+		return []
+
+	@staticmethod
+	def save_banks(banks):
+		"""Replace the host's whole user bank list (POST banks/save). ``banks`` is
+		the full ``[{'title','pedalboards':[{'bundle','title'}]}]`` list — the host
+		rewrites banks.json wholesale, so callers must send the complete list, not a
+		delta. Returns ``True`` on success. We never touch banks.json directly: the
+		host owns it (and keeps its in-memory state / HMI in sync)."""
+		try:
+			r = ModepController._request("post", "banks/save", json=banks)
+			return r is not None and r.status_code == 200
+		except Exception as e:
+			logging.error(f"Error saving banks: {e}")
+			return False
+
+	@staticmethod
 	def get_current_pedalboard():
 		try:
 			r = ModepController._request("get", "pedalboard/current")

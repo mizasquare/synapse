@@ -121,7 +121,12 @@ FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이
       `modepctrl.get_all_pedalboards`/`set_next_pedalboard`/`set_prev_pedalboard`는 **default 포함** →
       풋스위치 NAVIGATE가 숨김 보드를 밟음. 에디터와 동일 제외 규칙으로 통일. (제일 쌈)
 - [ ] **오버뷰에서도 보드 매니저 열기** — 현재 라이브 보드 스위처/매니저는 **에디터 안에서만**. 오버뷰 헤더에도 진입점.
-- [ ] **페달보드 순서 정렬 UI** — 보드 재정렬 인터페이스(뱅크/라이브러리 순서 관리).
+- [x] **뱅크 매니저 ✅(2026-06-29, 브랜치 `feat/bank-manager`)** — 오버뷰 헤더 BANK 버튼 → 풀 CRUD 오버레이.
+      뱅크 생성/이름변경/삭제(2탭) + 보드 추가·제거·순서변경(위/아래; 앞 4개=mode2 FS A·B·C·D) + 활성 뱅크 지정.
+      시임: `modepctrl.get_banks`/`save_banks`(호스트 `GET`/`POST banks/`, **전체 읽기→수정→통째 저장**) ·
+      `presenter.bank_manager_*`(드래프트 + `_commit_banks`가 저장+mode2 재바인딩) · `qtview` `bankList`/`boardCatalog` +
+      슬롯들 · `qml/main.qml` `bankMgr` 오버레이. 이름은 책상 물리키보드 전제(wvkbd 안 뜸) → 새 뱅크 기본값 = 날짜-시간.
+      `fakemodep`도 인메모리 뱅크 구현(데스크톱 테스트). 남은 것: **라이브러리(전체 보드) 순서 정렬**은 별개로 미구현.
 - [ ] **UNDO/REDO/SHUF 라이브** — 에디터 크롬에 버튼은 있으나 라이브 미배선. 스냅샷-restore desync 때문에
       **역연산(diff-and-apply) 시퀀스**로 재표현 필요 — 약간 까다로움.
 - [ ] **이펙터 프리셋 적용** — M7으로 프리셋 **이름/uri**까지 노출되면, `/effect/preset/load` 엔드포인트 래퍼 추가해
@@ -198,7 +203,7 @@ FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이
       ★mod-ui `fileTypes`=카테고리명→`configs.PATCH_FILE_TYPE_EXTS` 매핑. 상세는 에디터 섹션 M3.5 / [[param-vs-patch-set]].
 - [x] **풋스위치 모드 스펙 재정의 ✅(2026-06-26)** — mode 0(NAVIGATE)는 **전체 페달보드 라이브러리** 순회
       (`get_all_pedalboards`, 기존 뱅크 한정→전체). mode 2(BANK)는 **RECALL 폐기 → 뱅크 페달보드를 풋스위치에 바인딩**:
-      뱅크 자체를 고르는 게 아니라, 활성 뱅크(`current_bank`, 현재 0 고정; **뱅크 전환·편집은 추후 터치UI** placeholder)의
+      뱅크 자체를 고르는 게 아니라, 활성 뱅크(`current_bank`, 이제 **뱅크 매니저**(`set_active_bank`)가 구동 — 아래 ✅)의
       **첫 4보드를 FS0~3에 직접 바인딩**(`get_bank_pedalboard_entries`) → 밟으면 그 보드 로드. 뱅크 없으면 토스트+mode 1 복귀.
       스트립이 바인딩된 4보드명+"●현재" 표시. 포커스 중 FS PB변경 시 오버뷰 복귀(`_return_to_overview`).
       옛 `recall_pb_ss`/`assign_pb_ss_to_footswitch`는 죽은코드로 잔존(Tier 3 정리).

@@ -93,10 +93,11 @@ Window {
     // =========================================================== OVERVIEW
     Item {
         id: overviewScreen
+        objectName: "overviewScreen"
         anchors.fill: parent
         visible: view.screen === "overview"
         property bool boardsOpen: false   // board-manager overlay
-        property bool bankOpen: false     // bank-selector overlay (placeholder)
+        property bool bankMgrOpen: false  // bank-manager overlay (create/edit banks)
         property bool hubOpen: false      // settings / system hub overlay
         property string hubLeaf: "menu"   // hub content: "menu" | "config" | "banks" | "system"
         property bool sysConfirm: false   // system: an action is armed, awaiting 2nd tap
@@ -153,7 +154,8 @@ Window {
                         width: 70; height: 38; radius: 8
                         color: "#162033"; border.width: 1; border.color: "#3b6fe0"
                         Text { anchors.centerIn: parent; text: "BANK"; color: "#9cc2ff"; font.family: uiFont; font.pixelSize: 19 }
-                        MouseArea { anchors.fill: parent; onClicked: overviewScreen.bankOpen = true }
+                        MouseArea { anchors.fill: parent
+                                    onClicked: { view.refreshBanks(); overviewScreen.bankMgrOpen = true } }
                     }
                     Rectangle {
                         width: 72; height: 38; radius: 8
@@ -428,28 +430,250 @@ Window {
             }
         }
 
-        // -------- bank selector (overlay, placeholder) --------
+        // -------- bank manager (overlay) --------
+        // Left pane lists banks (+ new bank); right pane edits the selected bank's
+        // board order (= mode-2 FS A/B/C/D), adds/removes boards, sets it active,
+        // renames, deletes. Every edit POSTs the whole bank list via the bridge.
         Item {
-            visible: overviewScreen.bankOpen; anchors.fill: parent; z: 90
-            MouseArea { anchors.fill: parent; onClicked: overviewScreen.bankOpen = false }
+            id: bankMgr
+            visible: overviewScreen.bankMgrOpen; anchors.fill: parent; z: 92
+            property int sel: 0
+            property int delArmed: -1   // bank idx armed for 2-tap delete
+            property var selBank: (sel >= 0 && sel < view.bankList.length) ? view.bankList[sel] : null
+            function close() { overviewScreen.bankMgrOpen = false; delArmed = -1; bankName.open = false }
+
+            MouseArea { anchors.fill: parent; onClicked: bankMgr.close() }
             Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.6 }
+
             Rectangle {
-                width: 560; height: 280; radius: 12; anchors.centerIn: parent
+                width: 776; height: 460; radius: 12; anchors.centerIn: parent
                 color: cPanel; border.width: 1; border.color: cBorder
                 MouseArea { anchors.fill: parent }   // swallow clicks
-                Column {
-                    anchors.fill: parent; anchors.margins: 18; spacing: 12
-                    Item {
-                        width: parent.width; height: 30
-                        Text { text: "뱅크 선택"; color: cText; font.family: uiFont; font.pixelSize: 24
-                               anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: "✕"; color: cMuted; font.pixelSize: 24
-                               anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                               MouseArea { anchors.fill: parent; onClicked: overviewScreen.bankOpen = false } }
+
+                Item {
+                    id: bmHeader
+                    anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
+                    anchors.margins: 16; height: 30
+                    Text { text: "뱅크 매니저"; color: cText; font.family: uiFont; font.pixelSize: 24
+                           anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
+                    Text { text: "✕"; color: cMuted; font.pixelSize: 24
+                           anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                           MouseArea { anchors.fill: parent; onClicked: bankMgr.close() } }
+                }
+
+                Row {
+                    anchors.top: bmHeader.bottom; anchors.topMargin: 12
+                    anchors.left: parent.left; anchors.right: parent.right
+                    anchors.bottom: parent.bottom; anchors.leftMargin: 16
+                    anchors.rightMargin: 16; anchors.bottomMargin: 16
+                    spacing: 14
+
+                    // ---- left: bank list ----
+                    Rectangle {
+                        width: 250; height: parent.height; radius: 8
+                        color: "#10141d"; border.width: 1; border.color: cBorder
+                        Column {
+                            anchors.fill: parent; anchors.margins: 10; spacing: 8
+                            Rectangle {
+                                width: parent.width; height: 40; radius: 6
+                                color: "#162033"; border.width: 1; border.color: "#3b6fe0"
+                                Text { anchors.centerIn: parent; text: "+ 새 뱅크"; color: "#9cc2ff"; font.family: uiFont; font.pixelSize: 19 }
+                                MouseArea { anchors.fill: parent
+                                    onClicked: { bankName.target = -1; bankName.open = true;
+                                                 nameInput.text = view.suggestDateName(); nameInput.forceActiveFocus() } }
+                            }
+                            ListView {
+                                width: parent.width; height: parent.height - 48
+                                clip: true; spacing: 6; model: view.bankList
+                                delegate: Rectangle {
+                                    width: ListView.view.width; height: 56; radius: 6
+                                    color: index === bankMgr.sel ? "#1d2433" : "#161b26"
+                                    border.width: 1; border.color: index === bankMgr.sel ? cGreen : cBorder
+                                    Column {
+                                        anchors.left: parent.left; anchors.leftMargin: 10
+                                        anchors.right: parent.right; anchors.rightMargin: 8
+                                        anchors.verticalCenter: parent.verticalCenter; spacing: 2
+                                        Text { text: (modelData.active ? "● " : "") + modelData.title
+                                               color: modelData.active ? cGreen : cText; font.family: uiFont; font.pixelSize: 19
+                                               elide: Text.ElideRight; width: parent.width }
+                                        Text { text: modelData.pedalboards.length + "개 보드"; color: cDim; font.family: uiFont; font.pixelSize: 14 }
+                                    }
+                                    MouseArea { anchors.fill: parent; onClicked: { bankMgr.sel = index; bankMgr.delArmed = -1 } }
+                                }
+                            }
+                        }
                     }
-                    Text { text: "뱅크 기능 준비 중.\n곧 여기에서 뱅크(보드 묶음)를 전환하게 됩니다."
-                           color: cDim; font.family: uiFont; font.pixelSize: 18
-                           wrapMode: Text.WordWrap; width: parent.width }
+
+                    // ---- right: selected bank detail ----
+                    Rectangle {
+                        width: parent.width - 264; height: parent.height; radius: 8
+                        color: "#10141d"; border.width: 1; border.color: cBorder
+
+                        Text { visible: bankMgr.selBank === null; anchors.centerIn: parent
+                               text: "왼쪽에서 뱅크를 고르거나\n+ 새 뱅크로 만드세요."
+                               horizontalAlignment: Text.AlignHCenter
+                               color: cDim; font.family: uiFont; font.pixelSize: 18 }
+
+                        Column {
+                            visible: bankMgr.selBank !== null
+                            anchors.fill: parent; anchors.margins: 12; spacing: 9
+
+                            // title + actions
+                            Item {
+                                width: parent.width; height: 32
+                                Text { text: bankMgr.selBank ? bankMgr.selBank.title : ""
+                                       color: cText; font.family: uiFont; font.pixelSize: 22
+                                       anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                                       elide: Text.ElideRight; width: 180 }
+                                Row {
+                                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 6
+                                    Rectangle {
+                                        width: 56; height: 30; radius: 6
+                                        visible: bankMgr.selBank && !bankMgr.selBank.active
+                                        color: "#13241c"; border.width: 1; border.color: cGreen
+                                        Text { anchors.centerIn: parent; text: "활성"; color: cGreen; font.family: uiFont; font.pixelSize: 17 }
+                                        MouseArea { anchors.fill: parent; onClicked: view.setActiveBank(bankMgr.sel) }
+                                    }
+                                    Text { visible: bankMgr.selBank && bankMgr.selBank.active
+                                           text: "● 활성"; color: cGreen; font.family: uiFont; font.pixelSize: 16
+                                           anchors.verticalCenter: parent.verticalCenter }
+                                    Rectangle {
+                                        width: 56; height: 30; radius: 6
+                                        color: "#1b2230"; border.width: 1; border.color: cBorder
+                                        Text { anchors.centerIn: parent; text: "이름"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 17 }
+                                        MouseArea { anchors.fill: parent
+                                            onClicked: { bankName.target = bankMgr.sel; bankName.open = true;
+                                                         nameInput.text = bankMgr.selBank.title; nameInput.forceActiveFocus() } }
+                                    }
+                                    Rectangle {
+                                        width: 70; height: 30; radius: 6
+                                        color: "#2a1416"; border.width: 1; border.color: "#7a3b3b"
+                                        Text { anchors.centerIn: parent
+                                               text: bankMgr.delArmed === bankMgr.sel ? "정말?" : "삭제"
+                                               color: "#ffb3b3"; font.family: uiFont; font.pixelSize: 17 }
+                                        MouseArea { anchors.fill: parent
+                                            onClicked: {
+                                                if (bankMgr.delArmed === bankMgr.sel) {
+                                                    view.deleteBank(bankMgr.sel); bankMgr.delArmed = -1;
+                                                    if (bankMgr.sel >= view.bankList.length) bankMgr.sel = Math.max(0, view.bankList.length - 1);
+                                                } else { bankMgr.delArmed = bankMgr.sel }
+                                            } }
+                                    }
+                                }
+                            }
+
+                            Text { text: "이 뱅크의 보드 — 순서 = 풋스위치 A·B·C·D (앞 4개)"; color: cDim; font.family: uiFont; font.pixelSize: 14 }
+
+                            ListView {
+                                width: parent.width; height: 116; clip: true; spacing: 5
+                                model: bankMgr.selBank ? bankMgr.selBank.pedalboards : []
+                                delegate: Rectangle {
+                                    width: ListView.view.width; height: 38; radius: 6
+                                    color: index < 4 ? "#161f2b" : "#141821"
+                                    border.width: 1; border.color: cBorder
+                                    Text { text: (index < 4 ? ["A","B","C","D"][index] + "  " : "") + modelData.title
+                                           color: index < 4 ? cText : cMuted; font.family: uiFont; font.pixelSize: 17
+                                           anchors.left: parent.left; anchors.leftMargin: 10
+                                           anchors.verticalCenter: parent.verticalCenter
+                                           elide: Text.ElideRight; width: parent.width - 130 }
+                                    Row {
+                                        anchors.right: parent.right; anchors.rightMargin: 8
+                                        anchors.verticalCenter: parent.verticalCenter; spacing: 4
+                                        Rectangle { width: 34; height: 28; radius: 5; color: "#1b2230"; border.width: 1; border.color: cBorder
+                                            Text { anchors.centerIn: parent; text: "위"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 15 }
+                                            MouseArea { anchors.fill: parent; onClicked: view.bankMoveBoard(bankMgr.sel, index, -1) } }
+                                        Rectangle { width: 40; height: 28; radius: 5; color: "#1b2230"; border.width: 1; border.color: cBorder
+                                            Text { anchors.centerIn: parent; text: "아래"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 15 }
+                                            MouseArea { anchors.fill: parent; onClicked: view.bankMoveBoard(bankMgr.sel, index, 1) } }
+                                        Rectangle { width: 30; height: 28; radius: 5; color: "#241b2e"; border.width: 1; border.color: cBorder
+                                            Text { anchors.centerIn: parent; text: "✕"; color: "#ffb3b3"; font.pixelSize: 16 }
+                                            MouseArea { anchors.fill: parent; onClicked: view.bankRemoveBoard(bankMgr.sel, index) } }
+                                    }
+                                }
+                            }
+
+                            Text { text: "보드 추가 — 호스트 보드 (" + view.boardCatalog.length + ")"; color: cDim; font.family: uiFont; font.pixelSize: 14 }
+
+                            ListView {
+                                width: parent.width; height: 126; clip: true; spacing: 5
+                                model: view.boardCatalog
+                                delegate: Rectangle {
+                                    width: ListView.view.width; height: 36; radius: 6
+                                    color: "#141821"; border.width: 1; border.color: cBorder
+                                    Text { text: modelData.title; color: cText; font.family: uiFont; font.pixelSize: 17
+                                           anchors.left: parent.left; anchors.leftMargin: 10
+                                           anchors.verticalCenter: parent.verticalCenter
+                                           elide: Text.ElideRight; width: parent.width - 60 }
+                                    Rectangle {
+                                        width: 40; height: 28; radius: 5
+                                        anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
+                                        color: "#162033"; border.width: 1; border.color: "#3b6fe0"
+                                        Text { anchors.centerIn: parent; text: "+"; color: "#9cc2ff"; font.pixelSize: 20 }
+                                        MouseArea { anchors.fill: parent; onClicked: view.bankAddBoard(bankMgr.sel, modelData.bundle) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ---- naming sub-modal (create / rename) ----
+                // Banks are edited at a desk with a real keyboard (wvkbd doesn't
+                // come up on this device), so the field is just a plain TextInput:
+                // a new bank defaults to the current date-time (setlist-by-date),
+                // a rename prefills the bank's current title (non-destructive).
+                Item {
+                    id: bankName
+                    anchors.fill: parent
+                    property bool open: false
+                    property int target: -1     // -1 = create new, >=0 = rename idx
+                    visible: open
+                    function commit() {
+                        var t = nameInput.text.trim();
+                        if (t.length) {
+                            if (bankName.target < 0) {
+                                view.createBank(t);
+                                bankMgr.sel = view.bankList.length - 1;
+                                bankMgr.delArmed = -1;
+                            } else {
+                                view.renameBank(bankName.target, t);
+                            }
+                        }
+                        bankName.open = false;
+                    }
+                    Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.6
+                                MouseArea { anchors.fill: parent; onClicked: bankName.open = false } }
+                    Rectangle {
+                        width: 520; height: 200; radius: 12; anchors.centerIn: parent
+                        color: cPanel; border.width: 1; border.color: cBorder
+                        MouseArea { anchors.fill: parent }
+                        Column {
+                            anchors.fill: parent; anchors.margins: 18; spacing: 14
+                            Text { text: bankName.target < 0 ? "새 뱅크" : "뱅크 이름 변경"
+                                   color: cText; font.family: uiFont; font.pixelSize: 22 }
+                            Rectangle {
+                                width: parent.width; height: 52; radius: 8; color: "#10212a"
+                                border.width: 1; border.color: cGreen
+                                TextInput {
+                                    id: nameInput
+                                    anchors.fill: parent; anchors.margins: 12
+                                    verticalAlignment: TextInput.AlignVCenter
+                                    color: cText; font.family: uiFont; font.pixelSize: 24; clip: true
+                                    selectByMouse: true
+                                    onAccepted: bankName.commit()
+                                }
+                            }
+                            Row {
+                                spacing: 10
+                                Rectangle { width: 120; height: 44; radius: 8; color: "#13241c"; border.width: 1; border.color: cGreen
+                                    Text { anchors.centerIn: parent; text: "저장"; color: cGreen; font.family: uiFont; font.pixelSize: 19 }
+                                    MouseArea { anchors.fill: parent; onClicked: bankName.commit() } }
+                                Rectangle { width: 110; height: 44; radius: 8; color: "#241b2e"; border.width: 1; border.color: cBorder
+                                    Text { anchors.centerIn: parent; text: "취소"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 19 }
+                                    MouseArea { anchors.fill: parent; onClicked: bankName.open = false } }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -475,8 +699,7 @@ Window {
                                MouseArea { anchors.fill: parent
                                            onClicked: { overviewScreen.hubLeaf = "menu"; overviewScreen.sysConfirm = false } } }
                         Text { text: overviewScreen.hubLeaf === "system" ? "시스템"
-                                     : overviewScreen.hubLeaf === "config" ? "설정"
-                                     : overviewScreen.hubLeaf === "banks" ? "뱅크 관리" : "설정 / 시스템"
+                                     : overviewScreen.hubLeaf === "config" ? "설정" : "설정 / 시스템"
                                color: cText; font.family: uiFont; font.pixelSize: 24
                                anchors.horizontalCenter: parent.horizontalCenter
                                anchors.verticalCenter: parent.verticalCenter }
@@ -491,7 +714,6 @@ Window {
                         width: parent.width; spacing: 10
                         Repeater {
                             model: [ {k:"config", t:"설정 (CONFIG)",   s:"탭템포·풋스위치 등 — 준비 중"},
-                                     {k:"banks",  t:"뱅크 관리 (BANKS)", s:"뱅크 생성/편집 — 준비 중"},
                                      {k:"system", t:"시스템 (SYSTEM)",  s:"안전 종료 · 재부팅"} ]
                             Rectangle {
                                 width: parent.width; height: 64; radius: 8
@@ -513,11 +735,6 @@ Window {
                     // ---- config placeholder ----
                     Text { visible: overviewScreen.hubLeaf === "config"
                            text: "설정 화면 준비 중.\n하드코딩된 옵션들(탭템포 스냅 그리드, 풋스위치 콤보 등)이\n여기로 들어올 예정입니다. (docs/config-todo.md)"
-                           color: cDim; font.family: uiFont; font.pixelSize: 17
-                           wrapMode: Text.WordWrap; width: parent.width }
-                    // ---- banks placeholder ----
-                    Text { visible: overviewScreen.hubLeaf === "banks"
-                           text: "뱅크 관리 준비 중.\n뱅크 생성/편집과 보드 할당이 여기로 들어옵니다."
                            color: cDim; font.family: uiFont; font.pixelSize: 17
                            wrapMode: Text.WordWrap; width: parent.width }
                     // ---- system (real: shutdown / reboot, 2-tap confirm) ----

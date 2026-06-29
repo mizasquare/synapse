@@ -76,6 +76,7 @@ class QtView(QObject):
     levelUpdated = Signal('QVariant')                # overview IN/OUT JACK level meter (dict payload)
     toastRequested = Signal(str)                     # transient on-screen message
     boardsChanged = Signal()                         # overview board-manager list changed
+    banksChanged = Signal()                          # bank-manager lists changed
 
     PARAM_THROTTLE_MS = 40   # max ~25 host writes/s during a knob drag
 
@@ -94,6 +95,8 @@ class QtView(QObject):
         self._focus = {}            # FOCUS payload for QML
         self._tap = {}              # TAP TEMPO payload for QML ({bpb, klass})
         self._board_list = []       # overview board-manager entries [{bundle,title,current}]
+        self._bank_list = []        # bank-manager banks [{title,pedalboards,active}]
+        self._board_catalog = []    # bank-manager add-board picker [{bundle,title}]
 
         # Parameter-write throttle: a knob drag fires setParameter on every
         # positionChanged (~60/s), each a blocking HTTP POST on the GUI thread.
@@ -174,6 +177,14 @@ class QtView(QObject):
     @Property("QVariantList", notify=boardsChanged)
     def boardList(self):
         return self._board_list
+
+    @Property("QVariantList", notify=banksChanged)
+    def bankList(self):
+        return self._bank_list
+
+    @Property("QVariantList", notify=banksChanged)
+    def boardCatalog(self):
+        return self._board_catalog
 
     # ------------------------------------------ QML -> presenter (slots)
     @Slot(str)
@@ -281,6 +292,81 @@ class QtView(QObject):
         discipline; no-op if it is already current)."""
         if self.presenter:
             self.presenter.overview_switch_board(bundle)
+
+    # ------------------------------------------ bank manager (QML -> presenter)
+    def _push_banks(self):
+        """Re-read the presenter's draft into the QML-facing lists and notify."""
+        if self.presenter:
+            self._bank_list = self.presenter.bank_manager_banks()
+            self._board_catalog = self.presenter.bank_manager_catalog()
+            self.banksChanged.emit()
+
+    @Slot()
+    def refreshBanks(self):
+        """Load banks + board catalog from the host (call when the manager opens)."""
+        if self.presenter:
+            self.presenter.bank_manager_open()
+            self._push_banks()
+
+    @Slot(result=str)
+    def suggestDateName(self):
+        """Default bank name = current date-time ("YYYY-MM-DD HH:MM"). Banks are
+        mostly edited at a desk (real keyboard) while planning a setlist, so a
+        date stamp is a sensible starting name to keep or edit."""
+        from datetime import datetime
+        return datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    @Slot(str)
+    def createBank(self, title):
+        if self.presenter:
+            self.presenter.create_bank(title)
+            self._push_banks()
+
+    @Slot(int, str)
+    def renameBank(self, idx, title):
+        if self.presenter:
+            self.presenter.rename_bank(idx, title)
+            self._push_banks()
+
+    @Slot(int)
+    def deleteBank(self, idx):
+        if self.presenter:
+            self.presenter.delete_bank(idx)
+            self._push_banks()
+
+    @Slot(int)
+    def setActiveBank(self, idx):
+        if self.presenter:
+            self.presenter.set_active_bank(idx)
+            self._push_banks()
+
+    @Slot(int, str)
+    def bankAddBoard(self, idx, bundle):
+        if self.presenter:
+            self.presenter.bank_add_board(idx, bundle)
+            self._push_banks()
+
+    @Slot(int, int)
+    def bankRemoveBoard(self, idx, boardIdx):
+        if self.presenter:
+            self.presenter.bank_remove_board(idx, boardIdx)
+            self._push_banks()
+
+    @Slot(int, int, int)
+    def bankMoveBoard(self, idx, boardIdx, delta):
+        if self.presenter:
+            self.presenter.bank_move_board(idx, boardIdx, delta)
+            self._push_banks()
+
+    @Slot()
+    def toggleKeyboard(self):
+        """Show/hide the on-screen keyboard (wvkbd) for text fields on the touch
+        device. No-op-ish where wvkbd isn't installed."""
+        if self.presenter:
+            try:
+                self.presenter.toggle_keyboard()
+            except Exception as e:
+                print(f"[view] keyboard toggle failed: {e}")
 
     @Slot(str, str, float)
     def setParameter(self, instance, symbol, value):

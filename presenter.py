@@ -64,8 +64,8 @@ class Presenter:
             })
 
         # Mode-2 BANK selector: the active bank's first 4 boards map to FS0-3.
-        # current_bank is the seam a future touch UI (bank switch/edit) drives;
-        # for now it stays 0. bank_boards is the live [{bundle,title}] for the strip.
+        # current_bank is driven by the bank manager (set_active_bank); it picks
+        # which bank mode-2 uses. bank_boards is the live [{bundle,title}] strip.
         self.current_bank = 0
         self.bank_boards = []
 
@@ -450,6 +450,113 @@ class Presenter:
             return
         self._warn_if_editor_dirty()        # the switch /reset discards unsaved editor edits
         self._go_to_pedalboard(bundle)
+
+    # ---- bank manager (touch UI) -------------------------------------------
+    # The host owns banks.json; we never touch the file. The manager reads the
+    # whole bank list into a draft, mutates it in place, and POSTs the complete
+    # list back via save_banks after every edit (the host rewrites wholesale).
+    # current_bank picks which bank mode-2 maps to FS0-3.
+    def bank_manager_open(self):
+        """Load the bank draft + board catalog for the manager. Returns the
+        banks in display shape; also caches the draft we mutate."""
+        self._bank_draft = self.backend.get_banks() or []
+        self._bank_catalog = [
+            {"bundle": e["bundle"],
+             "title": e.get("title", "") or self._board_label(e["bundle"])}
+            for e in (self.backend.get_all_pedalboard_entries() or [])
+        ]
+        return self.bank_manager_banks()
+
+    @staticmethod
+    def _board_label(bundle):
+        return bundle.split("/")[-1].replace(".pedalboard", "")
+
+    def bank_manager_banks(self):
+        """Banks for the manager: ``[{title, pedalboards:[{bundle,title}], active}]``.
+        ``active`` flags the bank mode-2 currently maps to (current_bank)."""
+        draft = getattr(self, "_bank_draft", [])
+        return [{"title": b.get("title", "") or "(이름 없음)",
+                 "pedalboards": [{"bundle": p["bundle"],
+                                  "title": p.get("title", "") or self._board_label(p["bundle"])}
+                                 for p in b.get("pedalboards", [])],
+                 "active": (i == self.current_bank)}
+                for i, b in enumerate(draft)]
+
+    def bank_manager_catalog(self):
+        """Every available board to add: ``[{bundle,title}]`` (cached on open)."""
+        return getattr(self, "_bank_catalog", [])
+
+    def _title_for_bundle(self, bundle):
+        for e in getattr(self, "_bank_catalog", []):
+            if e["bundle"] == bundle:
+                return e["title"]
+        return self._board_label(bundle)
+
+    def _commit_banks(self):
+        """Persist the draft to the host and re-sync mode-2 if it is live so the
+        footswitch strip reflects the edit immediately."""
+        self.backend.save_banks(self._bank_draft)
+        if self.footswitch_mode == 2:
+            self.assign_footswitches()
+            self.view.update_mode_display(self.footswitch_mode)
+
+    def suggest_bank_name(self):
+        """A unique default name ("뱅크 N") so a bank can be created without typing."""
+        existing = {b.get("title", "") for b in getattr(self, "_bank_draft", [])}
+        n = 1
+        while ("뱅크 %d" % n) in existing:
+            n += 1
+        return "뱅크 %d" % n
+
+    def create_bank(self, title):
+        title = (title or "").strip() or self.suggest_bank_name()
+        self._bank_draft.append({"title": title, "pedalboards": []})
+        self._commit_banks()
+
+    def rename_bank(self, idx, title):
+        title = (title or "").strip()
+        if title and 0 <= idx < len(self._bank_draft):
+            self._bank_draft[idx]["title"] = title
+            self._commit_banks()
+
+    def delete_bank(self, idx):
+        if 0 <= idx < len(self._bank_draft):
+            del self._bank_draft[idx]
+            # keep current_bank in range (mode-2 reads banks[current_bank])
+            if self.current_bank >= len(self._bank_draft):
+                self.current_bank = max(0, len(self._bank_draft) - 1)
+            self._commit_banks()
+
+    def bank_add_board(self, idx, bundle):
+        if 0 <= idx < len(self._bank_draft):
+            self._bank_draft[idx].setdefault("pedalboards", []).append(
+                {"bundle": bundle, "title": self._title_for_bundle(bundle)})
+            self._commit_banks()
+
+    def bank_remove_board(self, idx, board_idx):
+        if 0 <= idx < len(self._bank_draft):
+            pbs = self._bank_draft[idx].get("pedalboards", [])
+            if 0 <= board_idx < len(pbs):
+                del pbs[board_idx]
+                self._commit_banks()
+
+    def bank_move_board(self, idx, board_idx, delta):
+        """Swap a board with its neighbour (delta -1 up / +1 down). Order matters:
+        the first 4 boards map to FS0-3 in mode-2."""
+        if 0 <= idx < len(self._bank_draft):
+            pbs = self._bank_draft[idx].get("pedalboards", [])
+            j = board_idx + delta
+            if 0 <= board_idx < len(pbs) and 0 <= j < len(pbs):
+                pbs[board_idx], pbs[j] = pbs[j], pbs[board_idx]
+                self._commit_banks()
+
+    def set_active_bank(self, idx):
+        """Pick the bank mode-2 maps to FS0-3 (and re-sync the strip if live)."""
+        if 0 <= idx < len(self._bank_draft):
+            self.current_bank = idx
+            if self.footswitch_mode == 2:
+                self.assign_footswitches()
+                self.view.update_mode_display(self.footswitch_mode)
 
     def prev_pedalboard(self):
         self._warn_if_editor_dirty()         # /reset 이 미저장 에디터 편집을 폐기 (비차단 알림)
