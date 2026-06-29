@@ -66,7 +66,8 @@ class Presenter:
         # Mode-2 BANK selector: the active bank's first 4 boards map to FS0-3.
         # current_bank is driven by the bank manager (set_active_bank); it picks
         # which bank mode-2 uses. bank_boards is the live [{bundle,title}] strip.
-        self.current_bank = 0
+        # Held across restarts (utils.app_state) to mirror MOD's HMI bank hold.
+        self.current_bank = utils.load_last_bank()
         self.bank_boards = []
 
         # Mode-1 STOMP: the 4 category-filtered effects bound to FS0-3. Exposed so
@@ -520,11 +521,17 @@ class Presenter:
             self._commit_banks()
 
     def delete_bank(self, idx):
+        if len(self._bank_draft) <= 1:
+            # Never strand the user with zero banks (mode-2 would have nothing to
+            # map, and the host's banks.json would go empty). Keep the last one.
+            self._notify("마지막 뱅크는 삭제할 수 없어요")
+            return
         if 0 <= idx < len(self._bank_draft):
             del self._bank_draft[idx]
             # keep current_bank in range (mode-2 reads banks[current_bank])
             if self.current_bank >= len(self._bank_draft):
                 self.current_bank = max(0, len(self._bank_draft) - 1)
+                utils.save_last_bank(self.current_bank)
             self._commit_banks()
 
     def bank_add_board(self, idx, bundle):
@@ -554,6 +561,7 @@ class Presenter:
         """Pick the bank mode-2 maps to FS0-3 (and re-sync the strip if live)."""
         if 0 <= idx < len(self._bank_draft):
             self.current_bank = idx
+            utils.save_last_bank(idx)
             if self.footswitch_mode == 2:
                 self.assign_footswitches()
                 self.view.update_mode_display(self.footswitch_mode)
@@ -795,6 +803,11 @@ class Presenter:
             # touch UI switches self.current_bank / edits banks. No bank -> message
             # + fall back to STOMP (mode 1).
             entries = self.backend.get_bank_pedalboard_entries(self.current_bank)
+            if not entries and self.current_bank != 0:
+                # held bank index is stale (deleted while app was off) -> clamp to 0
+                self.current_bank = 0
+                utils.save_last_bank(0)
+                entries = self.backend.get_bank_pedalboard_entries(0)
             if not entries:
                 self._notify("뱅크 없음 — STOMP 모드로")
                 self.bank_boards = []

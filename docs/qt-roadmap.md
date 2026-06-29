@@ -127,6 +127,9 @@ FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이
       `presenter.bank_manager_*`(드래프트 + `_commit_banks`가 저장+mode2 재바인딩) · `qtview` `bankList`/`boardCatalog` +
       슬롯들 · `qml/main.qml` `bankMgr` 오버레이. 이름은 책상 물리키보드 전제(wvkbd 안 뜸) → 새 뱅크 기본값 = 날짜-시간.
       `fakemodep`도 인메모리 뱅크 구현(데스크톱 테스트). 남은 것: **라이브러리(전체 보드) 순서 정렬**은 별개로 미구현.
+      폴리싱(2026-06-29): ① **마지막 뱅크 삭제 금지** 가드(presenter `_notify` + qml 삭제버튼 dim) — 0개로 자멸 방지.
+      ② **활성 뱅크 영속**(`utils.load/save_last_bank` → `~/.modep/app_state.json`) — MOD HMI가 기기-측에서 마지막
+      뱅크를 홀드하던 걸 재현. 재시작 시 로드 + stale 인덱스(앱 꺼진 새 뱅크 삭제됨) 진입 시 0 클램프.
 - [x] **UNDO/REDO 제거 ✅(2026-06-29)** — 웹 UI(mod-ui)에도 없는 기능(프론트엔드의 "undo"는
       잭 연결 실패 롤백 주석뿐). 라이브엔 애초에 미배선(스냅샷 스택은 디스크-편집 경로 전용)이라
       스냅샷-restore desync를 감수하고 유지할 가치가 없어 **버튼+백엔드 기계 전부 제거**

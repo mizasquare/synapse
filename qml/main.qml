@@ -546,13 +546,17 @@ Window {
                                                          nameInput.text = bankMgr.selBank.title; nameInput.forceActiveFocus() } }
                                     }
                                     Rectangle {
+                                        // The last bank can't be deleted (mode-2 needs one); dim it.
+                                        property bool canDel: view.bankList.length > 1
                                         width: 70; height: 30; radius: 6
+                                        opacity: canDel ? 1.0 : 0.4
                                         color: "#2a1416"; border.width: 1; border.color: "#7a3b3b"
                                         Text { anchors.centerIn: parent
                                                text: bankMgr.delArmed === bankMgr.sel ? "정말?" : "삭제"
                                                color: "#ffb3b3"; font.family: uiFont; font.pixelSize: 17 }
                                         MouseArea { anchors.fill: parent
                                             onClicked: {
+                                                if (!parent.canDel) return;
                                                 if (bankMgr.delArmed === bankMgr.sel) {
                                                     view.deleteBank(bankMgr.sel); bankMgr.delArmed = -1;
                                                     if (bankMgr.sel >= view.bankList.length) bankMgr.sel = Math.max(0, view.bankList.length - 1);
