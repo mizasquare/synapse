@@ -20,11 +20,6 @@ Return contracts worth noting:
 - ``snapshot_current_idx`` returns an ``int`` (``-1`` when it can't be
   resolved). ``get_snapshot_list`` returns a dict ``{"0": name, ...}`` (or an
   empty list on host failure); callers use ``len(...)`` and ``str(idx) in ...``.
-
-NOTE: ``presenter.recall_pb_ss`` (footswitch mode 2) calls ``set_snapshot``,
-which the real ``ModepController`` does **not** define -- a pre-existing latent
-bug, left as-is. A fake may add a working ``set_snapshot`` stub; it is not part
-of the faithful surface below.
 """
 
 
