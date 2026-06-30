@@ -1,13 +1,14 @@
 from collections import defaultdict
 import utils
 from modepctrl import get_backend
-from model import initialize_modep_pedalboard, Connection
+from model import initialize_modep_pedalboard, Connection, diff_live_graph
 from taptempo import TapTempoEngine
 import subprocess
 import threading
 import time
 
 import json
+import logging
 import os
 import configs
 from configs import LOCAL_STORAGE
@@ -111,6 +112,30 @@ class Presenter:
     def refresh_pedalboard(self):
         self.pedalboard = initialize_modep_pedalboard(self.backend)
         self.view_update_effect()
+
+    def _audit_desync(self, context):
+        """Detect (don't fix) cached-model vs live-host drift and log it.
+
+        Called at save boundaries: the model is normally kept fresh by the
+        synapsin reverse channel, so any drift caught here means that channel
+        dropped an event (or died) and we were holding stale state. The save
+        itself is safe regardless — the host serializes its OWN live graph — and
+        the caller's existing refresh_pedalboard() reconciles the model. This
+        only makes the otherwise-silent desync VISIBLE in the logs. Must run
+        BEFORE refresh (which rebuilds the model and erases the drift).
+
+        Best-effort: a missing/failed live graph is not drift, and any failure
+        here never blocks the save. Returns the drift list (for tests/callers)."""
+        try:
+            live = self.backend.dump_graph()
+        except Exception as e:
+            logging.debug("desync audit (%s): dump_graph failed: %s", context, e)
+            return []
+        drift = diff_live_graph(self.pedalboard, live)
+        if drift:
+            logging.warning("DESYNC at %s: reverse channel may be stale — %d drift(s): %s",
+                            context, len(drift), "; ".join(drift))
+        return drift
 
     # ── pb별 마지막 스냅샷 기억/복원 (세션 한정, 풋스위치 PB전환에서만 복원) ──
     def _remember_current_snapshot(self):
@@ -424,6 +449,7 @@ class Presenter:
         FACTORY board falls through to save-new on the host (mints a new user
         bundle and changes the current path), so the cached pedalboard would go
         stale otherwise. Returns the backend's success bool."""
+        self._audit_desync("save_current_board")
         ok = self.backend.save_current_pedalboard()
         self.refresh_pedalboard()   # adopt any path/title change (factory -> save-new)
         return ok
@@ -434,6 +460,7 @@ class Presenter:
         the new path/title and carry the remembered snapshot over to the new key.
         Returns the new ``{'bundlepath','title'}`` or None on failure."""
         prev = self.pedalboard.current_pb_path if self.pedalboard else None
+        self._audit_desync("save_board_as")
         res = self.backend.save_pedalboard_as(title)
         self.refresh_pedalboard()   # host switched current -> adopt new path/title
         if res:
@@ -942,10 +969,12 @@ class Presenter:
         pass
 
     def save_snapshot(self):
+        self._audit_desync("save_snapshot")
         ok = self.backend.snapshot_save()   # overwrites current snapshot + persists the pedalboard
         self.refresh_pedalboard()
         return bool(ok)
     def  save_snapshot_as(self, name):
+        self._audit_desync("save_snapshot_as")
         res = self.backend.snapshot_save_as(new_name=name)
         self.refresh_pedalboard()
         return res
