@@ -5,16 +5,18 @@ gateway) and the *model* (the dataclasses below + the builder that hydrates
 them) live in separate files. The two are still one logical layer -- the local
 stand-in for the host's truth -- but now have one reason to change each.
 
-The model objects and ``initialize_modep_pedalboard`` reach the MODEP host
-through ``modepctrl.get_backend()`` (never naming ``ModepController``
-directly), so an off-device entry point can ``set_backend(fake)`` to serve
-fixtures with no Pi hardware. Default backend is the real ``ModepController``.
+``initialize_modep_pedalboard(backend)`` takes the MODEP host seam as a required
+argument and threads it through the whole assembler chain. Library code never
+reaches the global ``modepctrl.get_backend()`` -- only the ``__main__`` entry
+resolves it. An off-device entry point injects a fake (the presenter's
+``self.backend``, ultimately ``set_backend(fake)``), serving fixtures with no Pi
+hardware. Default backend is the real ``ModepController``.
 
-NOTE: EffectPort (get_value/set_value) and EffectPatch (get_patch/set_patch) are
-still *active* -- they reach the backend directly, closer to Active Record than
-pure data. Being migrated to pure data (the assembler hydrates, the presenter
-does the host I/O via its injected backend); Pedalboard is already pure (snapshot
-state comes in as ctor args). EffectPort/EffectPatch are the remaining step.
+The dataclasses below (EffectPort, EffectPatch, Pedalboard) are now PURE DATA --
+they hold state, never reach the host. The assembler hydrates them at build time;
+the presenter does live host I/O through its injected backend (parameter_set,
+patch_set, ...). Out-of-band changes (web UI / HMI / snapshot recall) reach the
+view via the synapsin reverse channel -> refresh_pedalboard(), not per-read polling.
 """
 
 import configs
@@ -451,15 +453,15 @@ def _build_effect(effect_data: dict, get_effect_info, backend) -> Optional[Effec
 	)
 
 
-def initialize_modep_pedalboard(backend=None) -> Optional[Pedalboard]:
+def initialize_modep_pedalboard(backend) -> Optional[Pedalboard]:
 	#todo: tell modep to load the last pedalboard and snapshot
 	#some parameters are desynced with the current pedalboard and pb data retrived from saved pedalboard
 	"""Fetches the current pedalboard, retrieves all effect details, and constructs a Pedalboard object.
 
-	``backend`` is the MODEP host seam, threaded through the whole assembler chain
-	(no more reaching for the global mid-build). Defaults to ``get_backend()`` so
-	the standalone ``__main__`` entry below still works with no backend handy."""
-	backend = backend if backend is not None else get_backend()
+	``backend`` (the MODEP host seam) is REQUIRED — threaded through the whole
+	assembler chain so library code never reaches the global. Callers inject it
+	(the presenter passes ``self.backend``); only the ``__main__`` entry below
+	resolves the global via ``get_backend()``."""
 	pb_path, pb_data = _fetch_and_merge_graph(backend)
 	if pb_data is None:
 		return None
@@ -499,6 +501,6 @@ def initialize_modep_pedalboard(backend=None) -> Optional[Pedalboard]:
 
 
 if __name__ == '__main__':
-	pedalboard = initialize_modep_pedalboard()
+	pedalboard = initialize_modep_pedalboard(get_backend())
 	if pedalboard:
 		pedalboard.print_info()
