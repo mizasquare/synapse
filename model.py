@@ -10,9 +10,11 @@ through ``modepctrl.get_backend()`` (never naming ``ModepController``
 directly), so an off-device entry point can ``set_backend(fake)`` to serve
 fixtures with no Pi hardware. Default backend is the real ``ModepController``.
 
-NOTE: these dataclasses are *active* (EffectPort.get_value/set_value,
-EffectPatch.get_patch, Pedalboard._get_list_of_snapshots reach the backend),
-i.e. closer to Active Record than pure data -- a known wart, left as-is here.
+NOTE: EffectPort (get_value/set_value) and EffectPatch (get_patch/set_patch) are
+still *active* -- they reach the backend directly, closer to Active Record than
+pure data. Being migrated to pure data (the assembler hydrates, the presenter
+does the host I/O via its injected backend); Pedalboard is already pure (snapshot
+state comes in as ctor args). EffectPort/EffectPatch are the remaining step.
 """
 
 import configs
@@ -186,10 +188,11 @@ class Pedalboard:
 	list_of_snapshots: List[str] = field(default_factory=list)
 
 	def __post_init__(self):
+		# Pure, in-object derivations only (connection ordering). Snapshot state is
+		# supplied by the assembler as ctor args — constructing a Pedalboard no
+		# longer reaches the host.
 		self._order_instances()
 		self._reorder_effects()
-		self._get_current_snapshot_idx()
-		self._get_list_of_snapshots()
 
 	def _order_instances(self):
 		"""Orders effect instances based on their connections while treating ports correctly."""
@@ -257,15 +260,6 @@ class Pedalboard:
 		seen = set(self.ordered_instances)
 		leftovers = [e for e in self.effects if e.instance not in seen]
 		self.effects = ordered + leftovers
-
-	def _get_current_snapshot_idx(self):
-		"""Fetches the current snapshot index from the pedalboard."""
-		self.current_snapshot_idx = get_backend().snapshot_current_idx()
-
-	def _get_list_of_snapshots(self):
-		"""Fetches the list of snapshots available in the pedalboard."""
-		self.list_of_snapshots = get_backend().get_snapshot_list()
-		pass
 
 	def print_info(self):
 		"""Prints detailed pedalboard information."""
@@ -534,6 +528,10 @@ def initialize_modep_pedalboard(backend=None) -> Optional[Pedalboard]:
 		audio_outs=hardware.get("audio_outs", 2),
 		cv_ins=hardware.get("cv_ins", 0),
 		cv_outs=hardware.get("cv_outs", 0),
+		# Snapshot state read here (was Pedalboard.__post_init__'s job) so the
+		# dataclass stays pure data — no host I/O fires just by constructing it.
+		current_snapshot_idx=backend.snapshot_current_idx(),
+		list_of_snapshots=backend.get_snapshot_list(),
 	)
 
 
