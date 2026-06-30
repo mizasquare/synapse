@@ -254,6 +254,86 @@ class Pedalboard:
 		)
 
 
+def _values_agree(a, b, eps: float) -> bool:
+	"""Numeric-tolerant equality for a control value. Two Nones agree; a None vs a
+	real value does not. Numbers compare within ``eps`` (reverse-channel values
+	arrive as floats, so 0.30000001 must not read as drift); non-numerics fall
+	back to ``==``."""
+	if a is None or b is None:
+		return a is b
+	try:
+		return abs(float(a) - float(b)) <= eps
+	except (TypeError, ValueError):
+		return a == b
+
+
+def diff_live_graph(pedalboard, live, eps: float = 1e-6) -> List[str]:
+	"""Compare the cached ``Pedalboard`` model against a LIVE host graph (the dict
+	``backend.dump_graph()`` returns) and return human-readable drift lines —
+	empty when they agree.
+
+	This is the desync *detector*. The model is kept fresh out-of-band by the
+	synapsin reverse channel (model.py module docstring); any drift here means
+	that channel dropped an event (or died) and the app was holding stale state.
+	We compare only what dump_graph carries: the instance set, per-instance
+	bypass, control-port values, and connections. Patches (NAM/IR file state)
+	aren't in the live dump, so they're out of scope here.
+
+	Tolerant by design: a missing/None live graph yields ``[]`` (can't audit ≠
+	drift) so a host hiccup never raises a false alarm. Compares only the port
+	symbols present in BOTH sides — live-only ports (monitors/outputs the model
+	doesn't track) are not drift."""
+	if not pedalboard or not live:
+		return []
+	live_plugins = live.get("plugins")
+	if not live_plugins:
+		return []
+
+	drift: List[str] = []
+
+	live_by_inst: Dict[str, dict] = {}
+	for p in live_plugins:
+		inst = p.get("instance")
+		if inst is None:
+			continue
+		live_by_inst[inst] = {
+			"bypassed": bool(p.get("bypassed", False)),
+			"ports": {pt.get("symbol"): pt.get("value")
+					  for pt in p.get("ports", []) if pt.get("symbol") is not None},
+		}
+
+	model_by_inst = {e.instance: e for e in pedalboard.effects}
+
+	# 1) instance set — structural drift (add/remove not reflected)
+	for inst in sorted(set(model_by_inst) - set(live_by_inst)):
+		drift.append(f"instance {inst!r} in app but not on host")
+	for inst in sorted(set(live_by_inst) - set(model_by_inst)):
+		drift.append(f"instance {inst!r} on host but not in app")
+
+	# 2) bypass + 3) control-port values, for instances on both sides
+	for inst in sorted(set(model_by_inst) & set(live_by_inst)):
+		eff = model_by_inst[inst]
+		lp = live_by_inst[inst]
+		if bool(eff.bypassed) != lp["bypassed"]:
+			drift.append(f"{inst}:bypass app={eff.bypassed} host={lp['bypassed']}")
+		for sym, port in (eff.ports or {}).items():
+			if sym not in lp["ports"]:
+				continue
+			if not _values_agree(port.value, lp["ports"][sym], eps):
+				drift.append(f"{inst}/{sym} app={port.value} host={lp['ports'][sym]}")
+
+	# 4) connections (bare source/target, both namespaces already normalized)
+	model_conns = {(c.source, c.target) for c in pedalboard.connections}
+	live_conns = {(c.get("source"), c.get("target")) for c in (live.get("connections") or [])}
+	key = lambda st: (str(st[0]), str(st[1]))
+	for s, t in sorted(model_conns - live_conns, key=key):
+		drift.append(f"cable {s}->{t} in app but not on host")
+	for s, t in sorted(live_conns - model_conns, key=key):
+		drift.append(f"cable {s}->{t} on host but not in app")
+
+	return drift
+
+
 def _fetch_and_merge_graph(backend) -> Tuple[Optional[str], Optional[dict]]:
 	"""Fetch the current pedalboard bundle + its on-disk info, then overlay the
 	LIVE in-memory graph on top.
