@@ -118,26 +118,6 @@ class EffectPatch:
 	value: str = ""
 	property: str = ""
 
-	def get_patch(self):
-		"""Fetch the latest patch from MODEP."""
-		new_patch = get_backend().patch_get(self.instance, self.uri)
-		if new_patch is not None:
-			self.value = new_patch
-			return new_patch
-
-	def set_patch(self, new_patch: str):
-		"""Load a new patch into MODEP and update UI if successful.
-		Returns the backend error string (None on success) so the presenter can
-		branch — mirrors EffectPort.set_value. On success updates ``value`` (the
-		loaded file); ``file_path`` stays the picker's base directory."""
-		error_msg = get_backend().patch_set(self.instance, self.uri, new_patch)
-		if error_msg is None:  # Only update local data if request was successful
-			self.value = new_patch
-		else:
-			print(f"⚠️ Failed to load patch for {self.instance}: {error_msg}")
-		return error_msg
-
-
 @dataclass
 class Effect:
 	"""Represents an effect in the pedalboard with parameters and patches."""
