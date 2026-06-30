@@ -204,7 +204,7 @@ the strategy is **whole-file copy**, not diff-patching:
   can't sudo).
 
 Custom endpoints added by the patches (see [`REFERENCES.md`](REFERENCES.md) for details):
-`syn_set` / `syn_get` parameter routes, `syn_patch_set` / `syn_patch_get`, transport
+`syn_set` / `syn_get` parameter routes, `syn_patch_set`, transport
 (`/general/`), and the `notify_synapsin()` reverse notification over the unix socket.
 
 ---

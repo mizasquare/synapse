@@ -1264,17 +1264,6 @@ class EffectPatchSetSYN(JsonRequestHandler):
             notify_synapsin(message=f"EffectPatchSetSYN {e}")
             self.write({'error': str(e)})
 
-class EffectPatchGetSYN(JsonRequestHandler):
-    @web.asynchronous
-    @gen.engine
-    def get(self, instance, uri):
-        notify_synapsin(message=f"EffectPatchGetSYN {instance}, {uri}")
-        try:
-            value = SESSION.host.patch_get(instance, uri, None)
-            self.write({'value': value})
-        except Exception as e:
-            self.write({'error': str(e)})
-
 class GeneralCommand(JsonRequestHandler):
     @web.asynchronous
     @gen.engine
@@ -2510,7 +2499,6 @@ application = web.Application(
             (r"/effect/parameter/syn_set/*(/[A-Za-z0-9_:/]+[^/])/?", EffectParameterSetSYN),
             (r"/effect/parameter/syn_get/*(/[A-Za-z0-9_:/]+[^/])/?", EffectParameterGetSYN),
             (r"/effect/parameter/syn_patch_set/*(/[A-Za-z0-9_:/]+[^/])/?", EffectPatchSetSYN),
-            (r"/effect/parameter/syn_patch_get/*(/[A-Za-z0-9_:/]+[^/])/?", EffectPatchGetSYN),
             (r"/syn_dump_graph/?", GraphDumpSYN),
 
             # plugin presets

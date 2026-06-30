@@ -2710,15 +2710,6 @@ class Host(object):
 
         self.send_modified("patch_get %d %s" % (instance_id, paramuri), callback, datatype='boolean')
 
-    def syn_patch_get(self, instance, paramuri):
-        instance_id = self.mapper.get_id_without_creating(instance)
-        pluginData = self.plugins[instance_id]
-        parameter = pluginData['parameters'].get(paramuri, None)
-
-        if parameter is not None:
-            return parameter  # Assuming parameter is a value or dictionary that can be JSON serialized
-        return None  # Or appropriate error message or status
-
     def patch_set(self, instance, paramuri, value, callback):
         instance_id = self.mapper.get_id_without_creating(instance)
         pluginData  = self.plugins[instance_id]

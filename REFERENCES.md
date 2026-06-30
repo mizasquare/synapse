@@ -62,6 +62,6 @@ mod 코드(host/session/webserver) 수정 시 **파일 통째 cp** 전략을 쓴
 ## 커스텀 엔드포인트 (내 패치가 추가)
 
 - `POST /effect/parameter/syn_set/<port>` , `GET /effect/parameter/syn_get/<port>`
-- `POST /effect/parameter/syn_patch_set/<instance>` , `GET /effect/parameter/syn_patch_get/...`
+- `POST /effect/parameter/syn_patch_set/<instance>` (patch 읽기는 별도 엔드포인트 없이 `syn_get` 의 `:patch` 심볼로 처리 — `patches` dict 통째 반환)
 - `POST /general/` (transport-bpm / transport-bpb)
 - 역방향 알림: `notify_synapsin()` → unix dgram socket `/tmp/synapsin.sock` (앱이 bind)
