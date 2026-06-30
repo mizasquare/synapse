@@ -292,12 +292,6 @@ class FakeModepController(Backend):
             self._snapshot_idx = int(idx)
         return {}
 
-    def set_snapshot(self, idx):
-        # The real ModepController has no set_snapshot (latent bug in
-        # presenter.recall_pb_ss); the fake provides a working stub so
-        # footswitch mode 2 is exercisable off-device.
-        return self.load_snapshot(idx)
-
     def snapshot_save(self, save_pb_also=True):
         return True
 
