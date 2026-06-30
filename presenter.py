@@ -46,7 +46,7 @@ class Presenter:
         self.start_footswitch_polling(100)  # background thread @100Hz
 
         # Load pedalboard model
-        self.pedalboard = initialize_modep_pedalboard()
+        self.pedalboard = initialize_modep_pedalboard(self.backend)
         # EditorBridge ref (wired by the entry point) so footswitch board nav can
         # surface a non-blocking notice when it discards unsaved live editor edits.
         self.editor = None
@@ -109,7 +109,7 @@ class Presenter:
                 print(error_msg)
 
     def refresh_pedalboard(self):
-        self.pedalboard = initialize_modep_pedalboard()
+        self.pedalboard = initialize_modep_pedalboard(self.backend)
         self.view_update_effect()
 
     # ── pb별 마지막 스냅샷 기억/복원 (세션 한정, 풋스위치 PB전환에서만 복원) ──

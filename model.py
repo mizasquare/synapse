@@ -295,7 +295,7 @@ class Pedalboard:
 		)
 
 
-def _fetch_and_merge_graph() -> Tuple[Optional[str], Optional[dict]]:
+def _fetch_and_merge_graph(backend) -> Tuple[Optional[str], Optional[dict]]:
 	"""Fetch the current pedalboard bundle + its on-disk info, then overlay the
 	LIVE in-memory graph on top.
 
@@ -307,14 +307,14 @@ def _fetch_and_merge_graph() -> Tuple[Optional[str], Optional[dict]]:
 
 	Returns (pb_path, pb_data); pb_data is None if info retrieval failed.
 	"""
-	pb_path = get_backend().get_current_pedalboard()
-	pb_data = get_backend().get_pedalboard_info(pb_path)
+	pb_path = backend.get_current_pedalboard()
+	pb_data = backend.get_pedalboard_info(pb_path)
 	if not pb_data:
 		print("⚠️ Failed to retrieve pedalboard data.")
 		return pb_path, None
 
 	try:
-		live = get_backend().dump_graph()
+		live = backend.dump_graph()
 	except Exception as e:
 		print(f"⚠️ dump_graph failed, using disk graph: {e}")
 		live = None
@@ -335,7 +335,7 @@ def _parse_midi_cc_mappings(time_info: dict) -> Dict[str, Tuple[int, int]]:
 	return mappings
 
 
-def _make_effect_info_fetcher():
+def _make_effect_info_fetcher(backend):
 	"""Returns a get_effect_information(uri) that memoises per URI for the span of
 	one board load — a board that uses the same plugin twice would otherwise hit
 	the host (a serial socket round-trip) once per instance. Caches misses (None)
@@ -344,7 +344,7 @@ def _make_effect_info_fetcher():
 
 	def fetch(uri: str) -> Optional[dict]:
 		if uri not in cache:
-			cache[uri] = get_backend().effect_get_information(uri)
+			cache[uri] = backend.effect_get_information(uri)
 		return cache[uri]
 
 	return fetch
@@ -432,7 +432,7 @@ def _build_audio_ports(detailed_info: dict) -> Tuple[List[str], List[str]]:
 	)
 
 
-def _build_patches(instance_name: str, detailed_info: dict) -> Dict[str, EffectPatch]:
+def _build_patches(instance_name: str, detailed_info: dict, backend) -> Dict[str, EffectPatch]:
 	"""Patch-file parameters (NAM models, IR files, ...), from the plugin's
 	`parameters` section. Does a patch_get host call per valid parameter to read
 	the file currently loaded into that instance."""
@@ -443,7 +443,7 @@ def _build_patches(instance_name: str, detailed_info: dict) -> Dict[str, EffectP
 		patch_uri = param["uri"]
 		file_path = configs.PATCH_FILE_DIR_MAP.get(
 			patch_uri, configs.PATCH_FILE_DIR_MAP.get("defaultpath"))
-		current_patch = get_backend().patch_get(instance_name, patch_uri)
+		current_patch = backend.patch_get(instance_name, patch_uri)
 		if current_patch:
 			patch_value, patch_property = current_patch[0], current_patch[1]
 		else:
@@ -460,7 +460,7 @@ def _build_patches(instance_name: str, detailed_info: dict) -> Dict[str, EffectP
 	return patches
 
 
-def _build_effect(effect_data: dict, get_effect_info) -> Optional[Effect]:
+def _build_effect(effect_data: dict, get_effect_info, backend) -> Optional[Effect]:
 	"""Build one Effect from its graph entry + the plugin's LV2 definition.
 
 	Returns None (after logging) if the host can't describe the plugin, so the
@@ -487,18 +487,23 @@ def _build_effect(effect_data: dict, get_effect_info) -> Optional[Effect]:
 		x=effect_data.get("x", 0.0),
 		y=effect_data.get("y", 0.0),
 		ports=_build_input_ports(instance_name, effect_data, detailed_info),
-		patches=_build_patches(instance_name, detailed_info),
+		patches=_build_patches(instance_name, detailed_info, backend),
 		monitors=_build_monitors(instance_name, effect_uri, detailed_info),
 		audio_inputs=audio_inputs,
 		audio_outputs=audio_outputs,
 	)
 
 
-def initialize_modep_pedalboard() -> Optional[Pedalboard]:
+def initialize_modep_pedalboard(backend=None) -> Optional[Pedalboard]:
 	#todo: tell modep to load the last pedalboard and snapshot
 	#some parameters are desynced with the current pedalboard and pb data retrived from saved pedalboard
-	"""Fetches the current pedalboard, retrieves all effect details, and constructs a Pedalboard object."""
-	pb_path, pb_data = _fetch_and_merge_graph()
+	"""Fetches the current pedalboard, retrieves all effect details, and constructs a Pedalboard object.
+
+	``backend`` is the MODEP host seam, threaded through the whole assembler chain
+	(no more reaching for the global mid-build). Defaults to ``get_backend()`` so
+	the standalone ``__main__`` entry below still works with no backend handy."""
+	backend = backend if backend is not None else get_backend()
+	pb_path, pb_data = _fetch_and_merge_graph(backend)
 	if pb_data is None:
 		return None
 
@@ -506,10 +511,10 @@ def initialize_modep_pedalboard() -> Optional[Pedalboard]:
 	hardware = pb_data.get("hardware", {})
 	connections = [Connection(c["source"], c["target"]) for c in pb_data.get("connections", [])]
 
-	get_effect_info = _make_effect_info_fetcher()
+	get_effect_info = _make_effect_info_fetcher(backend)
 	effects = []
 	for effect_data in pb_data.get("plugins", []):
-		effect = _build_effect(effect_data, get_effect_info)
+		effect = _build_effect(effect_data, get_effect_info, backend)
 		if effect is not None:
 			effects.append(effect)
 
