@@ -183,11 +183,12 @@ class Presenter:
 
         effect = self.pedalboard.get_effect_by_instance(effect_instance)
         if effect and port_symbol in effect.ports:
-            error_msg = effect.ports[port_symbol].set_value(effect_instance, port_value)
+            error_msg = self.backend.parameter_set(effect_instance, port_symbol, port_value)
             if error_msg is None:
+                effect.ports[port_symbol].value = port_value  # keep model in sync (was set_value's job)
                 self.view.update_parameter_display(effect_instance, port_symbol, port_value)  # Instead of full refresh
             else:
-                print(error_msg)
+                print(f"⚠️ Failed to update {port_symbol}: {error_msg}")
 
     def patch_changed(self, plugin_instance, patch_uri, patch_file):
         effect = self.pedalboard.get_effect_by_instance(plugin_instance)
@@ -990,7 +991,7 @@ class Presenter:
                     "port_kind": port.widget_kind
                 }
                 for port in effect.ports.values()
-                if (port_value := port.get_value()) is not None  # Exclude ports with None value
+                if (port_value := port.value) is not None  # cached at load; host pushes changes via synapsin reverse channel
             ],
             # Monitor (output) ports: cached/seeded value -- NOT get_value() (output
             # ports aren't readable via parameter_get), and never None-excluded.

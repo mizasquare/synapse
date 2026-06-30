@@ -89,23 +89,6 @@ class EffectPort:
 			return "numeric"                    # has a real unit -> number readout
 		return "numeric"                        # graceful fallback
 
-	def get_value(self):
-		"""Fetch the latest value from MODEP."""
-		new_value = get_backend().parameter_get(self.instance, self.symbol)
-		if new_value is not None:
-			self.value = new_value
-			return new_value
-
-	def set_value(self, effect_instance: str, new_value: float):
-		"""Update parameter in MODEP, and sync only if the request succeeds.
-		Returns the backend error string (None on success) so callers can branch."""
-		error_msg = get_backend().parameter_set(effect_instance, self.symbol, new_value)
-		if error_msg is None:  # Only update if MODEP successfully applied the change
-			self.value = new_value
-		else:
-			print(f"⚠️ Failed to update {self.name} ({self.symbol}): {error_msg}")
-		return error_msg
-
 
 @dataclass
 class EffectPatch:
