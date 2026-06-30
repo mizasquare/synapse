@@ -192,11 +192,12 @@ class Presenter:
     def patch_changed(self, plugin_instance, patch_uri, patch_file):
         effect = self.pedalboard.get_effect_by_instance(plugin_instance)
         if effect and patch_uri in effect.patches:
-            error_msg = effect.patches[patch_uri].set_patch(patch_file)
+            error_msg = self.backend.patch_set(plugin_instance, patch_uri, patch_file)
             if error_msg is None:
+                effect.patches[patch_uri].value = patch_file  # keep model in sync (was set_patch's job)
                 self.view.update_patch_display(plugin_instance, patch_uri, patch_file)  # More efficient
             else:
-                print(error_msg)
+                print(f"⚠️ Failed to load patch for {plugin_instance}: {error_msg}")
 
     # ── 역방향 채널 (mod-ui notify_synapsin → /tmp/synapsin.sock → qt_main.py → 여기) ──
     # 웹UI/HMI 등 앱 바깥에서 일어난 변화를 desync 없이 앱 화면에 반영한다.
@@ -1016,7 +1017,7 @@ class Presenter:
                     "patch_uri": patch.uri,
                     "patch_file_types": patch.file_types,
                     "patch_file_path": patch.file_path,
-                    "patch_value": patch.get_patch(),
+                    "patch_value": patch.value,
                 } for patch in effect.patches.values()
             ]
         }
