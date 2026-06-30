@@ -28,6 +28,15 @@ class ModepController:
 			response = getattr(ModepController.session, method)(url, **kwargs)
 			response.raise_for_status()
 			return response
+		except requests.HTTPError as e:
+			# Non-2xx: surface the host's actual error body (truncated) in the log
+			# — raise_for_status alone drops it, and on a headless Pi that body is
+			# exactly what's needed to diagnose. Catch before RequestException
+			# (HTTPError is a subclass). Return contract unchanged: None.
+			status = getattr(e.response, "status_code", "?")
+			body = (e.response.text or "").strip()[:500] if e.response is not None else ""
+			logging.error(f"HTTP {method.upper()} {url} -> {status}: {body or e}")
+			return None
 		except requests.RequestException as e:
 			logging.error(f"HTTP {method.upper()} failed for {url}: {e}")
 			return None
@@ -254,11 +263,11 @@ class ModepController:
 	@staticmethod
 	def get_snapshot_list():
 		try:
-			r = requests.get(ModepController.SERVER_URI + "snapshot/list", timeout=2.0)
-			if r.status_code == 200:
+			r = ModepController._request("get", "snapshot/list")
+			if r is not None:
 				return r.json()
-		except:
-			pass
+		except Exception as e:
+			logging.error(f"Error fetching snapshot list: {e}")
 		return []
 
 	@staticmethod
@@ -292,14 +301,11 @@ class ModepController:
 		if idx < 0:
 			idx = 0 #fallback to the first snapshot
 		try:
-			url = f"{ModepController.SERVER_URI}snapshot/load"
-			r = requests.get(url, params={'id': idx}, timeout=2.0)
-			if r.status_code == 200:
+			r = ModepController._request("get", "snapshot/load", params={'id': idx})
+			if r is not None:
 				return r.json()
-			else:
-				print("Failed to save new snapshot.", r.text)
 		except Exception as e:
-			print(f"An error occurred: {e}")
+			logging.error(f"Error loading snapshot: {e}")
 
 	@staticmethod
 	def get_snapshot_name(snapshot_id=0):
@@ -468,43 +474,26 @@ class ModepController:
 
 	@staticmethod
 	def bypass_effect(instance, value):
-		try:
-			r = ModepController._request(
-				"post",
-				f"effect/parameter/syn_set/graph/{quote(instance, safe='')}/:bypass",
-				json={"value": bool(value)})
-			if r is None:
-				return "MODEP host did not respond"
-			if r.status_code == 200:
-				return None
-			else:
-				return r.text
-		except Exception as e:
-			return f"An error occurred: {e}"
+		endpoint = f"effect/parameter/syn_set/graph/{quote(instance, safe='')}/:bypass"
+		r = ModepController._request("post", endpoint, json={"value": bool(value)})
+		return None if r is not None else "MODEP host did not respond"
 
 	@staticmethod
 	def parameter_set(instance_id, symbol, value):
-		try:
-			encoded_instance_id = quote(instance_id, safe='')
-			encoded_symbol = quote(symbol, safe=':')
-			url = f"{ModepController.SERVER_URI}effect/parameter/syn_set/graph/{encoded_instance_id}/{encoded_symbol}"
-
-			r = requests.post(url, json={"value": value}, timeout=2.0)
-			if r.status_code == 200:
-				return None  # Success
-			else:
-				return r.text  # Error message
-		except Exception as e:
-			return f"An error occurred: {e}"
+		encoded_instance_id = quote(instance_id, safe='')
+		encoded_symbol = quote(symbol, safe=':')
+		endpoint = f"effect/parameter/syn_set/graph/{encoded_instance_id}/{encoded_symbol}"
+		r = ModepController._request("post", endpoint, json={"value": value})
+		return None if r is not None else "MODEP host did not respond"
 
 	@staticmethod
 	def parameter_get(instance_id, symbol):
 		try:
 			encoded_instance_id = quote(instance_id, safe='')
 			encoded_symbol = quote(symbol, safe=':')
-			url = f"{ModepController.SERVER_URI}effect/parameter/syn_get/graph/{encoded_instance_id}/{encoded_symbol}"
-			r = requests.get(url, timeout=2.0)
-			if r.status_code == 200:
+			endpoint = f"effect/parameter/syn_get/graph/{encoded_instance_id}/{encoded_symbol}"
+			r = ModepController._request("get", endpoint)
+			if r is not None:
 				value = r.json()
 
 				# Special handling for bypass parameter
@@ -512,40 +501,30 @@ class ModepController:
 					return bool(value)  # Ensure it returns a boolean
 
 				return value  # Convert everything else to float
-			else:
-				print("Failed to retrieve parameter.", r.text)
 		except Exception as e:
-			print(f"An error occurred: {e}")
+			logging.error(f"Error fetching parameter: {e}")
 
 	@staticmethod
 	def patch_set(instance, uri, value):
-		try:
-			encoded_instance = quote(instance, safe='')
-			url = f"{ModepController.SERVER_URI}effect/parameter/syn_patch_set/{encoded_instance}"
-			payload = {'instance': '/graph/' + instance,
-					   'uri': uri,
-					   'value_type': 'p', # not sure but presumably 'p'ath of lv2atom#Path
-					   'value_data': value}
-			r = requests.post(url, json=payload, timeout=2.0)
-			if r.status_code == 200:
-				return None
-			else:
-				return r.text
-		except Exception as e:
-			return f"An error occurred: {e}"
+		endpoint = f"effect/parameter/syn_patch_set/{quote(instance, safe='')}"
+		payload = {'instance': '/graph/' + instance,
+				   'uri': uri,
+				   'value_type': 'p', # not sure but presumably 'p'ath of lv2atom#Path
+				   'value_data': value}
+		r = ModepController._request("post", endpoint, json=payload)
+		return None if r is not None else "MODEP host did not respond"
 
 	@staticmethod
 	def patch_get(instance, uri):
 		try:
-			url = f"{ModepController.SERVER_URI}effect/parameter/syn_get//graph/{instance}/:patch"
-
-			r = requests.get(url, timeout=2.0)
-			if r.status_code == 200:
+			# Double slash is intentional: ":patch" reads the whole parameters dict
+			# via the syn_get seam (host.syn_param_get); caller indexes by uri.
+			endpoint = f"effect/parameter/syn_get//graph/{instance}/:patch"
+			r = ModepController._request("get", endpoint)
+			if r is not None:
 				return r.json()[uri]
-			else:
-				print("Failed to retrieve patch.", r.text)
 		except Exception as e:
-			print(f"An error occurred: {e}")
+			logging.error(f"Error fetching patch: {e}")
 
 	@staticmethod
 	def dump_graph():
@@ -631,39 +610,17 @@ class ModepController:
 
 	@staticmethod
 	def set_bpm(value):
-		try:
-			# Construct the URL with the instance and symbol as part of the path
-			url = f"{ModepController.SERVER_URI}general/"
-			# Format the value similarly to the server-side logic
-			formatted_value = "%.1f" % value
-
-			# Send the POST request with the formatted value as payload
-			r = requests.post(url, json={"cmd": "transport-bpm", "value": formatted_value}, timeout=2.0)
-
-			if r.status_code == 200:
-				return None
-			else:
-				return r.text
-		except Exception as e:
-			return f"An error occurred: {e}"
+		formatted_value = "%.1f" % value
+		r = ModepController._request("post", "general/",
+									 json={"cmd": "transport-bpm", "value": formatted_value})
+		return None if r is not None else "MODEP host did not respond"
 
 	@staticmethod
 	def set_bpb(value):
-		try:
-			# Construct the URL with the instance and symbol as part of the path
-			url = f"{ModepController.SERVER_URI}general/"
-			# Format the value similarly to the server-side logic
-			formatted_value = "%.1f" % value
-
-			# Send the POST request with the formatted value as payload
-			r = requests.post(url, json={"cmd": "transport-bpb", "value": formatted_value}, timeout=2.0)
-
-			if r.status_code == 200:
-				return None
-			else:
-				return r.text
-		except Exception as e:
-			return f"An error occurred: {e}"
+		formatted_value = "%.1f" % value
+		r = ModepController._request("post", "general/",
+									 json={"cmd": "transport-bpb", "value": formatted_value})
+		return None if r is not None else "MODEP host did not respond"
 
 
 # ── Backend seam ─────────────────────────────────────────────────────────────
