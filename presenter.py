@@ -935,11 +935,40 @@ class Presenter:
     def _tap_beat_off(self, led_index):
         self.hwi.LED[led_index] = 0
 
+    # Boot LED ceremony: a scripted ~3s light show over the 4 footswitch LEDs.
+    # Each frame is (delay_seconds, [s0, s1, s2, s3]) where a per-LED state is
+    # 0=off 1=blue 2=red 3=purple (see fsledctrl.LED.set_state). Runs on the
+    # event loop (non-blocking) so the splash->overview handoff isn't frozen.
+    _BOOT_FRAMES = [
+        # blue Knight-Rider sweep out and back
+        (0.00, [1, 0, 0, 0]), (0.10, [0, 1, 0, 0]), (0.20, [0, 0, 1, 0]),
+        (0.30, [0, 0, 0, 1]), (0.40, [0, 0, 1, 0]), (0.50, [0, 1, 0, 0]),
+        (0.60, [1, 0, 0, 0]),
+        # red sweep back the other way
+        (0.70, [0, 0, 0, 2]), (0.80, [0, 0, 2, 0]), (0.90, [0, 2, 0, 0]),
+        (1.00, [2, 0, 0, 0]),
+        # purple wipe filling left->right
+        (1.15, [3, 0, 0, 0]), (1.25, [3, 3, 0, 0]), (1.35, [3, 3, 3, 0]),
+        (1.45, [3, 3, 3, 3]),
+        # red/blue sparkle alternation
+        (1.60, [1, 2, 1, 2]), (1.72, [2, 1, 2, 1]), (1.84, [1, 2, 1, 2]),
+        (1.96, [2, 1, 2, 1]),
+        # triple purple finale, then dark
+        (2.10, [3, 3, 3, 3]), (2.25, [0, 0, 0, 0]), (2.40, [3, 3, 3, 3]),
+        (2.55, [0, 0, 0, 0]), (2.70, [3, 3, 3, 3]), (2.85, [0, 0, 0, 0]),
+    ]
+
     def boot_lightshow(self, i=None):
-        # for i in range(4):
-        #     self.scheduler.schedule_once(lambda dt, i=i: self.hwi.LED.get_led(i).blink(color='red', times=2, interval=0.1),
-        #                         i * 0.3)
-        pass
+        """Play the boot LED ceremony (see _BOOT_FRAMES). No-op if the hardware
+        can't drive LEDs (e.g. a fake injected in tests)."""
+        def paint(states):
+            try:
+                for idx, state in enumerate(states):
+                    self.hwi.LED[idx] = state
+            except Exception:
+                pass  # fake/absent LED backend -> silently skip the show
+        for delay, states in self._BOOT_FRAMES:
+            self.scheduler.schedule_once(lambda dt, s=states: paint(s), delay)
 
     def save_snapshot(self):
         ok = self.backend.snapshot_save()   # overwrites current snapshot + persists the pedalboard
