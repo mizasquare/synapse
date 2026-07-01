@@ -250,6 +250,12 @@ FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이
 
 ## Tier 3 — 정리 / 폴리시
 
+- [ ] **디바운스·콤보 판정을 하드웨어 추상화 단으로 이동** (아키텍처, 2026-07-01 pi-stomp 비교서 착안) —
+      현재 디바운스+릴리스엣지 콤보 검출이 앱 레이어에 섞여 있음: `DEBOUNCE_SAMPLES`([`presenter.py:660`](../presenter.py)),
+      `_footswitch_poll_loop`([:683](../presenter.py), `:708` 전원-릴리스 엣지 발화), `handle_multiple_footswitches`([:732](../presenter.py)).
+      pi-stomp처럼(`pistomp/gpioswitch.py`·`footswitch.py`) 안정상태·press/release **이벤트를 emit하는 `Switch`류 클래스**로
+      내리고 Presenter는 구독만 → HW 단위테스트 가능·Presenter 정리. **주의:** synapse의 릴리스엣지 콤보 판정(단일/콤보
+      명확 분리)은 좋은 UX라 **의미 유지, 위치만 이동**으로 한정. 당장 아님. → [`pi-stomp-comparison.md`](pi-stomp-comparison.md) §3(A).
 - [ ] **WebUI 경로 통째 삭제** — `open_webui`/`close_webui`([`presenter.py:481`](../presenter.py),[:497](../presenter.py)) +
       `xdotool`([:519](../presenter.py)) + `minimize`/`restore`/`enable_webui_button`([`qtview.py:228`](../qtview.py) 등 `pass`) + Kivy bezel 버튼.
       **Qt 경로선 호출조차 안 됨(죽은 코드)**, 온디바이스 웹UI는 스펙서 폐기 결정.
@@ -309,6 +315,7 @@ FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이
 
 - [`qt-migration-FINISHED.md`](qt-migration-FINISHED.md) — 완료된 이주 스택 아카이브(결정·검증).
 - [`config-todo.md`](config-todo.md) — 하드코딩→사용자설정 위시리스트(탭템포·콤보·튜너).
+- [`pi-stomp-comparison.md`](pi-stomp-comparison.md) — pi-stomp 비교 연구(2026-07-01): 디바운스 이동 카드 + 웹소켓 vs `notify_synapsin` 학습 + 웹소켓 이주 트리거.
 - [`eyecandy_idea.md`](eyecandy_idea.md) — 오디오 반응 캐릭터 애니 설계.
 - [`ui-design-rules.md`](ui-design-rules.md) — 7" 800×480 2-tier 가시성 룰.
 - **시안**: claude.ai/design 프로젝트 `9b9310ef…`("Kivy UI 재구성 방향") — `Pedal Prototype.dc.html`(800×600 인터랙티브) / `Pedal UI 비교.dc.html`(현행+개선안 A~F).
