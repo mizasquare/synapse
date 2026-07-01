@@ -1,5 +1,6 @@
 import mido
 import time
+import utils
 from hardwares.ADS1115 import ADS1115
 
 # Initialize ADS1115
@@ -26,11 +27,13 @@ print(f"Connected to MIDI port: {matching_ports[0]}")
 CC_VOLUME = 7  # Master Volume
 CC_EXPR = 11  # Expression
 
+# 채널별 보정(in_min/in_max)은 ~/.modep/pedal_calibration.json에 별도 저장 →
+# 채널마다 다른 페달 모델을 꽂아도 코드 수정 없이 값만 갱신하면 됨.
+# 실측(힐~토 홀드, ±4.096V FSR): 밟음(토)~17940, 뗌(힐)~0. 파일 없으면 utils의 기본값 사용.
+CAL = utils.load_pedal_calibration()
 
-# NOTE: 게인을 ±2.048V→±4.096V로 올리면서 같은 전압이 카운트 절반으로 읽힘 →
-#       기존 캘리브레이션(1638/29490)을 절반으로 스케일해 일관성만 맞춰둔 임시값.
-#       TODO(현장): 페달 꽂고 힐~토 실측 스윕으로 in_min/in_max 재캘리브레이션 필요. docs/hardware.md 참고.
-def map_value(value, in_min=819, in_max=14745, out_min=0, out_max=127):
+
+def map_value(value, in_min=150, in_max=17700, out_min=0, out_max=127):
     """Maps 16-bit ADS1115 range to 7-bit MIDI CC range with dead zones."""
     if value < in_min:
         return out_min
@@ -55,9 +58,9 @@ try:
         ads_0 = ADS.readChannel(0)  # Volume Control
         ads_1 = ADS.readChannel(1)  # Expression Pedal
 
-        # Map to MIDI range (0-127)
-        midi_vol = map_value(ads_0)
-        midi_expr = map_value(ads_1)
+        # Map to MIDI range (0-127) using per-channel calibration
+        midi_vol = map_value(ads_0, **CAL[0])   # ch0 = Volume
+        midi_expr = map_value(ads_1, **CAL[1])  # ch1 = Expression
 
         if current_time - start_time < ignore_duration:
             # During the ignore period, update the previous values without sending MIDI messages.
