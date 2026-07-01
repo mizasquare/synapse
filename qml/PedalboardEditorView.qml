@@ -52,7 +52,7 @@ Item {
         // a switch actually completed (clean tap OR confirmed discard) -> close the
         // switcher overlay so both paths land on the editor consistently.
         function onBoardSwitched() { win.liveBoardsOpen = false }
-        function onModeFlash(dir) { flash.toAdvanced = (dir === "advanced"); flashAnim.restart() }
+        function onModeFlash(dir) { modeFx.start(dir) }
         function onSpawnFly(name, color, fromX, fromY, toX, toY) {
             flyName.text = name; flyGhost.accent = color
             flyGhost.x = fromX; flyGhost.y = fromY; flyGhost.visible = true
@@ -1062,19 +1062,135 @@ Item {
             }
         }
 
-        // mode-transition flash: → ADVANCED feels "powerful" (orange ⚡),
-        // → QUICK feels "smart" (green ✦). Driven by editor.modeFlash(dir).
-        Rectangle {
-            id: flash; anchors.fill: parent; opacity: 0; z: 200; visible: opacity > 0
-            property bool toAdvanced: true
-            color: toAdvanced ? cOrange : cGreen
-            Text { anchors.centerIn: parent
-                   text: flash.toAdvanced ? "⚡  POWERFUL  ▸  ADVANCED" : "✦  SMART  ▸  QUICK"
-                   color: "#0e1118"; font.family: uiFont; font.pixelSize: 30 }
-            SequentialAnimation {
-                id: flashAnim
-                NumberAnimation { target: flash; property: "opacity"; from: 0; to: 0.5; duration: 180 }
-                NumberAnimation { target: flash; property: "opacity"; to: 0; duration: 620 }
+        // mode-transition FX (scan-rectify) — a particle overlay over the board,
+        // driven by editor.modeFlash(dir). → ADVANCED: a warm scan bar sweeps L→R
+        // charging the board (energetic). → QUICK: a cool scan bar combs top→down,
+        // raking scattered particles into a single rectified line (calm). The motion
+        // alone carries the "powerful vs smart" feel — no on-screen text, no sound.
+        // Ported from the 'Mode Transition Lab' design (concept B); board-local
+        // coords match the Lab's 734×446 board, so the sim numbers transfer 1:1.
+        Canvas {
+            id: modeFx
+            x: canvas.x; y: canvas.y; width: canvas.width; height: canvas.height
+            z: 200; clip: true; visible: running
+            property bool running: false
+            property bool adv: true        // direction: true = QUICK→ADVANCED
+            property real dms: 900         // total duration (ms)
+            property int steps: 54         // discrete sim steps (≈ dms / 16.67)
+            property int simStep: -1
+            property real elapsed: 0
+            property var parts: []
+            property var rng: null
+            readonly property var hot:  ["#fff4e0", "#ffd49a", "#ff9a4e", "#e8694a"]
+            readonly property var cool: ["#eafff5", "#bdf0d8", "#8fe0bd", "#5fd0a0"]
+
+            // small deterministic LCG so the scatter looks the same each run (no Math.imul dep)
+            function _mk(seed) { var a = seed >>> 0; return function () { a = (a * 1664525 + 1013904223) >>> 0; return a / 4294967296; }; }
+            function _smooth(a, b, t) { if (t <= a) return 0; if (t >= b) return 1; var x = (t - a) / (b - a); return x * x * (3 - 2 * x); }
+            function _easeIn(x) { return x * x; }
+            function _rgba(hex, al) { var n = parseInt(hex.slice(1), 16); return "rgba(" + ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + al + ")"; }
+
+            function start(dir) {
+                adv = (dir === "advanced");
+                dms = adv ? 900 : 1150;
+                steps = Math.max(1, Math.round(dms / 16.667));
+                rng = _mk((66 * 131 + (adv ? 7 : 23)) >>> 0);   // 'B' concept seed
+                parts = []; simStep = -1; elapsed = 0;
+                running = true; ticker.restart(); requestPaint();
+            }
+
+            function _onStep(step, t) {
+                var R = rng, W = width, H = height, MID = height / 2;
+                var pick = function (a) { return a[(R() * a.length) | 0]; };
+                var add = function (p) { if (parts.length < 2200) parts.push(p); };
+                if (adv) {
+                    // warm sprays kicked up ahead of the L→R scan bar
+                    var sx = W * _easeIn(Math.min(1, t / 0.72));
+                    if (t < 0.72) for (var i = 0; i < 8; i++)
+                        add({ x: sx + (R() - .5) * 8, y: R() * H, vx: 2 + R() * 5, vy: -(R() * 9) * (R() < .5 ? 1 : .3),
+                              life: 16 + R() * 20, max: 36, s: 2 + R() * 2, col: pick(hot), drag: .95, grav: .12 });
+                } else {
+                    // seed a cool cloud once, then the top→down scan captures each particle
+                    // and rakes it to its 40px column on the centre line
+                    if (step < 2) for (var j = 0; j < 105; j++) {
+                        var x = R() * W, y = R() * H;
+                        add({ x: x, y: y, vx: (R() - .5) * 2.5, vy: (R() - .5) * 2.5, life: steps + 30, max: steps + 30,
+                              s: 2 + R() * 1.5, col: pick(cool), drag: .92, slot: Math.round(x / 40) * 40 });
+                    }
+                    var sy = H * _smooth(0, 1, Math.min(1, t / 0.75)), kk = 0.012 + 0.06 * _smooth(.1, .85, t);
+                    for (var m = 0; m < parts.length; m++) {
+                        var p = parts[m];
+                        if (p.y < sy + 6 || p.captured) {
+                            p.captured = true; p.attract = true;
+                            p.tx = Math.max(12, Math.min(W - 12, p.slot)); p.ty = MID; p.k = kk;
+                        }
+                    }
+                }
+            }
+            function _updateParts() {
+                for (var i = parts.length - 1; i >= 0; i--) {
+                    var p = parts[i];
+                    if (p.attract) { var dx = p.tx - p.x, dy = p.ty - p.y; p.vx = (p.vx + dx * p.k) * p.drag; p.vy = (p.vy + dy * p.k) * p.drag; }
+                    else { p.vx *= p.drag; p.vy += (p.grav || 0); }
+                    p.x += p.vx; p.y += p.vy; p.life--;
+                    if (p.life <= 0) parts.splice(i, 1);
+                }
+            }
+            function _simTo(step) { while (simStep < step) { simStep++; _onStep(simStep, simStep / steps); _updateParts(); } }
+
+            onPaint: {
+                var ctx = getContext("2d"), W = width, H = height;
+                ctx.clearRect(0, 0, W, H);
+                var t = Math.min(1, elapsed / dms);
+                // --- back layer ---
+                if (adv) {
+                    var sxb = W * _easeIn(Math.min(1, t / 0.72));
+                    ctx.fillStyle = "rgba(8,6,3,0.45)"; ctx.fillRect(sxb, 0, W - sxb, H);   // dim the un-charged side
+                    var end = Math.max(0, (t - 0.78) / 0.22);
+                    if (end > 0) { ctx.fillStyle = _rgba("#ff9a4e", 0.4 * (1 - end)); ctx.fillRect(0, 0, W, H); }
+                }
+                // --- particles (additive) ---
+                ctx.save(); ctx.globalCompositeOperation = "lighter";
+                for (var k = 0; k < parts.length; k++) {
+                    var p = parts[k]; ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.max));
+                    ctx.fillStyle = p.col; var s = p.s; ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
+                }
+                ctx.restore();
+                // --- front layer (scan bar) ---
+                if (adv) {
+                    var sxf = W * _easeIn(Math.min(1, t / 0.72));
+                    if (t < 0.74) {
+                        ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = _rgba("#ffd49a", 0.85);
+                        ctx.shadowColor = "#ff9a4e"; ctx.shadowBlur = 16; ctx.lineWidth = 3;
+                        ctx.beginPath(); ctx.moveTo(sxf, 0); ctx.lineTo(sxf, H); ctx.stroke(); ctx.restore();
+                    }
+                } else {
+                    var sy = H * _smooth(0, 1, Math.min(1, t / 0.75));
+                    if (t < 0.8) {
+                        ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = _rgba("#8fe0bd", 0.8);
+                        ctx.shadowColor = "#5fd0a0"; ctx.shadowBlur = 10; ctx.lineWidth = 2;
+                        ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
+                        for (var gx = 20; gx < W; gx += 40) { ctx.beginPath(); ctx.moveTo(gx, sy); ctx.lineTo(gx, sy + 9); ctx.stroke(); }
+                        ctx.restore();
+                    }
+                    var va = 0.16 * _smooth(.5, .9, t);
+                    if (va > 0) {
+                        var g = ctx.createRadialGradient(W / 2, H / 2, H * 0.22, W / 2, H / 2, W * 0.62);
+                        g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, _rgba("#5fd0a0", va));
+                        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+                    }
+                }
+            }
+
+            Timer {
+                id: ticker; interval: 16; repeat: true; running: false
+                onTriggered: {
+                    modeFx.elapsed += 16;
+                    var t = Math.min(1, modeFx.elapsed / modeFx.dms);
+                    modeFx._simTo(Math.round(t * modeFx.steps));
+                    modeFx.requestPaint();
+                    if (t >= 1) { stop(); modeFx.running = false; modeFx.parts = []; }
+                }
             }
         }
     }

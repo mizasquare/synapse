@@ -172,6 +172,10 @@ def main():
             rt["meter"].stop()
         if rt["hardware"]:
             try:
+                rt["hardware"].lightshow_shutdown()   # ~1.5s farewell blink before pins reset
+            except Exception as e:
+                logging.error("shutdown lightshow failed: %s", e)
+            try:
                 rt["hardware"].cleanup()
             except Exception as e:
                 logging.error("hardware cleanup failed: %s", e)

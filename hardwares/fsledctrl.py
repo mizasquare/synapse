@@ -1,3 +1,5 @@
+import time
+
 from hardwares.MCP23017 import MCP23017
 
 class Footswitch:
@@ -163,6 +165,39 @@ class Controller:
         """
         reg = self.mcp.read_bank_a()
         return [0 if (reg >> pin) & 1 else 1 for pin in self._fs_pins]
+
+    # Shutdown LED ceremony: a ~1.5s "power-down" over the 4 LEDs. Each frame is
+    # (hold_seconds, [s0, s1, s2, s3]) with per-LED state 0=off 1=blue 2=red
+    # 3=purple. Runs BLOCKING (time.sleep) because it fires from aboutToQuit,
+    # after the Qt event loop is gone -- the scheduler can no longer tick.
+    _SHUTDOWN_FRAMES = [
+        # farewell purple flash
+        (0.15, [3, 3, 3, 3]), (0.10, [0, 0, 0, 0]), (0.15, [3, 3, 3, 3]),
+        (0.10, [0, 0, 0, 0]),
+        # red fills up left->right
+        (0.10, [2, 0, 0, 0]), (0.10, [2, 2, 0, 0]), (0.10, [2, 2, 2, 0]),
+        (0.10, [2, 2, 2, 2]),
+        # then drains away right->left into darkness
+        (0.10, [2, 2, 2, 0]), (0.10, [2, 2, 0, 0]), (0.10, [2, 0, 0, 0]),
+        (0.10, [0, 0, 0, 0]),
+        # last blue heartbeat, then off
+        (0.15, [0, 1, 1, 0]), (0.0, [0, 0, 0, 0]),
+    ]
+
+    def lightshow_shutdown(self):
+        """Play the blocking shutdown LED ceremony (see _SHUTDOWN_FRAMES).
+
+        Safe to call from aboutToQuit cleanup: it drives the LEDs directly with
+        time.sleep (no scheduler/event loop needed) and swallows any I/O error so
+        a flaky bus can never block process exit."""
+        try:
+            for hold, states in self._SHUTDOWN_FRAMES:
+                for idx, state in enumerate(states):
+                    self.LED[idx] = state
+                if hold:
+                    time.sleep(hold)
+        except Exception:
+            pass  # never let the farewell blink stall shutdown
 
     def cleanup(self):
         self.mcp.cleanup()
