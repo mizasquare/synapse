@@ -28,10 +28,9 @@ py-spy==0.4.2        # sampling profiler; dev/diagnostics only, not imported by 
 #   PyQt6==6.4.2           # Qt Quick (QML) + GUI binding   (apt python3-pyqt6)
 #   PyQt6-Qt6==6.4.2       # Qt runtime; matches the Pi's Qt 6.4.2
 #   numpy==1.24.2
-#   Pillow==9.4.0          # PIL  — images
 #   requests==2.28.1       # mod-ui HTTP client (modepctrl)
-#   mido==1.2.10           # MIDI
+#   mido==1.2.10           # MIDI (volumepedal CC bridge)
 #   python-rtmidi==1.4.7   # mido backend
-#   JACK-Client==0.5.3     # JACK audio graph
+#   JACK-Client==0.5.3     # JACK audio graph (levelmeter, mastervolume)
 #   smbus2==0.4.2          # I2C: footswitches / ring LEDs / pedals
-#   pyserial==3.5          # serial
+# (Pillow / pyserial are present on the Pi but NOT imported by the Synapse app.)

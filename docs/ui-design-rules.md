@@ -38,7 +38,7 @@
 ## 5. 풋스위치 / 입력 시뮬 (결정)
 - 스크린 **안**의 풋스위치 상태 스트립(LED+라벨) = **진짜 UI**(할당·상태 표시) → 구현.
 - 시안 스크린 **아래** 하드웨어 풋스위치 행 = 목업 장식 → **구현 안 함**.
-- Windows 개발 시 풋스위치 입력 = **키보드 shim(1~4) → `presenter.handle_footswitch_event`**. 위젯 아님(지울 것 없음). Pi에선 물리 스위치가 구동.
+- Windows 개발 시 풋스위치 입력 = **키보드 shim(Z/X/C/V → FS0..3) → `view.footswitchKey` → `FakeController` → `presenter.handle_footswitch_event`**. 위젯 아님(지울 것 없음). Pi에선 물리 스위치가 구동.
 - `FakeController`는 **no-op 유지**(하드웨어 seam 안 건드림). [[ui-migration-direction]] Step B 결정과 일치.
 
 ## 6. 컬러 토큰 (시안 추출, 시맨틱 고정)

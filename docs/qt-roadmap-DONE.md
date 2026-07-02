@@ -10,6 +10,39 @@
 
 ---
 
+## 데드코드 재수색 2R + 라이브 버그 + 스테일 문서 스윕 ✅ (2026-07-03)
+
+> 대멸종(`07a8115`) **이후** 6렌즈 재수색 + 적대적 검증(60에이전트 워크플로우)으로 스윕이 놓친 잔재를
+> 추가 확정. 덤으로 데드코드가 아닌 **라이브 버그 1건** 발견·수정. 세 브랜치로 분리 머지.
+
+- [x] **인스펙터 ACTIVE/BYPASSED 칩 no-op 버그 수정** (브랜치 `fix/inspector-bypass-chip`) — 칩이
+      `editor.toggleBypass(editor.sel)`을 호출했으나 `sel`은 pyqtProperty로 노출된 적 없는 평범한 파이썬 속성 →
+      QML에선 undefined → `@Slot(int)`가 0으로 강제변환 → 노드 id는 1부터라 `_node(0)=None` → **조용히 no-op**
+      (잠복 버그, 대멸종과 무관). 캔버스 전원버튼(438/475)은 `modelData.id`라 정상. 수정: 인자 없는
+      `toggleSelectedBypass()` 슬롯 추가(`closeInspector`/`resetParams`와 동일 패턴, 내부 `self.sel`) + QML 교체.
+      워크플로우가 오프스크린 PyQt6 재현으로 실증. **★Pi 육안검증: 인스펙터에서 이펙트 선택 후 칩 클릭 시 실제 토글되는지.**
+- [x] **데드코드 A버킷** (브랜치 `chore/deadcode-round2`, ~170줄) — 호출자 0을 레포 전체 grep(QML·셸·systemd·
+      tools·deploy 포함)으로 확인.
+      - `hardwares/MCP23017.py` ~123줄: 인터럽트 API 전체(`configSystemInterrupt`/`configPinInterrupt`/`readInterrupt`/
+        `clearInterrupts`/`_readInterruptRegister` + 전용 상수). 풋스위치는 폴링이 확정 정답([[polling-vs-interrupts-decision]]).
+        포렌식: 이 경로만 `self._lock` 미적용 + `readInterrupt`는 `mirrorEnabled` 미초기화로 실행 시 AttributeError →
+        한 번도 안 돌아본 코드. 칩 안전 기본값 쓰는 `__init__`/`cleanup`의 `GPINTEN*`/`INTCON*`/`DEFVAL*`은 존치.
+      - `hardwares/Adafruit_I2C.py` ~45줄: 미사용 벤더 메소드 6개(`reverseByteOrder`/`write16`/`writeRaw8`/`readS8`/
+        `readU16`/`readS16`). `readU16`은 유일 호출자가 죽은 `readS16`이라 이행성 데드. ADS1115는 자체 레지스터 처리.
+      - `presenter.py`: 미사용 `import json`.
+      - **존치(오탐 방지)**: `ADS1115.py` 인터럽트-인접 11개 메소드(차동읽기·컴퍼레이터)는 볼륨페달 Phase 2 자산.
+- [x] **스테일 문서 스윕** (브랜치 `docs/stale-sweep-roadmap-rewrite`, 18곳) — 대멸종/후속 머지가 문서에 반영 안 된 것 정정.
+      - `README.md`: 온디바이스 웹UI "What it does" 불릿·footswitch `3`=web UI(존재 안 함)·configs.py 설명(삭제 상수)·
+        깨진 `app.py` 링크·`mastervolume.py`/`deploy/` 누락·tests `cochlea_selftest` 누락·rough-edges 완료항목·tools obsolete 표기.
+      - `REFERENCES.md`: chromium 실행이 presenter.py에 있다는 스테일 → 폐기 완료로.
+      - `editor_bridge.py:273` docstring "manual rescan"(삭제됨), `cochlea/__init__.py` T1 미래형 독스트링(튜너 완료),
+        `requirements.txt` PIL/pyserial 주석(앱 미사용), `ui-design-rules.md` 키보드 shim `1~4`→`Z/X/C/V`,
+        `expression-pedal-handoff.md` "커밋 안 함"(실제 `1abab37`/`27f84e5` 커밋됨), `pedalboard-editor-handoff.md` M7 미래형.
+      - **로드맵 우선순위 축 재배열**: 안정성→기능→설계미덕→아키텍처→미관. 이미 완료된 3항목([undefined]→bool·
+        플랫카드 좌표계·네이밍 리팩터) 감사 정정 노트로 이관, HTTP 배칭 전제오류 정정.
+
+---
+
 ## Tier 3 정리 — 데드코드 스윕 ✅ (2026-07-03, 브랜치 `chore/deadcode-sweep`)
 
 > Kivy→Qt 이주 잔재 + 미배선 고아 일괄 제거. ~319줄 삭제(7파일). 구문·잔존참조·import 스모크 검증. 6에이전트 스윕 교차확인.
