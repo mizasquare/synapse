@@ -1,0 +1,29 @@
+[Unit]
+Description=Synapse master volume (jack_mix_box gain stage in the output path)
+After=modep-mod-host.service modep-mod-ui.service jack.service
+BindsTo=jack.service
+Wants=modep-mod-ui.service
+
+[Service]
+# jack_mix_box is the tracked main process: it holds the gain and keeps passing
+# audio even if the router/UI dies. RT scheduling so the mixer runs clean in the
+# JACK graph. Runs as `modep` (in group `jack`) to reach the promiscuous server.
+CPUSchedulingPolicy=fifo
+CPUSchedulingPriority=80
+LimitRTPRIO=99
+LimitMEMLOCK=infinity
+User=modep
+Group=modep
+Environment=JACK_PROMISCUOUS_SERVER=jack
+
+# stereo channel, initial 0 dB (unity = transparent at boot), volume on MIDI CC 7
+ExecStart=/usr/bin/jack_mix_box --name=synapsevol --stereo --volume=0 7
+# insert it into mod-monitor -> system:playback once its ports are up
+ExecStartPost=/usr/local/bin/synapse-mastervol-rewire.sh synapsevol
+# on stop/restart, restore the direct path so audio survives
+ExecStopPost=/usr/local/bin/synapse-mastervol-revert.sh synapsevol
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

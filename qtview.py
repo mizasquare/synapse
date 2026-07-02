@@ -17,7 +17,6 @@ Visual tokens (colors/fonts) live in QML; this bridge passes data + flags only.
 import logging
 import os
 import random
-import re
 import subprocess
 
 from PyQt6.QtCore import QObject, QTimer, pyqtProperty as Property, pyqtSignal as Signal, pyqtSlot as Slot
@@ -287,44 +286,30 @@ class QtView(QObject):
                 log.warning("%s failed: %s", cmd, exc)
         self.toastRequested.emit(f"{label} 실패 — 권한 확인 필요 (sudo/polkit)")
 
-    # ------------------------------------------ master volume (ALSA / Pisound)
-    # The Pisound's only settable mixer control is a digital PCM playback volume
-    # (pre-DAC attenuation, 0-100). We reach it directly via `amixer` by card *name*
-    # ("pisound") so it survives card-index reshuffles -- bypassing mod-host/mod-ui,
-    # which expose only a read-only master (get_master_volume, no setter) via the HMI
-    # path. The board's physical knob remains the real post-DAC analog master.
-    _AMIXER_CARD = "pisound"
-    _AMIXER_CTL = "PCM"
+    # ------------------------------------------ master volume (JACK gain stage)
+    # Pisound's ALSA PCM control is driver read-only (access=r-------), so software
+    # volume can't live there. Instead a jack_mix_box gain client ("synapsevol",
+    # started by the synapse-mastervol service) sits in mod-monitor -> system:playback,
+    # and we drive its level with MIDI CC7 via mastervolume.MasterVolume. Lazily
+    # created so app startup never blocks on it.
+    def _mastervol(self):
+        mv = getattr(self, "_mastervol_ctl", None)
+        if mv is None:
+            from mastervolume import MasterVolume
+            mv = self._mastervol_ctl = MasterVolume()
+        return mv
 
     @Slot(result=int)
     def masterVolume(self):
-        """Current Pisound PCM playback volume as 0-100, or -1 if unavailable."""
-        try:
-            out = subprocess.run(["amixer", "-c", self._AMIXER_CARD, "sget", self._AMIXER_CTL],
-                                 capture_output=True, text=True, timeout=5)
-            if out.returncode != 0:
-                return -1
-            m = re.search(r"\[(\d+)%\]", out.stdout)
-            return int(m.group(1)) if m else -1
-        except Exception as exc:  # amixer missing, no card, timeout, ...
-            logging.getLogger(__name__).warning("masterVolume read failed: %s", exc)
-            return -1
+        """Current master volume 0-100 (synapse-owned), or -1 if the gain client
+        isn't reachable (service not running / no JACK)."""
+        mv = self._mastervol()
+        return mv.get_percent() if mv.available() else -1
 
     @Slot(int)
     def setMasterVolume(self, pct):
-        """Set the Pisound PCM playback volume (digital). pct is clamped to 0-100."""
-        pct = max(0, min(100, int(pct)))
-        try:
-            out = subprocess.run(["amixer", "-q", "-c", self._AMIXER_CARD,
-                                  "sset", self._AMIXER_CTL, f"{pct}%"],
-                                 capture_output=True, text=True, timeout=5)
-            if out.returncode != 0:
-                self.toastRequested.emit("볼륨 설정 실패 — Pisound 믹서 확인")
-                logging.getLogger(__name__).warning("setMasterVolume %s%% failed: %s",
-                                                    pct, out.stderr.strip())
-        except Exception as exc:
-            self.toastRequested.emit("볼륨 설정 실패 — amixer 없음/오류")
-            logging.getLogger(__name__).warning("setMasterVolume %s%% error: %s", pct, exc)
+        """Drive the JACK gain stage to pct (0-100) via CC7."""
+        self._mastervol().set_percent(pct)
 
     @Slot()
     def refreshBoards(self):

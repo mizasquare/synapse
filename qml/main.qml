@@ -752,15 +752,35 @@ Window {
                             volAvail = v >= 0;
                             masterVol = v >= 0 ? v : 0;
                         }
-                        // throttle amixer writes during a drag (final value guaranteed onReleased)
-                        Timer { id: volApply; interval: 80; repeat: false
-                                onTriggered: view.setMasterVolume(configLeaf.masterVol) }
+                        // Throttle CC writes DURING a drag: leading edge fires
+                        // immediately, then flush the latest value at most every
+                        // interval while the finger keeps moving (repeat timer,
+                        // stops itself when idle). restart()-per-move would instead
+                        // defer everything until the finger paused — the bug we fix.
+                        property bool volDirty: false
+                        Timer { id: volApply; interval: 70; repeat: true; running: false
+                                onTriggered: {
+                                    if (configLeaf.volDirty) {
+                                        view.setMasterVolume(configLeaf.masterVol);
+                                        configLeaf.volDirty = false;
+                                    } else {
+                                        volApply.stop();
+                                    }
+                                } }
+                        function applyVol() {
+                            if (volApply.running) {
+                                configLeaf.volDirty = true;             // coalesce within window
+                            } else {
+                                view.setMasterVolume(configLeaf.masterVol);  // leading edge
+                                volApply.start();
+                            }
+                        }
 
-                        // --- master volume (digital) section ---
-                        Text { text: "마스터 볼륨 (디지털)"
+                        // --- master volume (software) section ---
+                        Text { text: "마스터 볼륨"
                                color: cText; font.family: uiFont; font.pixelSize: 20 }
 
-                        // slider row (hand-rolled, house style) — hidden if mixer unavailable
+                        // slider row (hand-rolled, house style) — hidden if gain stage unavailable
                         Row {
                             visible: configLeaf.volAvail
                             width: parent.width; spacing: 14
@@ -785,7 +805,7 @@ Window {
                                     function setFromX(mx) {
                                         var p = Math.max(0, Math.min(1, mx / volTrack.width));
                                         configLeaf.masterVol = Math.round(p * 100);
-                                        volApply.restart();
+                                        configLeaf.applyVol();
                                     }
                                     onPressed: setFromX(mouseX)
                                     onPositionChanged: setFromX(mouseX)
@@ -798,11 +818,11 @@ Window {
                                    color: cGreen; font.family: uiFont; font.pixelSize: 22 }
                         }
                         Text { visible: configLeaf.volAvail
-                               text: "Pisound PCM · DAC 앞단 디지털 감쇠입니다. 크게 줄이면 헤드룸이 깎이니\n큰 음량 조절은 보드의 물리 노브(아날로그 마스터)를 쓰세요."
+                               text: "출력단 소프트웨어 게인(JACK)입니다. 100% = 유니티, 아래로 감쇠.\n보드의 물리 노브가 최종 아날로그 마스터입니다."
                                color: cDim; font.family: uiFont; font.pixelSize: 15
                                wrapMode: Text.WordWrap; width: parent.width }
                         Text { visible: !configLeaf.volAvail
-                               text: "Pisound 믹서를 찾을 수 없습니다 (amixer -c pisound)."
+                               text: "게인 스테이지를 찾을 수 없습니다 (synapse-mastervol 서비스 확인)."
                                color: cMuted; font.family: uiFont; font.pixelSize: 16
                                wrapMode: Text.WordWrap; width: parent.width }
                     }
