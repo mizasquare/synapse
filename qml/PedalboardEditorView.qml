@@ -656,7 +656,7 @@ Item {
                             border.width: 1; border.color: editor.inspBypassed ? cDim : cGreen
                             Text { id: bypTxt; anchors.centerIn: parent; text: editor.inspBypassed ? "BYPASSED" : "ACTIVE"
                                    color: editor.inspBypassed ? cMuted : cGreen; font.family: uiFont; font.pixelSize: 14 }
-                            MouseArea { anchors.fill: parent; onClicked: editor.toggleBypass(editor.sel) }
+                            MouseArea { anchors.fill: parent; onClicked: editor.toggleSelectedBypass() }
                         }
                         WideBtn { label: "리셋"; accent: cBorder; onTap: editor.resetParams() }
                         WideBtn { label: "연결 →"; accent: cBlue; visible: editor.inspCanConnect
