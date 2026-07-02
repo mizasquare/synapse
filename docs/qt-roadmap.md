@@ -202,9 +202,14 @@ FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이
       ③ 미터 **dB 매핑**(modmeter 출력=선형진폭 0..1이라 선형 norm이면 바가 ~1%만 차 안 보임 → `20·log10`, -60dB 바닥).
       라이브 검증 OK(HighGainRig 신호→바 가시적 움직임). 설계=[`focus-control-rendering.md`](focus-control-rendering.md).
       후속(미완): 패치선택기(아래 별도) · enum/trigger 위젯 **실조작** 검증 · 모니터 tier-2 하드코딩 레지스트리는 빈 채 둠.
-- [ ] **튜너** — 콤보 B+C가 `pass`([`presenter.py:402`](../presenter.py)), Qt 튜너 화면 없음.
-      ★피치검출 `yin.py`가 `under_vsersion1/`로 빠져 **누락**([`tunerpopup.py:8`](../tunerpopup.py) import 실패).
-      필요: YIN DSP 복원(또는 대체) + presenter 배선(탭템포 패턴) + 풀스크린 QML 튜너 화면. (오디오버퍼 파이프는 아이캔디와 공유.)
+- [x] **튜너 ✅(2026-07-02, 브랜치 `tuner`)** — B+C 콤보 → 풀스크린 QML 튜너 화면. mod-host 내장 튜너 접근불가라
+      자체 `cochlea/` DSP 패키지로 **클린룸 자작**: **듀얼 NSDF+HPS 교차검증**(시간·주파수 영역의 옥타브 오류 방향이
+      반대라 상쇄) + **50/60Hz 험 자동감지·주파수영역 노치**(험이 진짜 하모닉이라 검출 전 제거 필수) + 스레드 엔진
+      (One Euro 필터·노트락 히스테리시스·무음/온셋 게이팅). presenter `enter_tuner`/`exit_tuner`(탭템포 패턴, 온디맨드
+      JACK 클라, 아무 풋스위치나 밟아 이탈), qtview `tunerUpdated` 30Hz 폴링. **풋스위치 LED 근접도 스트로브**
+      (오프피치=빨강, 정튠 가까울수록 빨라짐 → 맞으면 파란 세리머니+락). 순수 numpy(scipy無, 새 의존성 0). Pi 실기타
+      검증 OK("빠르고 정확"). 콘솔 러너 `python -m cochlea jack`. 후속(선택): 화면 스트로브 시각폴리싱·A4조정·튜닝중
+      뮤트·베이스모드. (옛 scipy `under_vsersion1/{yin,hps}.py`는 폐기 — 참고만.)
 - [x] **패치/IR 파일 선택기 ✅(2026-06-27, M3.5, 커밋 `e89a458`+`cf0fcfe`)** — FOCUS·에디터 둘 다 구현.
       공유 `qml/PatchPicker.qml` + `presenter.list_patch_files` + `qtview.setPatch`/`update_patch_display`.
       ★mod-ui `fileTypes`=카테고리명→`configs.PATCH_FILE_TYPE_EXTS` 매핑. 상세는 에디터 섹션 M3.5 / [[param-vs-patch-set]].
@@ -246,7 +251,7 @@ FOCUS 컨트롤/모니터 렌더링 + 라이브 레벨미터 피드까지 라이
       `Drive-cupcake`식)로 해결됨 + 필요시 연결된 **HW 무선 키보드**가 폴백. 온스크린 키보드(wvkbd/커스텀 QWERTY) 불필요.
       잔재 `toggle_keyboard`(wvkbd, [`presenter.py:477`](../presenter.py))는 Qt 경로서 미호출 죽은코드 → Tier 3 삭제 대상.
 
-> 시안 화면 매핑(참고): Overview·Focus·TapTempo·Toast=구현됨 / Tuner·Menu·Browser=미구현 / **Keyboard=폐기**(이름추천기로 대체) / HW 풋스위치 행=스트립으로 존재.
+> 시안 화면 매핑(참고): Overview·Focus·TapTempo·Tuner·Toast=구현됨 / Menu·Browser=미구현 / **Keyboard=폐기**(이름추천기로 대체) / HW 풋스위치 행=스트립으로 존재.
 
 ## Tier 3 — 정리 / 폴리시
 
