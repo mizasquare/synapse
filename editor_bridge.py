@@ -270,7 +270,7 @@ class EditorBridge(QObject):
     def _load_live_catalog(self):
         """Swap the bootstrap (frozen) catalog for the live host's full installed
         plugin set: backend.effect_list() -> plugincatalog.normalize(). Held for the
-        session (plugin install is rare; M7-3 adds manual rescan + per-uri self-heal).
+        session (plugin install is rare; per-uri self-heal covers stragglers).
         Keeps the frozen fallback if the host returns nothing or errors."""
         be = self._backend()
         if not be:

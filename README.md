@@ -29,7 +29,8 @@ Synapse replaces that with a **purpose-built touchscreen front end** and wires i
 - **2 pedals** (volume + expression potentiometers) mapped to MIDI CC.
 - On-screen **plugin parameter** editing, **bypass** toggles, a **tuner**, real-time
   **level meters**, **BPM/transport** control, and a touch **pedalboard editor**.
-- On-demand launch of the original MODEP **web UI** for deeper editing.
+- The original MODEP **web UI** stays reachable from a phone / desktop browser for deeper
+  editing (the on-device Chromium launch was retired 2026-07-03).
 
 ---
 
@@ -120,8 +121,9 @@ injected at the seams — no separate UI fork).
 
 ### Footswitch modes
 `presenter.footswitch_mode`: `0` = pedalboard navigation · `1` = STOMP (4 category-filtered
-effects → FS0–3) · `2` = BANK (the active bank's first 4 boards → FS0–3) · `3` = web UI ·
-`4` = tap tempo.
+effects → FS0–3) · `2` = BANK (the active bank's first 4 boards → FS0–3) ·
+`4` = tap tempo. (Modes `0`/`1`/`2` cycle in order; `4` is a separate entry. The old
+`3` = web UI mode was removed with the on-device Chromium path.)
 
 ---
 
@@ -147,7 +149,8 @@ synapse/
 ├── levelmeter.py       # own JACK client → overview IN/OUT level meters
 ├── taptempo.py         # tap-tempo engine (timing + LED metronome)
 ├── volumepedal.py      # standalone pedal → MIDI CC bridge (separate process)
-├── configs.py          # paths, scale factor, fonts, socket path
+├── mastervolume.py     # CC7 master-volume sender (dB taper) → synapsevol JACK gain stage
+├── configs.py          # MODEP paths, patch-file dir/type maps, synapsin socket path
 ├── utils.py            # helpers
 ├── run_synapsepy.sh    # launch script (activate venv → python qt_main.py)
 ├── qml/                # QML UI (main · ControlWidget · MonitorWidget · PatchPicker · PedalboardEditorView)
@@ -155,8 +158,9 @@ synapse/
 ├── fixtures/           # off-device dev fixtures (fake-backend JSON)
 ├── resources/          # images, fonts (VT323), icons
 ├── mod-tweaks/         # patched mod-ui source + deploy.sh (see below)
-├── tests/              # qt_smoke · taptempo_selftest · stress_add_test (run from repo root)
-├── tools/              # dev/bring-up scripts: dump_effects · hwitest · ADStest · test (wvkbd toggle)
+├── deploy/             # on-device services (volume-service: soft master volume)
+├── tests/              # qt_smoke · taptempo_selftest · stress_add_test · cochlea_selftest (run from repo root)
+├── tools/              # dev/bring-up scripts: dump_effects · hwitest · ADStest · test (obsolete — wvkbd retired)
 ├── docs/               # design / diagnosis / roadmap notes
 ├── REFERENCES.md       # external + live-system references
 └── (untracked snapshots, not on the Qt path)
@@ -180,8 +184,9 @@ Auto-start chain on boot:
 ```
 
 The repo's [`run_synapsepy.sh`](run_synapsepy.sh) is a copy of the device's original launch
-script; paths (`/home/miza/...`, the `synapse-venv` virtualenv) are device-specific. (The old
-Kivy entry [`app.py`](app.py) + `gcamp6s-venv` are kept for rollback.)
+script; paths (`/home/miza/...`, the `synapse-venv` virtualenv) are device-specific. (The legacy
+Kivy entry was removed — `run_synapsepy.sh.kivy-bak` + git history hold it for rollback; the
+device also keeps the old `gcamp6s-venv`.)
 
 **Off-device development:** the Qt mock [`qt_dev.py`](qt_dev.py) runs headless on a PC with a
 fake backend + fake hardware injected at the seams — see [`requirements-dev.txt`](requirements-dev.txt).
@@ -225,7 +230,5 @@ Custom endpoints added by the patches (see [`REFERENCES.md`](REFERENCES.md) for 
 ## Roadmap / known rough edges
 
 - **Naming refactor** — converge the code on *Synapse* (app) vs *GCaMP6s* (box).
-- Dead web-UI path (`open_webui`/`close_webui` + the X11 `xdotool` call) is slated for removal in
-  [`docs/qt-roadmap.md`](docs/qt-roadmap.md) Tier 3 (unused on the Qt path; obsoleted by the compositor bypass).
 </content>
 </invoke>

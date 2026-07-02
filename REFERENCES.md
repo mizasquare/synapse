@@ -48,8 +48,8 @@ mod 코드(host/session/webserver) 수정 시 **파일 통째 cp** 전략을 쓴
 - **컴포지터 우회 예정**: labwc를 걷어내고 Qt **eglfs로 KMS/DRM 직행**(단일앱 풀스크린).
   데스크톱 컴포지터 없이 부팅→앱 직행이 **실물 Pi 5 실전테스트로 동작 검증됨**(가능 확인).
   배경/작업: `docs/qt-roadmap.md`, `docs/qt-migration-FINISHED.md`.
-- 웹UI: 온디맨드 `chromium-browser --start-fullscreen http://localhost/` (presenter.py)
-  — **온디바이스 폐기 방향**(웹UI는 폰/옆 데스크톱에서 mod-ui 서버 접속)
+- 웹UI: **온디바이스 실행 폐기 완료**(2026-07-03, presenter.py의 chromium 실행 코드 삭제).
+  웹UI는 폰/옆 데스크톱 브라우저에서 mod-ui 서버(`http://<pi>/`)에 접속.
 
 ## 환경
 
