@@ -13,6 +13,7 @@ from .ring_buffer import RingBuffer
 from .audio_source import (
     AudioSource, JackSource, ToneSource, ToneSweepSource, build_source,
 )
+from .tuner_engine import TunerEngine, TunerReading, OneEuroFilter, NoteTracker
 from . import hum_filter
 
 __all__ = [
@@ -20,5 +21,6 @@ __all__ = [
     "NoteReading", "freq_to_note", "nearest_string", "STRING_SETS",
     "RingBuffer",
     "AudioSource", "JackSource", "ToneSource", "ToneSweepSource", "build_source",
+    "TunerEngine", "TunerReading", "OneEuroFilter", "NoteTracker",
     "hum_filter",
 ]

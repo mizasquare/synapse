@@ -10,6 +10,7 @@ hum-notch + cross-check design.
 """
 import os
 import sys
+import time
 
 import numpy as np
 
@@ -17,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from cochlea import PitchDetector, RingBuffer, freq_to_note, nearest_string
 from cochlea import hum_filter
+from cochlea import OneEuroFilter, NoteTracker, TunerEngine, ToneSource
 
 SR = 48000
 N = 8192
@@ -177,10 +179,73 @@ def test_sweep_and_silence():
     check(est is None, "pure silence -> None")
 
 
+def test_one_euro():
+    print("tuner_engine: OneEuroFilter")
+    f = OneEuroFilter(min_cutoff=0.8, beta=0.03)
+    rng = np.random.default_rng(1)
+    t = 0.0
+    ins, outs = [], []
+    for _ in range(80):
+        x = 7.0 + 0.05 * rng.standard_normal()       # noisy constant (log-freq units)
+        ins.append(x)
+        outs.append(f(x, t))
+        t += 0.05
+    in_std = float(np.std(ins[20:]))
+    out_std = float(np.std(outs[20:]))
+    check(out_std < 0.4 * in_std, "smooths a noisy hold (std %.4f -> %.4f)" % (in_std, out_std))
+    # step response converges toward the new level
+    f2 = OneEuroFilter()
+    t = 0.0
+    for _ in range(5):
+        f2(7.0, t); t += 0.05
+    last = 7.0
+    for _ in range(40):
+        last = f2(8.0, t); t += 0.05
+    check(abs(last - 8.0) < 0.05, "step converges to new value (%.3f)" % last)
+
+
+def test_note_tracker():
+    print("tuner_engine: NoteTracker (hysteresis)")
+    nt = NoteTracker(switch_hold=3)
+    E2 = 82.41
+    nt.update(E2); nt.update(E2)
+    locked = nt.update(164.81)                        # one E3 octave outlier
+    check(locked == 40, "single octave outlier does not switch lock (E2)")
+    locked = nt.update(E2)
+    check(locked == 40, "returns to E2 cleanly")
+    # sustained new note switches after switch_hold frames
+    nt2 = NoteTracker(switch_hold=3)
+    nt2.update(E2)
+    A2 = 110.0
+    r1, r2, r3 = nt2.update(A2), nt2.update(A2), nt2.update(A2)
+    check(r1 == 40 and r2 == 40 and r3 == 45, "sustained A2 switches after 3 frames")
+
+
+def test_engine_smoke():
+    print("tuner_engine: live engine smoke (threaded, ~2s)")
+    eng = TunerEngine(ToneSource(196.0), freq_min=65.0)   # G3
+    eng.start()
+    reading = None
+    deadline = time.monotonic() + 3.0
+    try:
+        while time.monotonic() < deadline:
+            r = eng.get_reading()
+            if r is not None and abs(cents_err(r.freq_hz, 196.0)) < 20.0:
+                reading = r
+                break
+            time.sleep(0.05)
+    finally:
+        eng.stop()
+    ok = reading is not None and reading.note == "G3"
+    check(ok, "engine reports G3 from a 196 Hz tone (%s)"
+          % ("%s %.2f Hz" % (reading.note, reading.freq_hz) if reading else "None"))
+
+
 def main():
     for t in (test_note_mapping, test_ring_buffer, test_hum_filter,
               test_clean_tones, test_octave_trap, test_hum_rejection,
-              test_sweep_and_silence):
+              test_sweep_and_silence, test_one_euro, test_note_tracker,
+              test_engine_smoke):
         t()
     print()
     if _fails:

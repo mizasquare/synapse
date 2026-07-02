@@ -111,18 +111,19 @@ class _ToneBase(AudioSource):
             self._thread = None
 
     def _run(self):
-        phase = 0.0
-        hum_phase = 0.0
+        cyc = 0.0            # accumulated phase in *cycles* (phase-continuous
+        hum_phase = 0.0      # across blocks and frequency changes -> no glitches)
         block_dur = self.BLOCK / self._sr
         t = 0.0
         rng = np.random.default_rng(0)
         while self._running:
             t0 = time.monotonic()
             freq = self._freq_at(t)
-            period = self._sr / freq
-            idx = (phase + np.arange(self.BLOCK)) % period
-            buf = self._amp * (1.0 - 4.0 * np.abs(idx / period - 0.5))   # square-ish tri
-            phase += self.BLOCK
+            inc = freq / self._sr
+            ph = cyc + inc * np.arange(1, self.BLOCK + 1)
+            frac = ph % 1.0
+            buf = self._amp * (1.0 - 4.0 * np.abs(frac - 0.5))          # triangle
+            cyc = ph[-1]
             if self._hum_amp > 0.0 and self._hum_hz > 0.0:
                 ph = hum_phase + 2.0 * np.pi * self._hum_hz * np.arange(self.BLOCK) / self._sr
                 buf = buf + self._hum_amp * np.sin(ph)
