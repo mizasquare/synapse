@@ -55,8 +55,3 @@ def notch_gain(freqs, mains, n_harmonics=DEFAULT_N_HARMONICS, sigma_hz=DEFAULT_S
             break
         g *= 1.0 - np.exp(-0.5 * ((freqs - fc) / sigma_hz) ** 2)
     return g
-
-
-def denotch_spectrum(spectrum, freqs, mains, **kw):
-    """Apply the notch gain to a complex rfft spectrum in place-safe fashion."""
-    return spectrum * notch_gain(freqs, mains, **kw)

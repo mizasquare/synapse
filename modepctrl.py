@@ -57,19 +57,6 @@ class ModepController:
 		return []
 
 	@staticmethod
-	def get_pedalboards_in_bank(bank_id=DEFAULT_BANK):
-		result = []
-		try:
-			r = ModepController._request("get", "banks/")
-			if r is not None and r.status_code == 200:
-				j = r.json()
-				for i in j[bank_id]["pedalboards"]:
-					result.append(i["bundle"])
-		except Exception as e:
-			logging.error(f"Error fetching pedalboards in bank: {e}")
-		return result
-
-	@staticmethod
 	def get_bank_pedalboard_entries(bank_id=DEFAULT_BANK):
 		"""First bank's pedalboards as ``[{'bundle','title'}]`` for the mode-2 bank
 		selector. Empty list if there is no such bank / it's empty / host error."""
@@ -178,22 +165,6 @@ class ModepController:
 		return bool(cur) and cur.rstrip("/") == board.rstrip("/")
 
 	@staticmethod
-	def get_last_pedalboard():
-		try:
-			return open(ModepController.LAST_PEDALBOARD, "rt").read()
-		except FileNotFoundError:
-			logging.error("Last pedalboard file not found.")
-			return ModepController.DEFAULT_PEDALBOARD
-
-	@staticmethod
-	def set_last_pedalboard(board):
-		try:
-			with open(ModepController.LAST_PEDALBOARD, "wt") as f:
-				f.write(board)
-		except Exception as e:
-			logging.error(f"Failed to set last pedalboard: {e}")
-
-	@staticmethod
 	def set_next_pedalboard():
 		# Navigate ALL pedalboards, not just the active bank: the user expects the
 		# footswitch to reach every board in pedalboard/list (a bank is a curated
@@ -271,32 +242,6 @@ class ModepController:
 		return []
 
 	@staticmethod
-	def load_next_snapshot():
-		currentidx = ModepController.snapshot_current_idx()
-		snapshots = ModepController.get_snapshot_list()
-		if len(snapshots) == 1:
-			print("No another snapshot!")
-			return currentidx
-
-		next_ss = (currentidx + 1) % len(snapshots)
-		print("Switching %s -> %s" % (currentidx, next_ss))
-		ModepController.load_snapshot(next_ss)
-		return next_ss
-
-	@staticmethod
-	def load_prev_snapshot():
-		currentidx = ModepController.snapshot_current_idx()
-		snapshots = ModepController.get_snapshot_list()
-		if len(snapshots) == 1:
-			print("No another snapshot!")
-			return currentidx
-
-		prev_ss = (currentidx - 1) % len(snapshots)
-		print("Switching %s -> %s" % (currentidx, prev_ss))
-		ModepController.load_snapshot(prev_ss)
-		return prev_ss
-
-	@staticmethod
 	def load_snapshot(idx):
 		if idx < 0:
 			idx = 0 #fallback to the first snapshot
@@ -306,17 +251,6 @@ class ModepController:
 				return r.json()
 		except Exception as e:
 			logging.error(f"Error loading snapshot: {e}")
-
-	@staticmethod
-	def get_snapshot_name(snapshot_id=0):
-		try:
-			r = ModepController._request("get", "snapshot/name?id=%d" % snapshot_id)
-			if r is not None and r.status_code == 200:
-				return r.json()
-		except:
-			pass
-		return ""
-
 
 	@staticmethod
 	def snapshot_save(save_pb_also=True):

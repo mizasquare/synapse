@@ -1,9 +1,7 @@
-from collections import defaultdict
 import utils
 from modepctrl import get_backend
 from model import initialize_modep_pedalboard, Connection, diff_live_graph
 from taptempo import TapTempoEngine
-import subprocess
 import threading
 import time
 
@@ -11,11 +9,10 @@ import json
 import logging
 import os
 import configs
-from configs import LOCAL_STORAGE
 
 # Footswitch mode ids. 0-2 are the press-driven modes cycled by modechange();
-# 3 (WebUI) and 4 (tap tempo) are transient modes entered out-of-band (button /
-# chord) and kept out of that cycle.
+# 4 (tap tempo) is a transient mode entered out-of-band (chord) and kept out of
+# that cycle.
 TAP_TEMPO_MODE = 4
 
 # Tuner LED feedback (the 4 footswitch LEDs strobe while tuning, so you can tune
@@ -47,7 +44,6 @@ class Presenter:
         # 0: pedalboard nav, 1: parameter assign, 2: pb snapshot assign
         self.footswitch_mode = 0
         self.footswitch_assigns = [None, None, None, None]
-        self.footswitch_combo_assigns = {}
         self.footswitch_input_que = [0] * 4
         # Tap-tempo engine (the C+D chord enters it; see handle_multiple_footswitches).
         # Framework-agnostic: it only needs the scheduler + the two callbacks below.
@@ -78,16 +74,6 @@ class Presenter:
         self.editor = None
         # pb별 마지막 활성 스냅샷 기억 (세션 한정 인메모리). key=current_pb_path, value=snapshot idx
         self.pb_snapshot_memory = {}
-        # Footswitch-mode-2 (RECALL) pedalboard+snapshot assignments, keyed "0".."3".
-        # Loaded from disk so they persist across runs; defaults guarantee all four
-        # keys exist. Key names ("pedalboard"/"snapshot_idx") match the writer
-        # (assign_pb_ss_to_footswitch) and reader (recall_pb_ss) below.
-        self.fs_assignment_data = utils.load_footswitch_assignments() or {}
-        for i in range(4):
-            self.fs_assignment_data.setdefault(str(i), {
-                "pedalboard": None,
-                "snapshot_idx": None,
-            })
 
         # Mode-2 BANK selector: the active bank's first 4 boards map to FS0-3.
         # current_bank is driven by the bank manager (set_active_bank); it picks
@@ -119,20 +105,6 @@ class Presenter:
     def initiate_view(self):
         self.view_update_effect()
         self.view_update_bpm()
-
-    def set_beat(self, bpb=None, bpm=None):
-        if bpb:
-            error_msg = self.backend.set_bpb(bpb)
-            if error_msg is None:
-                self.pedalboard.bpb = bpb
-            else:
-                print(error_msg)
-        if bpm:
-            error_msg = self.backend.set_bpm(bpm)
-            if error_msg is None:
-                self.pedalboard.bpm = bpm
-            else:
-                print(error_msg)
 
     def refresh_pedalboard(self):
         self.pedalboard = initialize_modep_pedalboard(self.backend)
@@ -215,12 +187,6 @@ class Presenter:
 
         effectData = self._build_view_effect(effect)
         self.view.populate_port_area(effectData=effectData)
-
-    def view_mode_change(self, mode):
-        pass
-
-    def view_update_footsw_display(self, updated_data):
-        pass
 
     def parameter_changed(self, effect_instance, port_symbol, port_value):
         if port_symbol == ":bypass":
@@ -660,51 +626,6 @@ class Presenter:
         self.refresh_pedalboard()
         return self.pedalboard
 
-    def assign_pb_ss_to_footswitch(self, fs_idx_to_assign):
-        """
-        FS indices are 0-3. Assigns the current pedalboard and snapshot to the given footswitch.
-        """
-        # Suppose self.pedalboard keeps track of pedalboard_name, current_snapshot_idx, etc.
-
-        pedalboard = self.pedalboard.current_pb_path
-        snapshot_idx = self.pedalboard.current_snapshot_idx
-
-        self.fs_assignment_data[str(fs_idx_to_assign)] = {
-            "pedalboard": pedalboard,
-            "snapshot_idx": snapshot_idx
-        }
-
-        # Persist to JSON
-        utils.save_footswitch_assignments(self.fs_assignment_data)
-
-        print(f"Footswitch {fs_idx_to_assign} assigned to PB {pedalboard}, snapshot {snapshot_idx}")
-
-    def recall_pb_ss(self, fs_idx):
-        """Load pedalboard and snapshot as stored in footswitch_assignments.json"""
-        assignment = self.fs_assignment_data.get(str(fs_idx))
-        if not assignment or assignment["pedalboard"] is None:
-            print(f"No assignment for footswitch {fs_idx}.")
-            return
-
-        # Actually load the pedalboard / snapshot
-        pb_path = assignment["pedalboard"]
-        ss_idx = assignment["snapshot_idx"]
-
-        # set_pedalboard returns a success BOOL (True == loaded; M6a made the
-        # partial-failure case detectable). It used to return None always, so the
-        # old `error is None` check is now wrong — branch on the bool.
-        self._warn_if_editor_dirty()         # the switch /reset discards unsaved editor edits
-        if self.backend.set_pedalboard(pb_path):
-            # Re-initialize your pedalboard object
-            self.refresh_pedalboard()
-            # Then set the snapshot
-            self.pedalboard.current_snapshot_idx = ss_idx
-            self.backend.load_snapshot(ss_idx)
-            self.view_update_effect()
-            print(f"Recalled PB {pb_path}, snapshot {ss_idx}.")
-        else:
-            print(f"Failed to load PB {pb_path}.")
-
     # Consecutive identical samples required before a switch state change is
     # accepted (software debounce). At 100 Hz, 3 samples == ~30 ms: longer than
     # mechanical bounce (<10 ms) yet imperceptible to the player.
@@ -880,70 +801,10 @@ class Presenter:
                 for i in range(4)
             ]
 
-        elif self.footswitch_mode == 3: # WebUI mode
-            self.footswitch_assigns = [None, None, None, self.close_webui]
-
         elif self.footswitch_mode == TAP_TEMPO_MODE:
             # Any single press is a beat tap; chords exit (handle_multiple_footswitches).
             self.footswitch_assigns = [self.tap_input] * 4
 
-    def toggle_keyboard(self, *args):
-        utils.toggle_wvkbd()
-
-
-    def open_webui(self, *args):
-        self.hwi.LED[3] = 1  # turn 4th red LED on
-
-        # Check if Chromium is already running
-        result = subprocess.run(['pgrep', 'chromium'], stdout=subprocess.PIPE)
-        if result.stdout:
-            print("Chromium is already running.")
-        else:
-            # Start Chromium in full-screen mode
-            self.chromium_process = subprocess.Popen(['chromium-browser', '--start-fullscreen', 'http://localhost/'])
-            # Minimize the app window (view owns window control)
-            self.view.minimize()
-            # Set footswitch mode to 3 and reassign footswitches
-            self.footswitch_mode = 3
-            self.assign_footswitches()
-
-    def close_webui(self, *args):
-        print("close_webui called")
-        if hasattr(self, 'chromium_process'):
-            print("Terminating Chromium process")
-            self.chromium_process.terminate()
-            try:
-                self.chromium_process.wait(timeout=5)
-                print("Chromium process terminated")
-            except subprocess.TimeoutExpired:
-                print("Chromium did not terminate in time; killing it")
-                self.chromium_process.kill()
-                print("Chromium process killed")
-        else:
-            print("Chromium process handle not found; attempting to kill by name")
-            subprocess.run(['pkill', '-f', 'chromium-browser'])
-        # Rest of the method
-        self.footswitch_mode = 0
-        self.hwi.LED[3] = 0  # turn 4th red LED off
-
-        self.assign_footswitches()
-
-        self.view.restore()
-        os.system("xdotool search --name 'GCaMP6s' windowactivate")
-
-        self.refresh_pedalboard()
-
-        # Re-enable the webui button
-        self.view.enable_webui_button()
-
-    def abcd_availability(self, availabilities):
-        self.view.set_abcd_availability(availabilities)
-
-    def abcd_button_state_change(self, prev_state, new_state):
-        ##do something
-        ...
-        #relase ABCDbutton
-        ...
     def view_update_bpm(self):
         self.view.update_bpm_display(self.pedalboard.bpm)
 
@@ -1128,17 +989,10 @@ class Presenter:
         if mode is None:
             mode = (self.footswitch_mode + 1) % 3
         self.footswitch_mode = mode
-        if self.footswitch_mode == 0:
-            self.abcd_availability(False)
-        else:
-            self.abcd_availability(True)
         # Assign FIRST (mode 2 fills self.bank_boards and may fall back to mode 1),
         # THEN refresh the mode label + strip so it reflects the final state.
         self.assign_footswitches()
         self.view.update_mode_display(self.footswitch_mode)
-
-    def abcd_button_state(self,prev,current):
-        print(f"prev:{prev},current:{current}") #-1 is released. 0,1,2,3 is pressed for each button
 
     def _build_view_effect(self, effect):
         bypassed = self.backend.parameter_get(effect.instance, ":bypass")  # Fetch bypass state correctly

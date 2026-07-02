@@ -33,7 +33,7 @@ import unicodedata
 import configs
 import plugincatalog
 
-from PyQt6.QtCore import (QObject, QTimer, pyqtProperty as Property,
+from PyQt6.QtCore import (QObject, pyqtProperty as Property,
                           pyqtSignal as Signal, pyqtSlot as Slot)
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -308,13 +308,6 @@ class EditorBridge(QObject):
         self.cat['plugins'].append(p)
         self.cat['count'] = len(self.cat['plugins'])
         return p
-
-    @Slot()
-    def rescanCatalog(self):
-        """Manually re-fetch the host's full plugin catalog (e.g. after installing
-        a new plugin). Plugin install is rare, so this is on-demand, not polled."""
-        self._load_live_catalog()
-        self.toast.emit('플러그인 카탈로그 갱신 · %d개' % self.cat.get('count', 0))
 
     @Slot()
     def enterLive(self):
@@ -607,12 +600,6 @@ class EditorBridge(QObject):
             y = (MID_Y - 3 * HALF) if role == 'source' else (MID_Y + HALF)
             out.append((uri, max(IN_X + 8, min(OUT_X - NODEW - 8, x)), y, True))
         return out
-
-    def round_trip_ok(self, nodes):
-        g = self.arcs_from_layout(nodes)
-        relaid = self.layout_from_graph(g)
-        fake = [{'id': i, 'uri': u, 'x': x, 'y': y} for i, (u, x, y, _b) in enumerate(relaid)]
-        return self.arcs_from_layout(fake) == g
 
     def _apply_layout(self, graph):
         relaid = self.layout_from_graph(graph)
@@ -1208,10 +1195,6 @@ class EditorBridge(QObject):
         QML hides mock-only chrome (QUICK/evolve/mock board manager) when live."""
         return self._live_flag
 
-    @Property(int, notify=changed)
-    def effectCount(self):
-        return self.cat['count']
-
     @Property('QVariantList', notify=changed)
     def rail(self):
         return self._rail
@@ -1255,10 +1238,6 @@ class EditorBridge(QObject):
     @Property(str, notify=changed)
     def inMode(self):
         return self.in_mode
-
-    @Property(bool, notify=changed)
-    def roundTripOK(self):
-        return self.round_trip_ok(self.nodes) if self.mode == 'quick' else True
 
     # advanced
     @Property('QVariantList', notify=changed)
