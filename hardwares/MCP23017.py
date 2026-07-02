@@ -16,10 +16,6 @@ MCP23017_INTCONB = 0x09
 MCP23017_IOCON = 0x0A  # 0x0B is the same
 MCP23017_GPPUA = 0x0C
 MCP23017_GPPUB = 0x0D
-MCP23017_INTFA = 0x0E
-MCP23017_INTFB = 0x0F
-MCP23017_INTCAPA = 0x10
-MCP23017_INTCAPB = 0x11
 MCP23017_GPIOA = 0x12
 MCP23017_GPIOB = 0x13
 MCP23017_OLATA = 0x14
@@ -32,21 +28,6 @@ class MCP23017(object):
     INPUT = 1
     LOW = 0
     HIGH = 1
-
-    INTMIRRORON = 1
-    INTMIRROROFF = 0
-    # int pin starts high. when interrupt happens, pin goes low
-    INTPOLACTIVELOW = 0
-    # int pin starts low. when interrupt happens, pin goes high
-    INTPOLACTIVEHIGH = 1
-    INTERRUPTON = 1
-    INTERRUPTOFF = 0
-    INTERRUPTCOMPAREDEFAULT = 1
-    INTERRUPTCOMPAREPREVIOUS = 0
-
-    # register values for use below
-    IOCONMIRROR = 6
-    IOCONINTPOL = 1
 
     # set defaults
     def __init__(self, address, num_gpios, busnum=-1):
@@ -201,110 +182,6 @@ class MCP23017(object):
                 if regValue & (1 << pin - 8) != 0: value = 1
         # 1 or 0
         return value
-
-        # configure system interrupt settings
-
-    # mirror - are the int pins mirrored? 1=yes, 0=INTA associated with PortA, INTB associated with PortB
-    # intpol - polarity of the int pin. 1=active-high, 0=active-low
-    def configSystemInterrupt(self, mirror, intpol):
-        assert mirror == 0 or mirror == 1, "Valid options for MIRROR: 0 or 1"
-        assert intpol == 0 or intpol == 1, "Valid options for INTPOL: 0 or 1"
-        # get current register settings
-        registerValue = self.i2c.readU8(MCP23017_IOCON)
-        # set mirror bit
-        registerValue = self._changeBit(registerValue, self.IOCONMIRROR, mirror)
-        self.mirrorEnabled = mirror
-        # set the intpol bit
-        registerValue = self._changeBit(registerValue, self.IOCONINTPOL, intpol)
-        # set ODR pin
-        self.i2c.write8(MCP23017_IOCON, registerValue)
-
-    # configure interrupt setting for a specific pin. set on or off
-    def configPinInterrupt(self, pin, enabled, compareMode=0, defval=0):
-        assert pin >= 0 and pin < self.num_gpios, "Pin number %s is invalid, only 0-%s are valid" % (
-        pin, self.num_gpios)
-        assert self.direction & (
-                    1 << pin) != 0, "Pin %s not set to input! Must be set to input before you can change interrupt config." % pin
-        assert enabled == 0 or enabled == 1, "Valid options: 0 or 1"
-        if (pin < 8):
-            # first, interrupt on change feature
-            self._readAndChangePin(MCP23017_GPINTENA, pin, enabled)
-            # then, compare mode (previous value or default value?)
-            self._readAndChangePin(MCP23017_INTCONA, pin, compareMode)
-            # last, the default value. set it regardless if compareMode requires it, in case the requirement has changed since program start
-            self._readAndChangePin(MCP23017_DEFVALA, pin, defval)
-        else:
-            self._readAndChangePin(MCP23017_GPINTENB, pin - 8, enabled)
-            self._readAndChangePin(MCP23017_INTCONB, pin - 8, compareMode)
-            self._readAndChangePin(MCP23017_DEFVALB, pin - 8, defval)
-
-    # private function to return pin and value from an interrupt
-    def _readInterruptRegister(self, port):
-        assert port == 0 or port == 1, "Port to get interrupts from must be 0 or 1!"
-        value = 0
-        pin = None
-        if port == 0:
-            interruptedA = self.i2c.readU8(MCP23017_INTFA)
-            if interruptedA != 0:
-                pin = int(math.log(interruptedA, 2))
-                # get the value of the pin
-                valueRegister = self.i2c.readU8(MCP23017_INTCAPA)
-                if valueRegister & (1 << pin) != 0: value = 1
-            return pin, value
-        if port == 1:
-            interruptedB = self.i2c.readU8(MCP23017_INTFB)
-            if interruptedB != 0:
-                pin = int(math.log(interruptedB, 2))
-                # get the value of the pin
-                valueRegister = self.i2c.readU8(MCP23017_INTCAPB)
-                if valueRegister & (1 << pin) != 0: value = 1
-                # want return 0-15 pin value, so add 8
-                pin = pin + 8
-            return pin, value
-
-    # this function should be called when INTA or INTB is triggered to indicate an interrupt occurred
-    # optionally accepts the bank number that caused the interrupt (0 or 1)
-    # the function determines the pin that caused the interrupt and gets its value
-    # the interrupt is cleared
-    # returns pin and the value
-    # pin is 0 - 15, not relative to bank
-    def readInterrupt(self, port=None):
-        assert self.mirrorEnabled == 1 or port != None, "Mirror not enabled and port not specified - call with port (0 or 1) or set mirrored."
-        # default value of pin. will be set to 1 if the pin is high
-        value = 0
-        # if the mirror is enabled, we don't know what port caused the interrupt, so read both
-        if self.mirrorEnabled == 1:
-            # read 0 first, if no pin, then read and return 1
-            pin, value = self._readInterruptRegister(0)
-            if pin == None:
-                return self._readInterruptRegister(1)
-            else:
-                return pin, value
-        elif port == 0:
-            return self._readInterruptRegister(0)
-        elif port == 1:
-            return self._readInterruptRegister(1)
-
-    # check to see if there is an interrupt pending 3 times in a row (indicating it's stuck)
-    # and if needed clear the interrupt without reading values
-    # return 0 if everything is ok
-    # return 1 if the interrupts had to be forcefully cleared
-    def clearInterrupts(self):
-        if self.i2c.readU8(MCP23017_INTFA) > 0 or self.i2c.readU8(MCP23017_INTFB) > 0:
-            iterations = 3
-            count = 1
-            # loop to check multiple times to lower chance of false positive
-            while count <= iterations:
-                if self.i2c.readU8(MCP23017_INTFA) == 0 and self.i2c.readU8(MCP23017_INTFB) == 0:
-                    return 0
-                else:
-                    time.sleep(.5)
-                    count += 1
-            # if we made it to the end of the loop, reset
-            if count >= iterations:
-                self.i2c.readU8(MCP23017_GPIOA)
-                self.i2c.readU8(MCP23017_GPIOB)
-                return 1
 
     # cleanup function - set values everything to safe values
     # should be called when program is exiting

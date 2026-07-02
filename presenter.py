@@ -5,7 +5,6 @@ from taptempo import TapTempoEngine
 import threading
 import time
 
-import json
 import logging
 import os
 import configs
