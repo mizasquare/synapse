@@ -22,6 +22,9 @@ Window {
     readonly property color cText:   "#e8edf4"
     readonly property color cMuted:  "#7e8694"
     readonly property color cDim:    "#5a6270"
+    readonly property color cPurple: "#b58af0"   // tuner accent (design rules §6)
+    readonly property color cAmber:  "#d99a4e"   // tuner: slightly off pitch
+    readonly property color cRed:    "#e6402e"   // tuner: far off pitch
 
     // dev: quit a true-fullscreen instance (no title bar to close) — mirrors the editor
     Shortcut { sequences: ["Ctrl+Q"]; context: Qt.ApplicationShortcut; onActivated: Qt.quit() }
@@ -717,7 +720,7 @@ Window {
                         visible: overviewScreen.hubLeaf === "menu"
                         width: parent.width; spacing: 10
                         Repeater {
-                            model: [ {k:"config", t:"설정 (CONFIG)",   s:"탭템포·풋스위치 등 — 준비 중"},
+                            model: [ {k:"config", t:"설정 (CONFIG)",   s:"마스터 볼륨 (디지털)"},
                                      {k:"system", t:"시스템 (SYSTEM)",  s:"안전 종료 · 재부팅"} ]
                             Rectangle {
                                 width: parent.width; height: 64; radius: 8
@@ -736,11 +739,73 @@ Window {
                             }
                         }
                     }
-                    // ---- config placeholder ----
-                    Text { visible: overviewScreen.hubLeaf === "config"
-                           text: "설정 화면 준비 중.\n하드코딩된 옵션들(탭템포 스냅 그리드, 풋스위치 콤보 등)이\n여기로 들어올 예정입니다. (docs/config-todo.md)"
-                           color: cDim; font.family: uiFont; font.pixelSize: 17
-                           wrapMode: Text.WordWrap; width: parent.width }
+                    // ---- config ----
+                    Column {
+                        id: configLeaf
+                        visible: overviewScreen.hubLeaf === "config"
+                        width: parent.width; spacing: 16
+                        property int  masterVol: 100
+                        property bool volAvail: true
+                        // seed from the live mixer whenever this leaf opens
+                        onVisibleChanged: if (visible) {
+                            var v = view.masterVolume();
+                            volAvail = v >= 0;
+                            masterVol = v >= 0 ? v : 0;
+                        }
+                        // throttle amixer writes during a drag (final value guaranteed onReleased)
+                        Timer { id: volApply; interval: 80; repeat: false
+                                onTriggered: view.setMasterVolume(configLeaf.masterVol) }
+
+                        // --- master volume (digital) section ---
+                        Text { text: "마스터 볼륨 (디지털)"
+                               color: cText; font.family: uiFont; font.pixelSize: 20 }
+
+                        // slider row (hand-rolled, house style) — hidden if mixer unavailable
+                        Row {
+                            visible: configLeaf.volAvail
+                            width: parent.width; spacing: 14
+                            Rectangle {
+                                id: volTrack
+                                width: parent.width - 78; height: 16; radius: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: "#1b2230"; border.width: 1; border.color: cBorder
+                                Rectangle {   // fill
+                                    width: volTrack.width * configLeaf.masterVol / 100
+                                    height: parent.height; radius: 8; color: cGreen
+                                }
+                                Rectangle {   // handle
+                                    width: 24; height: 24; radius: 12; color: cText
+                                    border.width: 2; border.color: cGreen
+                                    y: (parent.height - height) / 2
+                                    x: Math.max(0, Math.min(volTrack.width - width,
+                                                volTrack.width * configLeaf.masterVol / 100 - width / 2))
+                                }
+                                MouseArea {
+                                    anchors.fill: parent; preventStealing: true
+                                    function setFromX(mx) {
+                                        var p = Math.max(0, Math.min(1, mx / volTrack.width));
+                                        configLeaf.masterVol = Math.round(p * 100);
+                                        volApply.restart();
+                                    }
+                                    onPressed: setFromX(mouseX)
+                                    onPositionChanged: setFromX(mouseX)
+                                    onReleased: view.setMasterVolume(configLeaf.masterVol)
+                                }
+                            }
+                            Text { text: configLeaf.masterVol + "%"
+                                   width: 64; horizontalAlignment: Text.AlignRight
+                                   anchors.verticalCenter: parent.verticalCenter
+                                   color: cGreen; font.family: uiFont; font.pixelSize: 22 }
+                        }
+                        Text { visible: configLeaf.volAvail
+                               text: "Pisound PCM · DAC 앞단 디지털 감쇠입니다. 크게 줄이면 헤드룸이 깎이니\n큰 음량 조절은 보드의 물리 노브(아날로그 마스터)를 쓰세요."
+                               color: cDim; font.family: uiFont; font.pixelSize: 15
+                               wrapMode: Text.WordWrap; width: parent.width }
+                        Text { visible: !configLeaf.volAvail
+                               text: "Pisound 믹서를 찾을 수 없습니다 (amixer -c pisound)."
+                               color: cMuted; font.family: uiFont; font.pixelSize: 16
+                               wrapMode: Text.WordWrap; width: parent.width }
+                    }
                     // ---- system (real: shutdown / reboot, 2-tap confirm) ----
                     Column {
                         visible: overviewScreen.hubLeaf === "system"
@@ -1012,6 +1077,131 @@ Window {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom; anchors.bottomMargin: 16
             text: "탭: 풋스위치 아무거나  ·  종료: 콤보(2개 동시)"
+            color: cDim; font.family: uiFont; font.pixelSize: 22
+        }
+    }
+
+    // ============================================================ TUNER
+    // Guitar tuner (cochlea engine). B+C enters (presenter.enter_tuner); any
+    // footswitch exits. view.tunerUpdated pushes readings ({} == listening).
+    Item {
+        id: tunerScreen
+        anchors.fill: parent
+        visible: view.screen === "tuner"
+
+        property bool live: false
+        property string note: "--"
+        property real cents: 0
+        property real freq: 0
+        property string strg: ""
+        property real conf: 0
+        property bool inTune: false
+
+        // in-tune -> green, slightly off -> amber, far off -> red, no signal -> dim.
+        // A property binding (not a function) so it re-evaluates on cents/live change.
+        readonly property color stateColor: !live ? cDim
+            : (Math.abs(cents) < 3 ? cGreen : (Math.abs(cents) < 15 ? cAmber : cRed))
+
+        Connections {
+            target: view
+            function onTunerUpdated(r) {
+                if (!r || r.note === undefined) {
+                    tunerScreen.live = false;
+                } else {
+                    tunerScreen.live = true;
+                    tunerScreen.note = r.note;
+                    tunerScreen.cents = r.cents;
+                    tunerScreen.freq = r.freq;
+                    tunerScreen.strg = r.string;
+                    tunerScreen.conf = r.confidence;
+                    tunerScreen.inTune = r.inTune;
+                }
+            }
+        }
+
+        // header
+        Text {
+            x: 16; y: 16; text: "TUNER"
+            color: cPurple; font.family: uiFont; font.pixelSize: 44
+        }
+        Text {
+            anchors.right: parent.right; anchors.rightMargin: 16; y: 26
+            text: "A 440"
+            color: cMuted; font.family: uiFont; font.pixelSize: 28
+        }
+
+        // big note name
+        Text {
+            id: noteText
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 92
+            text: tunerScreen.live ? tunerScreen.note : "--"
+            color: tunerScreen.stateColor
+            font.family: uiFont; font.pixelSize: 190
+        }
+
+        // cents readout
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: noteText.bottom; anchors.topMargin: -16
+            text: tunerScreen.live
+                  ? ((tunerScreen.cents >= 0 ? "+" : "") + tunerScreen.cents.toFixed(1) + "¢")
+                  : ""
+            color: tunerScreen.stateColor
+            font.family: uiFont; font.pixelSize: 40
+        }
+
+        // deviation meter: a needle over a +/-50 cent scale
+        Item {
+            id: meter
+            width: 640; height: 56
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 348
+            Rectangle {                                   // baseline
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width; height: 3; color: cBorder
+            }
+            Rectangle {                                   // centre (in-tune) tick
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.verticalCenter: parent.verticalCenter
+                width: 4; height: 40; color: cGreen
+            }
+            Repeater {                                    // +/-25, +/-50 ticks
+                model: [-50, -25, 25, 50]
+                Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: parent.width / 2 + (modelData / 50.0) * (parent.width / 2) - 1
+                    width: 2; height: 22; color: cDim
+                }
+            }
+            Rectangle {                                   // moving needle
+                visible: tunerScreen.live
+                width: 10; height: 50; radius: 3
+                color: tunerScreen.stateColor
+                anchors.verticalCenter: parent.verticalCenter
+                x: parent.width / 2
+                   + (Math.max(-50, Math.min(50, tunerScreen.cents)) / 50.0) * (parent.width / 2)
+                   - width / 2
+                Behavior on x { NumberAnimation { duration: 60 } }
+            }
+        }
+
+        // nearest open string + measured frequency (or "listening")
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 418
+            text: tunerScreen.live
+                  ? (tunerScreen.strg + "    " + tunerScreen.freq.toFixed(1) + " Hz")
+                  : "듣는 중…"
+            color: tunerScreen.live ? cText : cDim
+            font.family: uiFont; font.pixelSize: 28
+        }
+
+        // footer
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom; anchors.bottomMargin: 12
+            text: "종료: 풋스위치 아무거나"
             color: cDim; font.family: uiFont; font.pixelSize: 22
         }
     }

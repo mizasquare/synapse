@@ -29,12 +29,16 @@ config just means passing values at construction (`presenter.__init__`).
 
 | Option | Today | Notes |
 |---|---|---|
-| combo → action map | hard-coded in `presenter.handle_multiple_footswitches` | A+B=modechange, B+C=tuner(stub), C+D=tap-tempo. Make remappable. |
+| combo → action map | hard-coded in `presenter.handle_multiple_footswitches` | A+B=modechange, B+C=tuner, C+D=tap-tempo. Make remappable. |
 | `FOOTSWITCH_POLL_HZ` | `100` | Poll rate. |
 | `DEBOUNCE_SAMPLES` | `3` | Debounce window (≈30 ms @100 Hz). |
 | long-press / hold actions | none | Possible alternative to chords for entering modes. |
 
-## Tuner (not built yet)
+## Tuner (built — cochlea)
 
-- B+C chord is reserved for a tuner mode (`handle_multiple_footswitches` stub).
-  When built, give it its own config block here.
+- B+C chord opens the tuner (`presenter.enter_tuner`); any footswitch exits.
+- Tunables worth exposing here later: in-tune threshold (`TUNER_IN_TUNE_CENTS`),
+  LED strobe rate (`TUNER_BLINK_SLOW_HZ`/`TUNER_BLINK_FAST_HZ`), silence gate
+  (`cochlea.tuner_engine.TunerEngine.SILENCE_RMS`), A4 reference, bass mode
+  (longer analysis window). LED/threshold constants live in `presenter.py`;
+  DSP/gate constants in `cochlea/tuner_engine.py`.

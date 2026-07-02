@@ -17,6 +17,7 @@ Visual tokens (colors/fonts) live in QML; this bridge passes data + flags only.
 import logging
 import os
 import random
+import re
 import subprocess
 
 from PyQt6.QtCore import QObject, QTimer, pyqtProperty as Property, pyqtSignal as Signal, pyqtSlot as Slot
@@ -74,6 +75,7 @@ class QtView(QObject):
     dataChanged = Signal()
     monitorUpdated = Signal(str, float, float, str)  # (symbol, norm, value, display): per-meter live update
     levelUpdated = Signal('QVariant')                # overview IN/OUT JACK level meter (dict payload)
+    tunerUpdated = Signal('QVariant')                # tuner reading (dict payload; {} == listening)
     toastRequested = Signal(str)                     # transient on-screen message
     boardsChanged = Signal()                         # overview board-manager list changed
     banksChanged = Signal()                          # bank-manager lists changed
@@ -91,7 +93,7 @@ class QtView(QObject):
         self._cables = []
         self._graph_h = _GH
         self._foot = []
-        self._screen = "overview"   # "booting" | "overview" | "focus" | "taptempo" | "edit"
+        self._screen = "overview"   # "booting" | "overview" | "focus" | "taptempo" | "tuner" | "edit"
         self._focus = {}            # FOCUS payload for QML
         self._tap = {}              # TAP TEMPO payload for QML ({bpb, klass})
         self._board_list = []       # overview board-manager entries [{bundle,title,current}]
@@ -115,6 +117,13 @@ class QtView(QObject):
         self._level_timer = QTimer(self)
         self._level_timer.setInterval(33)
         self._level_timer.timeout.connect(self._emit_levels)
+
+        # TUNER screen: the cochlea engine (its own JACK client) is polled ~30 Hz
+        # while the tuner is up, and each reading pushed to QML via tunerUpdated.
+        self._tuner_src = None
+        self._tuner_timer = QTimer(self)
+        self._tuner_timer.setInterval(33)
+        self._tuner_timer.timeout.connect(self._emit_tuner)
 
     def set_presenter(self, presenter):
         self.presenter = presenter
@@ -277,6 +286,45 @@ class QtView(QObject):
             except Exception as exc:  # FileNotFoundError, TimeoutExpired, ...
                 log.warning("%s failed: %s", cmd, exc)
         self.toastRequested.emit(f"{label} 실패 — 권한 확인 필요 (sudo/polkit)")
+
+    # ------------------------------------------ master volume (ALSA / Pisound)
+    # The Pisound's only settable mixer control is a digital PCM playback volume
+    # (pre-DAC attenuation, 0-100). We reach it directly via `amixer` by card *name*
+    # ("pisound") so it survives card-index reshuffles -- bypassing mod-host/mod-ui,
+    # which expose only a read-only master (get_master_volume, no setter) via the HMI
+    # path. The board's physical knob remains the real post-DAC analog master.
+    _AMIXER_CARD = "pisound"
+    _AMIXER_CTL = "PCM"
+
+    @Slot(result=int)
+    def masterVolume(self):
+        """Current Pisound PCM playback volume as 0-100, or -1 if unavailable."""
+        try:
+            out = subprocess.run(["amixer", "-c", self._AMIXER_CARD, "sget", self._AMIXER_CTL],
+                                 capture_output=True, text=True, timeout=5)
+            if out.returncode != 0:
+                return -1
+            m = re.search(r"\[(\d+)%\]", out.stdout)
+            return int(m.group(1)) if m else -1
+        except Exception as exc:  # amixer missing, no card, timeout, ...
+            logging.getLogger(__name__).warning("masterVolume read failed: %s", exc)
+            return -1
+
+    @Slot(int)
+    def setMasterVolume(self, pct):
+        """Set the Pisound PCM playback volume (digital). pct is clamped to 0-100."""
+        pct = max(0, min(100, int(pct)))
+        try:
+            out = subprocess.run(["amixer", "-q", "-c", self._AMIXER_CARD,
+                                  "sset", self._AMIXER_CTL, f"{pct}%"],
+                                 capture_output=True, text=True, timeout=5)
+            if out.returncode != 0:
+                self.toastRequested.emit("볼륨 설정 실패 — Pisound 믹서 확인")
+                logging.getLogger(__name__).warning("setMasterVolume %s%% failed: %s",
+                                                    pct, out.stderr.strip())
+        except Exception as exc:
+            self.toastRequested.emit("볼륨 설정 실패 — amixer 없음/오류")
+            logging.getLogger(__name__).warning("setMasterVolume %s%% error: %s", pct, exc)
 
     @Slot()
     def refreshBoards(self):
@@ -537,6 +585,37 @@ class QtView(QObject):
         self.levelUpdated.emit({
             "inNorm": in_n, "inPeak": in_p, "inDb": in_db,
             "outNorm": out_n, "outPeak": out_p, "outDb": out_db,
+        })
+
+    # -- tuner screen (cochlea engine polling; mirrors the level-meter feed) ----
+    IN_TUNE_CENTS = 3.0    # |cents| under this reads as in-tune (green)
+
+    def show_tuner(self, engine):
+        """Presenter entered the tuner -> poll the engine and switch to the screen."""
+        self._tuner_src = engine
+        self._tuner_timer.start()
+        self._screen = "tuner"
+        self.dataChanged.emit()
+
+    def hide_tuner(self):
+        """Presenter left the tuner -> stop polling, back to overview."""
+        self._tuner_timer.stop()
+        self._tuner_src = None
+        self._screen = "overview"
+        self.dataChanged.emit()
+
+    def _emit_tuner(self):
+        src = self._tuner_src
+        if src is None:
+            return
+        r = src.get_reading()
+        if r is None:
+            self.tunerUpdated.emit({})           # nothing detected -> "listening"
+            return
+        self.tunerUpdated.emit({
+            "note": r.note, "cents": r.cents, "freq": r.freq_hz,
+            "ideal": r.ideal_hz, "confidence": r.confidence,
+            "string": r.string, "inTune": abs(r.cents) < self.IN_TUNE_CENTS,
         })
 
     def update_patch_display(self, instance, uri, file_path):

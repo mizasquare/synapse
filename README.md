@@ -104,12 +104,16 @@ injected at the seams — no separate UI fork).
   `editor` QML context-property bridges, plus the GUI-thread scheduler (`QtScheduler`, the
   Qt-event-loop implementation of the `scheduler.Scheduler` seam).
 - **`qml/`** — the UI: `main.qml` (overview, focus/inspector, footswitch strip, tap-tempo,
-  board manager), `ControlWidget.qml` (knob/toggle/trigger/enum), `MonitorWidget.qml`
+  tuner, board manager), `ControlWidget.qml` (knob/toggle/trigger/enum), `MonitorWidget.qml`
   (output-port meters + tuner), `PatchPicker.qml` (NAM/IR/cabsim file picker),
   `PedalboardEditorView.qml` (EDIT screen).
 - **`monitorfeed.py` / `levelmeter.py`** — live value feeds: a passive mod-ui websocket
   listener (output/monitor ports → focus-card meters) and an own JACK client tapping
   capture/playback (overview IN/OUT level meters).
+- **`cochlea/`** — the guitar tuner's DSP: dual-algorithm pitch detection (NSDF + HPS with
+  octave cross-check), mains-hum notching, and a threaded engine (One Euro smoothing,
+  note-lock, silence/onset gating). Its own JACK client; pure numpy. `python -m cochlea jack`
+  runs it standalone. Wired to the B+C footswitch chord via `presenter.enter_tuner`.
 - **`taptempo.py`** — tap-tempo engine (timing math + LED metronome, no GUI/hardware imports).
 - **`volumepedal.py`** — a **standalone** process (not imported by the app) that polls the
   two pedals on the ADS1115 and emits MIDI CC to the `GAAD67` port.
