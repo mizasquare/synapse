@@ -122,7 +122,7 @@ class TunerEngine:
     RING_CAPACITY = 16384
     DSP_RATE_HZ = 20
 
-    SILENCE_RMS = 0.003    # below this: no reading
+    SILENCE_RMS = 0.00285  # below this: no reading (nudged ~5% quieter to accept softer notes)
     ONSET_RATIO = 3.0      # RMS jump factor that means "new note plucked"
     ONSET_HOLDOFF = 1      # frames skipped after an onset (drop the attack transient)
     CONF_MIN = 0.30        # below this cross-check confidence: don't publish
