@@ -18,6 +18,17 @@ from configs import LOCAL_STORAGE
 # chord) and kept out of that cycle.
 TAP_TEMPO_MODE = 4
 
+# Tuner LED feedback (the 4 footswitch LEDs strobe while tuning, so you can tune
+# eyes-off the screen): off-pitch = a red strobe that speeds up as the note nears
+# pitch; the moment it lands = a short blue flourish, then steady blue. Silence
+# (engine gates on volume/confidence) = LEDs off.
+TUNER_IN_TUNE_CENTS = 3.0
+TUNER_FAR_CENTS = 50.0
+TUNER_LED_TICK_HZ = 30.0
+TUNER_BLINK_SLOW_HZ = 2.0     # far from pitch -> slow red blink
+TUNER_BLINK_FAST_HZ = 10.0    # near pitch -> fast, "nervous" red blink
+TUNER_CEREMONY_SEC = 0.5      # length of the blue flourish on hitting pitch
+
 class Presenter:
     def __init__(self, view, scheduler, backend=None, hardware=None,
                  tuner_source_factory=None):
@@ -50,6 +61,12 @@ class Presenter:
         self._tuner_source_factory = tuner_source_factory
         self._tuner_engine = None
         self._in_tuner = False
+        # LED-feedback strobe state (see TUNER_* constants + _tuner_led_tick).
+        self._tuner_led_handle = None
+        self._tuner_led_phase = 0.0
+        self._tuner_led_state = None
+        self._tuner_was_in_tune = False
+        self._tuner_tune_since = 0.0
         self._poll_thread = None
         self._poll_stop = None
         self.start_footswitch_polling(100)  # background thread @100Hz
@@ -976,12 +993,24 @@ class Presenter:
         self._in_tuner = True
         self.hwi.LED.stop_all_blinking()
         self.view.show_tuner(engine)
+        # Drive the footswitch LED strobe from the reading (GUI-thread ticker).
+        self._tuner_led_state = None
+        self._tuner_led_phase = 0.0
+        self._tuner_was_in_tune = False
+        self._tuner_led_handle = self.scheduler.schedule_interval(
+            self._tuner_led_tick, 1.0 / TUNER_LED_TICK_HZ)
 
     def exit_tuner(self):
-        """Leave the tuner -> stop the audio engine, back to overview."""
+        """Leave the tuner -> stop the audio engine + LED strobe, back to overview."""
         if not self._in_tuner:
             return
         self._in_tuner = False
+        if self._tuner_led_handle is not None:
+            self.scheduler.unschedule(self._tuner_led_handle)
+            self._tuner_led_handle = None
+        for i in range(4):
+            self.hwi.LED[i] = 0
+        self._tuner_led_state = 0
         engine, self._tuner_engine = self._tuner_engine, None
         if engine is not None:
             try:
@@ -989,6 +1018,47 @@ class Presenter:
             except Exception as e:
                 logging.error("tuner stop failed: %s", e)
         self.view.hide_tuner()
+
+    def _tuner_led_tick(self, dt):
+        """~30 Hz while tuning: drive the 4 footswitch LEDs from the latest reading.
+        Off-pitch = red strobe that speeds up as the note nears pitch; the moment
+        it lands = a short blue flourish, then steady blue; silence = LEDs off."""
+        engine = self._tuner_engine
+        if engine is None:
+            return
+        r = engine.get_reading()
+        if r is None:                              # engine already gates on volume/confidence
+            self._tuner_was_in_tune = False
+            self._tuner_led_phase = 0.0
+            self._set_all_leds(0)
+            return
+        if abs(r.cents) < TUNER_IN_TUNE_CENTS:
+            now = time.monotonic()
+            if not self._tuner_was_in_tune:        # just landed on pitch
+                self._tuner_was_in_tune = True
+                self._tuner_tune_since = now
+                self._tuner_led_phase = 0.0
+            if now - self._tuner_tune_since < TUNER_CEREMONY_SEC:
+                self._tuner_led_phase = (self._tuner_led_phase + 12.0 / TUNER_LED_TICK_HZ) % 1.0
+                self._set_all_leds(0b01 if self._tuner_led_phase < 0.5 else 0)   # quick blue flourish
+            else:
+                self._set_all_leds(0b01)           # steady blue = in tune
+            return
+        # off pitch: red strobe, faster the closer to pitch
+        self._tuner_was_in_tune = False
+        span = TUNER_FAR_CENTS - TUNER_IN_TUNE_CENTS
+        closeness = 1.0 - min(1.0, max(0.0, (abs(r.cents) - TUNER_IN_TUNE_CENTS) / span))
+        blink_hz = TUNER_BLINK_SLOW_HZ + closeness * (TUNER_BLINK_FAST_HZ - TUNER_BLINK_SLOW_HZ)
+        self._tuner_led_phase = (self._tuner_led_phase + blink_hz / TUNER_LED_TICK_HZ) % 1.0
+        self._set_all_leds(0b10 if self._tuner_led_phase < 0.5 else 0)
+
+    def _set_all_leds(self, state):
+        """Set all 4 footswitch LEDs to `state`, skipping redundant I2C writes."""
+        if state == self._tuner_led_state:
+            return
+        for i in range(4):
+            self.hwi.LED[i] = state
+        self._tuner_led_state = state
 
     def _tap_on_bpm(self, bpm):
         """Engine produced a refined BPM -> tell MODEP + update the on-screen widget."""
