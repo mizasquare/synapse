@@ -1998,6 +1998,12 @@ class EditorBridge(QObject):
             self._live_bypass(nid, n['bypass'])
             self._rebuild()
 
+    @Slot()
+    def toggleSelectedBypass(self):
+        # Inspector ACTIVE/BYPASSED chip: operate on the current selection.
+        # (sel is a plain attr, not a QML-visible Property — QML must not read it.)
+        self.toggleBypass(self.sel)
+
     @Slot(str, float, result=str)
     def setKnobNorm(self, sym, norm):
         """Live during a dial drag — update the value and return its formatted text.
