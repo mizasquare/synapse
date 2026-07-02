@@ -19,7 +19,8 @@ from configs import LOCAL_STORAGE
 TAP_TEMPO_MODE = 4
 
 class Presenter:
-    def __init__(self, view, scheduler, backend=None, hardware=None):
+    def __init__(self, view, scheduler, backend=None, hardware=None,
+                 tuner_source_factory=None):
         self.view = view
         # scheduler: event-loop timer abstraction (see scheduler.Scheduler).
         # Keeps the presenter and hardware layer free of any GUI-framework import.
@@ -42,6 +43,13 @@ class Presenter:
         self._mode_before_tap = 0
         self.tap_tempo = TapTempoEngine(
             self.scheduler, on_bpm=self._tap_on_bpm, on_beat=self._tap_on_beat)
+        # Guitar tuner (cochlea): the B+C chord enters it; an on-demand audio
+        # engine (its own JACK client on capture_1) runs only while the tuner
+        # screen is up. An off-device entry point can inject a synthetic audio
+        # source via tuner_source_factory (else the real JackSource is used).
+        self._tuner_source_factory = tuner_source_factory
+        self._tuner_engine = None
+        self._in_tuner = False
         self._poll_thread = None
         self._poll_stop = None
         self.start_footswitch_polling(100)  # background thread @100Hz
@@ -738,6 +746,11 @@ class Presenter:
 
     def handle_footswitch_event(self, status):
         print(f'Footswitch event: {status}')
+        # In the tuner, any footswitch activity exits back to overview
+        # (stomp-to-exit, like a hardware tuner pedal).
+        if self._in_tuner:
+            self.exit_tuner()
+            return
         # For each pressed (or released) footswitch, trigger a blink on its corresponding LED.
         for i, s in enumerate(status):
             # In tap-tempo mode the metronome owns the LEDs; skip the per-press
@@ -764,8 +777,8 @@ class Presenter:
         # Adjacent-pair chords select a mode (footswitch-combo convention):
         if status == [1, 1, 0, 0]:        # A+B -> cycle footswitch mode
             self.modechange()
-        elif status == [0, 1, 1, 0]:      # B+C -> tuner (not implemented yet)
-            pass
+        elif status == [0, 1, 1, 0]:      # B+C -> guitar tuner
+            self.enter_tuner()
         elif status == [0, 0, 1, 1]:      # C+D -> tap tempo
             self.enter_tap_tempo()
         elif status == [0, 0, 0, 0]:
@@ -943,6 +956,39 @@ class Presenter:
     def tap_input(self, *args):
         """A single footswitch press while in tap-tempo mode = one beat tap."""
         self.tap_tempo.tap()
+
+    def enter_tuner(self):
+        """B+C chord -> guitar tuner screen. Spins up an on-demand cochlea engine
+        (its own JACK client on capture_1) that runs only while tuning; any
+        footswitch press then exits (see handle_footswitch_event guard)."""
+        if self._in_tuner:
+            return
+        try:
+            from cochlea import TunerEngine, JackSource
+            make_source = self._tuner_source_factory or JackSource
+            engine = TunerEngine(make_source(), string_set="guitar")
+            engine.start()
+        except Exception as e:
+            logging.error("tuner start failed: %s", e)
+            self._notify("튜너: 오디오 입력 없음")
+            return
+        self._tuner_engine = engine
+        self._in_tuner = True
+        self.hwi.LED.stop_all_blinking()
+        self.view.show_tuner(engine)
+
+    def exit_tuner(self):
+        """Leave the tuner -> stop the audio engine, back to overview."""
+        if not self._in_tuner:
+            return
+        self._in_tuner = False
+        engine, self._tuner_engine = self._tuner_engine, None
+        if engine is not None:
+            try:
+                engine.stop()
+            except Exception as e:
+                logging.error("tuner stop failed: %s", e)
+        self.view.hide_tuner()
 
     def _tap_on_bpm(self, bpm):
         """Engine produced a refined BPM -> tell MODEP + update the on-screen widget."""

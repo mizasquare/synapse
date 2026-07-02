@@ -62,13 +62,19 @@ def main():
     # so --real never disturbs a running qt_main.
     view = QtView()
     scheduler = QtScheduler()
+    # Off-device the tuner has no JACK/guitar, so feed it a synthetic swept tone
+    # (watch the needle move). On-device qt_main injects nothing -> real JackSource.
+    from cochlea import ToneSweepSource
+    tuner_src = lambda: ToneSweepSource(110.0)
     if "--real" in argv:
         # No backend= / no set_backend -> default get_backend() = real ModepController.
-        presenter = Presenter(view, scheduler, hardware=FakeController())
+        presenter = Presenter(view, scheduler, hardware=FakeController(),
+                              tuner_source_factory=tuner_src)
     else:
         backend = FakeModepController()
         modepctrl.set_backend(backend)
-        presenter = Presenter(view, scheduler, backend=backend, hardware=FakeController())
+        presenter = Presenter(view, scheduler, backend=backend, hardware=FakeController(),
+                              tuner_source_factory=tuner_src)
     view.set_presenter(presenter)
 
     # Populate the view from the presenter before loading QML, so first paint is
@@ -78,6 +84,8 @@ def main():
         presenter.view_render_parameters(focus_inst)
     if "--tap" in argv:
         presenter.enter_tap_tempo()  # dev: open the TAP TEMPO screen for a screenshot
+    if "--tuner" in argv:
+        presenter.enter_tuner()      # dev: open the TUNER screen (swept-tone source)
 
     editor = EditorBridge()
     editor.set_presenter(presenter)   # EDIT screen seeds from the live/fake board
