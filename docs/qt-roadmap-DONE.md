@@ -10,6 +10,21 @@
 
 ---
 
+## Tier 3 정리 — 데드코드 스윕 ✅ (2026-07-03, 브랜치 `chore/deadcode-sweep`)
+
+> Kivy→Qt 이주 잔재 + 미배선 고아 일괄 제거. ~319줄 삭제(7파일). 구문·잔존참조·import 스모크 검증. 6에이전트 스윕 교차확인.
+
+- [x] **WebUI 온디바이스 경로** — `open_webui`/`close_webui`/`xdotool` + qtview `minimize`/`restore`/`enable_webui_button` 스텁 + FS mode-3(WEBUI). QML 미호출 죽은 섬. (웹UI는 폰/옆 데스크톱 접속으로 유지, 온디바이스 Chromium만 폐기.)
+- [x] **wvkbd 온스크린 키보드 체인** — `qtview.toggleKeyboard`(QML 미호출) → `presenter.toggle_keyboard` → `utils.toggle_wvkbd`. 설계상 텍스트입력=실물 HW 키보드가 정답(`main.qml:628` 주석 확인).
+- [x] **ABCD 완전 폐기** — `abcd_button_state`/`abcd_button_state_change`/`abcd_availability` + qtview `set_abcd_availability` 스텁 + modechange 호출. 기능(포커스 이펙터→FS 바인딩)은 **추후 오버뷰-인스펙터 이펙터 배정으로 재구현 예정** — 진짜 기능 심을 때 다시 넣기로. [[abcd-button-intent]].
+- [x] **pb_ss RECALL 섬** — 옛 mode-2(RECALL, 현 BANK로 대체) `recall_pb_ss`/`assign_pb_ss_to_footswitch` + `fs_assignment_data` init + `utils.load/save_footswitch_assignments`.
+- [x] **미배선 고아 메소드** — `set_beat`(bpm/bpb 래퍼, 미배선 — bpb 설정 신규는 로드맵으로 이관), modepctrl `get_pedalboards_in_bank`/`get_last_pedalboard`/`set_last_pedalboard`/`load_next_snapshot`/`load_prev_snapshot`/`get_snapshot_name`, `view_mode_change`/`view_update_footsw_display` 스텁, `footswitch_combo_assigns` 빈 dict.
+- [x] **editor_bridge QML 고아** — `roundTripOK`+`round_trip_ok`(체인), `rescanCatalog`, `effectCount`, 미사용 `QTimer` import.
+- [x] **기타** — `utils.optimize_for_newline`(Kivy 트렁케이터, 결과버림 버그), `cochlea/hum_filter.denotch_spectrum`, `configs` Kivy 상수(`SCALE_FACTOR`/`PLG·PRM_MAX_CHARACTERS`/`FONTS`/`FONT_DIR`/`DEFAULT_USER_FILES_DIR`).
+- **존치 판단**: `boot_lightshow`(부팅 LED 세리머니 — 라이브·호출됨, 로드맵의 "죽은 스텁" 표기는 오탐), `taptempo.set_meter`·`cochlea/tuner_engine.set_a4`(재사용 엔진 public API), `last_board` 파일/`LAST_PEDALBOARD` 상수(외부 pisound 버튼 스크립트 사용 가능성). `EffectPort.set_value` 잉여인자는 이미 active-record 청산(순수 데이터화) 때 제거됨 — 별도 할 일 없었음.
+
+---
+
 ## Tier 1 — 라이브 무대 신뢰성 ✅ (전부 완료)
 
 - [x] **HTTP timeout 추가** (2026-06-25, `1074b5e`) — `_request`에 `setdefault("timeout", 2.0)` + 8개 직접 호출

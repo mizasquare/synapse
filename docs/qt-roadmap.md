@@ -28,13 +28,13 @@
       남은 것: `volumepedal.py`(독립 프로세스) 앱 폴링 통합 + **부팅 페달 감지**(게인토글 프로브, ch0) +
       **config 사용여부 옵션** + **언플러그 시퀀스**(CC7→127 1초 램프·홀드→송신중단→홀드=풀 패스스루 페일세이프).
       코드개선(미적용): 단발→연속모드, 860→64~128SPS, EMA+히스테리시스 CC 지터제거. 설계 = 메모리 `soft-master-volume-plan`.
+- [ ] **박자표(bpb) 설정 기능** — 탭템포는 BPM만 실배선(`_tap_on_bpm`→`backend.set_bpm`). **박자표 변경 UI·경로 미구현.**
+      `backend.set_bpb`는 존재하나 라이브 호출자 없음(유일 호출처였던 미배선 래퍼 `set_beat`은 2026-07-03 삭제). transport/헤더에서 bpb 설정 배선 필요.
 - [ ] **모멘터리(홀드) 모드** — [`presenter.py`](../presenter.py) 폴링이 릴리스엣지 전용 → press-ON/release-OFF 없음.
 - [ ] **Bypass-all / 전역 풋스위치 액션** — presenter에 `bypass_all()` 없음.
-- [ ] **확장 콤보** — A+B/B+C/C+D 외(A+C·A+D·B+D·3중)는 "Invalid"([`presenter.py:804`](../presenter.py)).
-      콤보→액션 맵 리맵 가능화(→ [`config-todo.md`](config-todo.md)).
 - [ ] **이펙터 프리셋 (블록 저장/불러오기)** — 블록 단위 설정 저장. 위 "프리셋 적용"(LV2 preset)과 별개인 **진짜 신규**.
 - [ ] **이펙터 타입 구분(model vs param)** — 앰프/NAM(모델 줄 크게) vs 컴프/게이트(노브만). `patches` 유무/카테고리로 도출 — 모델에 작은 플래그.
-- [ ] **스냅샷 브라우저(오버뷰)** — 이름으로 점프. 보드 브라우저는 완료(오버뷰 보드매니저), 스냅샷 브라우저만 남음. 데이터·백엔드 있음(`get_snapshot_list`+`load_snapshot`) → 리스트/모달 UI만.
+- [ ] **스냅샷 브라우저 — 오버뷰 모달만 남음** — 이름으로 목록 점프 기능 자체는 **에디터에 구현됨**(`editor.selectSnapshot`→`presenter.go_to_snapshot`, 백엔드 `get_snapshot_list`+`load_snapshot`). 백엔드·presenter·에디터 UI 완료 → 남은 건 **오버뷰 화면 전용 스냅샷 모달**(오버뷰 보드매니저에 대응하는 스냅샷판) 하나뿐.
 - [ ] **LED 정상상태 색** — HW가 red/blue/purple 지원([`fsledctrl.py`](../hardwares/fsledctrl.py))인데 지금은 누를 때 blink만 → 할당/포커스 상태에 따라 색을 켜둔 채 유지.
 
 ## i18n / 테마 토큰화 (한 묶음 — 결정 2026-06-28)
@@ -53,15 +53,13 @@
 
 - [ ] **eglfs 풀스크린 부팅 전환** — 현재 labwc 위 창모드 잠정(`~/run_synapsepy.sh`, `dfd42c6`) → lightdm/labwc 제거 후 eglfs 직행. 롤백본 `run_synapsepy.sh.kivy-bak`.
 - [ ] **eglfs 런처 견고화** — DSI 2개 connected 자동선택 모호 → `run_qt.sh`+`eglfs_kms.json`로 card/커넥터/모드 고정 + `HIDECURSOR=1` + `QT_QUICK_BACKEND=software`.
-- [ ] **종료 어포던스** — `main.qml`에 Esc→`Qt.quit()`(현재 프로세스 kill만).
+- [ ] **종료 어포던스** — 깨끗한 종료는 `Ctrl+Q`→`Qt.quit()`로 이미 있음([`main.qml:30`](../qml/main.qml)). 남은 건 Esc 키/터치 종료 어포던스 추가.
 
 ## Tier 3 — 정리 / 폴리시
 
-- [ ] **WebUI 경로 통째 삭제** — `open_webui`/`close_webui`([`presenter.py:894,910`](../presenter.py)) + `xdotool`([:932](../presenter.py)) + `minimize`/`restore` 스텁. Qt 경로선 호출조차 안 됨(죽은 코드), 온디바이스 웹UI 폐기 결정.
-- [ ] **죽은 스텁 제거** — `view_mode_change`([`presenter.py:219`](../presenter.py)), `view_update_footsw_display`([:222](../presenter.py)), `footswitch_combo_assigns` 빈 dict([:50](../presenter.py)), `boot_lightshow`([:1104](../presenter.py)), `toggle_keyboard`(wvkbd, [:890](../presenter.py)), 옛 `recall_pb_ss`/`assign_pb_ss_to_footswitch`.
+- [x] **데드코드 스윕 (WebUI·wvkbd·ABCD·pb_ss·고아메소드 등 ~405줄)** — 완료 2026-07-03, → [`qt-roadmap-DONE.md`](qt-roadmap-DONE.md) "데드코드 스윕". (`boot_lightshow`는 라이브라 존치 — 옛 "죽은 스텁" 표기는 오탐이었음.)
 - [ ] **디바운스·콤보 판정을 하드웨어 추상화 단으로 이동** (2026-07-01 pi-stomp 착안) — 디바운스+릴리스엣지 콤보 검출이 앱 레이어에 섞임. pi-stomp처럼 이벤트 emit `Switch` 클래스로 내리고 Presenter는 구독만. **릴리스엣지 콤보 UX는 의미 유지, 위치만 이동.** → [`pi-stomp-comparison.md`](pi-stomp-comparison.md) §3(A).
 - [ ] **`[undefined]→bool` 경고** — [`main.qml`](../qml/main.qml) FOCUS 패치 visible 바인딩, 무해. `!!(...)`로 정리.
-- [ ] **`EffectPort.set_value` 잉여 인자** — [`modepctrl.py`](../modepctrl.py) 안 쓰는 `effect_instance`(self.instance 있음). 무해, 시그니처 정리.
 - [ ] **LED 블링크 후 정상색 미복원** — [`fsledctrl.py`](../hardwares/fsledctrl.py) blink 끝나면 OFF, 이전색 기억 없음(위 'LED 정상상태 색'과 연동).
 - [ ] **HTTP 50-왕복 초기화 배칭/캐시** — `initialize_modep_pedalboard`가 포트마다 1요청 → 느린망 로드지연. 배칭/캐시 검토.
 - [ ] **플랫 다크 카드 / 좌표계** — 시안 800×600 vs 실제 800×480 좌표 일관성 점검.
@@ -77,10 +75,10 @@
 
 ## 폐기 / 재배치 (의도 확정됨)
 
-- **ABCD 버튼** → 시안엔 없음. "포커스 이펙터를 FS에 수동 바인딩"은 FS 설정화면이 대체. 잔재 정리 Tier 3. [[abcd-button-intent]].
-- **WebUI(Chromium)** → 온디바이스 폐기(웹UI는 폰/옆 데스크톱 접속). 코드 삭제 Tier 3.
+- **ABCD 버튼** → 시안엔 없음. "포커스 이펙터를 FS에 수동 바인딩"은 오버뷰-인스펙터 이펙터 배정이 대체(재구현 예정). 잔재 삭제 완료(2026-07-03). [[abcd-button-intent]].
+- **WebUI(Chromium)** → 온디바이스 폐기(웹UI는 폰/옆 데스크톱 접속). 온디바이스 코드 삭제 완료(2026-07-03).
 - **베젤 합성영역**(save/saveas/pb/ss/mode/bpm) → 해체: 저장/로드→⚙MENU 허브(완료), PB/SS→콤보, 모드→FS 설정, BPM→Tap+헤더.
-- **온스크린 키보드(wvkbd/커스텀)** → 폐기(2026-06-28). 이름추천기+HW 키보드 폴백. 잔재 `toggle_keyboard` 죽은코드 Tier 3.
+- **온스크린 키보드(wvkbd/커스텀)** → 폐기(2026-06-28). 이름추천기+HW 키보드 폴백. 잔재(`toggle_keyboard`/`toggle_wvkbd`) 삭제 완료(2026-07-03).
 
 ## 미래 기능
 
@@ -96,7 +94,7 @@
 - **STOMP 클로저 버그 = 오탐.** `presenter.py`의 `e0~e3`는 루프변수 아닌 서로 다른 변수 4개 → 올바른 캡처. (캡션 정합은 `5449552`로 별개 완료.)
 - **RECALL 실행 = 정상.** 키 통일, `load_snapshot` 사용.
 - **`set_snapshot`(실 백엔드) 불필요.** `load_snapshot`으로 처리(죽은 스텁은 `16fbb2c`로 제거됨).
-- **WebUI minimize/restore = 블로커 아님.** Qt 경로 미호출 죽은 코드 → Tier 3 삭제 대상.
+- **WebUI minimize/restore = 블로커 아님.** Qt 경로 미호출 죽은 코드 → 삭제 완료(2026-07-03).
 
 ## 참조
 

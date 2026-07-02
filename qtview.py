@@ -391,16 +391,6 @@ class QtView(QObject):
             self.presenter.bank_move_board(idx, boardIdx, delta)
             self._push_banks()
 
-    @Slot()
-    def toggleKeyboard(self):
-        """Show/hide the on-screen keyboard (wvkbd) for text fields on the touch
-        device. No-op-ish where wvkbd isn't installed."""
-        if self.presenter:
-            try:
-                self.presenter.toggle_keyboard()
-            except Exception as e:
-                print(f"[view] keyboard toggle failed: {e}")
-
     @Slot(str, str, float)
     def setParameter(self, instance, symbol, value):
         """Knob drag -> presenter applies it (coalesced/throttled — see _flush_params).
@@ -622,7 +612,7 @@ class QtView(QObject):
         self.dataChanged.emit()
 
     def update_mode_display(self, mode):
-        self._mode = {0: "NAVIGATE", 1: "STOMP", 2: "BANK", 3: "WEBUI",
+        self._mode = {0: "NAVIGATE", 1: "STOMP", 2: "BANK",
                       4: "TAP TEMPO"}.get(mode, str(mode))
         self._rebuild_footswitches()
         self.dataChanged.emit()
@@ -645,19 +635,6 @@ class QtView(QObject):
         n = max(1, int(bpb or 4))
         klass = "WALTZ" if n % 3 == 0 else ("EVEN" if n % 2 == 0 else "ODD")
         return {"bpb": n, "klass": klass}
-
-    # presenter also calls these; no Qt UI for them in phase 1.
-    def set_abcd_availability(self, availabilities):
-        pass
-
-    def minimize(self):
-        pass
-
-    def restore(self):
-        pass
-
-    def enable_webui_button(self):
-        pass
 
     # --------------------------------------------------------- FOCUS builder
     @staticmethod
