@@ -1,6 +1,6 @@
 # pi-stomp 비교 연구 (2026-07-01 세션)
 
-`C:\Users\swson\pi-stomp`(treefallsound의 성숙한 오픈소스 MOD 스톰박스)와 synapse를
+`C:\Users\-----\pi-stomp`(treefallsound의 성숙한 오픈소스 MOD 스톰박스)와 synapse를
 축별로 비교하고, 무엇을 배워올지 분류한 기록. **참고문헌 성격** — 대부분 당장 작업 대상이
 아니라 "그들이 먼저 밟은 돌"을 알아두는 용도.
 
