@@ -1,13 +1,17 @@
 [Unit]
-Description=Synapse master volume (jack_mix_box gain stage in the output path)
+Description=Synapse master volume (control daemon + jack_mix_box gain stage)
 After=modep-mod-host.service modep-mod-ui.service jack.service
 BindsTo=jack.service
 Wants=modep-mod-ui.service
 
 [Service]
-# jack_mix_box is the tracked main process: it holds the gain and keeps passing
-# audio even if the router/UI dies. RT scheduling so the mixer runs clean in the
-# JACK graph. Runs as `modep` (in group `jack`) to reach the promiscuous server.
+# volumectl.py is the tracked main process: it spawns/owns jack_mix_box
+# ("synapsevol"), listens for raw volume CCs on its "control in" port (bus tap
+# + app slider), applies the taper and drives the mixer over a private CC7
+# link, and echoes applied state on "state out". The mixer keeps passing audio
+# at its last gain even if the app/UI dies. RT scheduling is inherited by the
+# spawned jack_mix_box. Runs as `modep` (in group `jack`) to reach the
+# promiscuous server. Needs the JACK-Client python package (see README).
 CPUSchedulingPolicy=fifo
 CPUSchedulingPriority=80
 LimitRTPRIO=99
@@ -16,9 +20,8 @@ User=modep
 Group=modep
 Environment=JACK_PROMISCUOUS_SERVER=jack
 
-# stereo channel, initial 0 dB (unity = transparent at boot), volume on MIDI CC 7
-ExecStart=/usr/bin/jack_mix_box --name=synapsevol --stereo --volume=0 7
-# insert it into mod-monitor -> system:playback once its ports are up
+ExecStart=/usr/bin/python3 /usr/local/bin/synapse-volumectl.py
+# insert the mixer into mod-monitor -> system:playback once its ports are up
 ExecStartPost=/usr/local/bin/synapse-mastervol-rewire.sh synapsevol
 # on stop/restart, restore the direct path so audio survives
 ExecStopPost=/usr/local/bin/synapse-mastervol-revert.sh synapsevol

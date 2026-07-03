@@ -1,0 +1,20 @@
+[Unit]
+Description=Synapse reflex (foot-pedal MIDI device: volume + expression)
+# No hard deps: reflex retries the GAAD67 amidithru port until it appears, and
+# the management socket works even before MIDI is up (calibration over SSH).
+After=local-fs.target sound.target
+
+[Service]
+# Runs as `miza`: owns ~/.modep (calibration/mapping/socket) and is in the
+# i2c group for the ADS1115. Executed from the repo checkout because reflex.py
+# imports the in-repo ADS1115 driver (hardwares/). The venv provides mido +
+# python-rtmidi + smbus2 — adjust both paths if the checkout/venv move.
+User=miza
+Group=miza
+WorkingDirectory=/home/miza/synapse
+ExecStart=/home/miza/synapse-venv/bin/python reflex.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
