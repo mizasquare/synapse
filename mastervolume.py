@@ -1,17 +1,25 @@
-"""Master-volume control: send MIDI CC7 to the jack_mix_box gain stage ("synapsevol").
+"""Master-volume *controller*: a dumb MIDI fader talking to synapse-volume.
 
-The actual gain lives in an independent JACK client (the synapse-mastervol systemd
-service inserts jack_mix_box into mod-monitor -> system:playback). synapse only
-*controls* it, here, by emitting MIDI CC7 into its "midi in" port. Keeping the audio
-path out of this process means a GUI crash never kills the sound -- the mixer holds
-its last gain.
+Volume authority lives in the synapse-volume control daemon (the box's system
+volume device — deploy/volume-service/volumectl.py). It owns the taper and the
+private CC7 link into the jack_mix_box gain stage; keeping the audio path and
+the volume law out of this process means a GUI crash never kills the sound OR
+the pedal's volume control.
 
-MIDI writes must happen inside JACK's process callback, so the GUI thread just parks
-a target value (0-127) and the callback emits a CC when it changes. Connecting to the
-gain client is retried lazily (set_percent), since the service may come up after us.
+This class is therefore just another controller on that device, like the
+reflex pedal:
+- sends raw linear CC (0-127, no taper) to "synapse-volume:control in" over a
+  direct JACK link;
+- subscribes to "synapse-volume:state out" for the applied-state echo (the
+  motorized-fader feedback idiom), so the slider follows pedal moves and gets
+  the current value on (re)connect without asking.
+
+MIDI writes/reads must happen inside JACK's process callback, so the GUI
+thread just parks a target and polls the parked echo (poll_echo) — the qtview
+ticker marshals it into the QML slider. Connecting is retried lazily
+(set_percent/available), since the service may come up after us.
 """
 import logging
-import math
 
 try:
     import jack
@@ -20,54 +28,45 @@ except Exception:                       # off-device / no JACK -> no-op controll
 
 log = logging.getLogger(__name__)
 
-_CC = 7                                  # CC7 = Channel Volume
+_CC = 102                                # raw volume command (synapse-volume's listen CC)
 _STATUS = 0xB0                           # Control Change, MIDI channel 1
-_DEST = "synapsevol:midi in"            # jack_mix_box "midi in" (name from the service)
-
-# jack_mix_box's fader is linear in dB with CC127 = 0 dB (unity). Measured
-# empirically (2026-07, 256/48k): dB ~= 0.5545*CC - 70.4, i.e. ~0.5545 dB per CC
-# step, CC0 = mute. We invert that to turn a wanted dB into a CC. Recalibrate
-# these two numbers if the jack_mixer build changes its scale.
-_DB_PER_CC = 0.5545
-_CC_UNITY = 127
-
-# Slider taper: amplitude = (pct/100) ** _TAPER_EXP, then -> dB -> CC. A plain
-# linear pct->CC felt far too quiet in the middle (50% landed at ~-35 dB), because
-# the CC axis is already dB. Shaping amplitude instead gives a natural volume law:
-#   EXP 1.0 = linear amplitude (50% -> -6 dB),  2.0 = square law (50% -> -12 dB).
-# Bump toward 1.0 for a louder middle, toward 3.0 for finer low-level control.
-_TAPER_EXP = 2.0
+_DEST = "synapse-volume:control in"      # commands go here (direct link)
+_SRC = "synapse-volume:state out"        # applied-state echo comes from here
 
 
-def _pct_to_cc(pct):
-    """Map a 0-100 slider position to a jack_mix_box CC via an amplitude taper."""
-    pct = max(0.0, min(100.0, float(pct)))
-    if pct <= 0.0:
-        return 0                                   # full mute
-    if pct >= 100.0:
-        return _CC_UNITY                           # unity (0 dB)
-    amp = (pct / 100.0) ** _TAPER_EXP
-    db = 20.0 * math.log10(amp)
-    return max(0, min(127, round(_CC_UNITY + db / _DB_PER_CC)))
+def _pct_to_raw(pct):
+    """0-100 slider position -> raw linear CC (the daemon applies the taper)."""
+    pct = max(0, min(100, int(pct)))
+    return round(pct * 127 / 100)
+
+
+def _raw_to_pct(raw):
+    return round(max(0, min(127, int(raw))) * 100 / 127)
 
 
 class MasterVolume:
-    """Sends CC7 to the gain client. `available()` is False when JACK or the gain
-    client isn't there, so the UI can grey the slider out."""
+    """Raw-CC controller + state subscriber for the synapse-volume daemon.
+    `available()` is False when JACK or the daemon isn't there, so the UI can
+    grey the slider out."""
 
-    def __init__(self, name="SynapseMasterVol", dest=_DEST, default_pct=100):
+    def __init__(self, name="SynapseMasterVol", dest=_DEST, src=_SRC, default_pct=100):
         self._dest = dest
-        self._pct = max(0, min(100, int(default_pct)))   # slider truth (0-100)
-        self._target = _pct_to_cc(self._pct)             # CC actually driven
+        self._src = src
+        self._pct = max(0, min(100, int(default_pct)))   # last commanded/echoed pct
+        self._target = _pct_to_raw(self._pct)            # raw CC actually driven
         self._last = -1                  # last CC actually emitted (-1 = force send)
+        self._echo = -1                  # last raw echoed by the daemon (RT-parked)
+        self._echo_seen = -1             # last echo consumed by poll_echo()
         self._client = None
         self._out = None
+        self._in = None
         self._ok = False
         if jack is None:
             return
         try:
             self._client = jack.Client(name, no_start_server=True)
             self._out = self._client.midi_outports.register("out")
+            self._in = self._client.midi_inports.register("in")
 
             @self._client.set_process_callback
             def _process(_frames):
@@ -76,6 +75,11 @@ class MasterVolume:
                 if t != self._last:
                     self._out.write_midi_event(0, bytes([_STATUS, _CC, t & 0x7F]))
                     self._last = t
+                for _offset, data in self._in.incoming_midi_events():
+                    if len(data) == 3:
+                        b = bytes(data)
+                        if b[0] & 0xF0 == _STATUS and b[1] == _CC:
+                            self._echo = b[2] & 0x7F   # park; GUI ticker collects
 
             self._client.activate()
             self._ok = True
@@ -85,14 +89,21 @@ class MasterVolume:
             self._ok = False
 
     def _try_connect(self):
-        """Connect out -> gain client if not already. Returns True when connected.
-        Resets _last so the current target is (re)sent on a fresh connection."""
+        """Connect out -> daemon and daemon echo -> in, if not already.
+        Returns True when the command link is up. Resets _last so the current
+        target is (re)sent on a fresh connection."""
         if not self._ok:
             return False
         try:
             dst = self._client.get_port_by_name(self._dest)
         except Exception:
-            return False                 # gain client not up yet
+            return False                 # daemon not up yet
+        try:
+            src = self._client.get_port_by_name(self._src)
+            if src not in self._in.connections:
+                self._client.connect(src, self._in)
+        except Exception:
+            pass                         # echo is best-effort; commands still work
         try:
             if dst in self._out.connections:
                 return True
@@ -107,15 +118,28 @@ class MasterVolume:
         return self._try_connect()
 
     def set_percent(self, pct):
-        """Park a 0-100 target (tapered to a CC); the process callback emits CC7."""
+        """Park a 0-100 target as a raw CC; the process callback emits it."""
         self._pct = max(0, min(100, int(pct)))
-        self._target = _pct_to_cc(self._pct)
+        self._target = _pct_to_raw(self._pct)
         self._try_connect()              # (re)establish if the service came up late
         return self._pct
 
     def get_percent(self):
-        """App-side truth: the slider position we're driving (synapse owns the
-        master). Returns the pct, not a CC-derived value, so the taper round-trips."""
+        """Best current truth: the last daemon echo if one arrived (any
+        controller may have moved the volume), else the last commanded pct."""
+        if self._echo >= 0:
+            return _raw_to_pct(self._echo)
+        return self._pct
+
+    def poll_echo(self):
+        """Consume a fresh daemon echo: returns the new pct, or None if the
+        applied state hasn't changed since the last poll. Called by the GUI
+        ticker (the RT callback only parks the int)."""
+        e = self._echo
+        if e < 0 or e == self._echo_seen:
+            return None
+        self._echo_seen = e
+        self._pct = _raw_to_pct(e)
         return self._pct
 
     def close(self):

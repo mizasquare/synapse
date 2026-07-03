@@ -40,12 +40,12 @@ Synapse replaces that with a **purpose-built touchscreen front end** and wires i
 |---|---|---|---|---|
 | Footswitches | 4 | MCP23017 (I²C bus 1) | `0x27`, port A pins 0–3 | Active-low, internal pull-up; pressed → reads 1 |
 | Ring LEDs | 4× red/blue pair (8) | MCP23017 (I²C bus 1) | `0x27`, port B pins 8–15 | Active-low; red/blue pins paired high→low |
-| Volume pedal | 1 | ADS1115 (I²C bus 1) | `0x49`, channel 0 | Potentiometer → MIDI CC 7 |
-| Expression pedal | 1 | ADS1115 (I²C bus 1) | `0x49`, channel 1 | Potentiometer → MIDI CC 11 |
+| Volume pedal | 1 | ADS1115 (I²C bus 1) | `0x49`, channel 0 | Potentiometer → MIDI CC 102 (reflex) |
+| Expression pedal | 1 | ADS1115 (I²C bus 1) | `0x49`, channel 1 | Potentiometer → MIDI CC 103 (reflex) |
 | Touchscreen | 1 | `ft5x06` | `/dev/input/event9` | 7" capacitive |
 
 *(All wiring above is derived from the code — see [`hardwares/fsledctrl.py`](hardwares/fsledctrl.py)
-and [`volumepedal.py`](volumepedal.py) — not from a separate hardware spec.)*
+and [`reflex.py`](reflex.py) — not from a separate hardware spec.)*
 
 **Platform:** Raspberry Pi 5 (RP1, `pinctrl-rp1`), 8 GB RAM · Patchbox OS · system Python 3.11 ·
 MODEP 1.13.0 · labwc (Wayland) compositor · MIDI via pisound / `amidithru GAAD67`.
@@ -116,8 +116,10 @@ injected at the seams — no separate UI fork).
   note-lock, silence/onset gating). Its own JACK client; pure numpy. `python -m cochlea jack`
   runs it standalone. Wired to the B+C footswitch chord via `presenter.enter_tuner`.
 - **`taptempo.py`** — tap-tempo engine (timing math + LED metronome, no GUI/hardware imports).
-- **`volumepedal.py`** — a **standalone** process (not imported by the app) that polls the
-  two pedals on the ADS1115 and emits MIDI CC to the `GAAD67` port.
+- **`reflex.py`** — the box's foot-pedal **MIDI device** (a **standalone** service, not
+  imported by the app): polls the two pedals on the ADS1115 and emits MIDI CC (volume 102 /
+  expression 103) to the `GAAD67` port; owns its own calibration and per-axis channel/CC
+  mapping, managed over a Unix socket. See [`deploy/reflex-service/`](deploy/reflex-service/).
 
 ### Footswitch modes
 `presenter.footswitch_mode`: `0` = pedalboard navigation · `1` = STOMP (4 category-filtered
@@ -148,8 +150,8 @@ synapse/
 ├── monitorfeed.py      # passive mod-ui websocket → output-port meters
 ├── levelmeter.py       # own JACK client → overview IN/OUT level meters
 ├── taptempo.py         # tap-tempo engine (timing + LED metronome)
-├── volumepedal.py      # standalone pedal → MIDI CC bridge (separate process)
-├── mastervolume.py     # CC7 master-volume sender (dB taper) → synapsevol JACK gain stage
+├── reflex.py           # standalone foot-pedal MIDI device (separate service; socket-managed)
+├── mastervolume.py     # master-volume controller (raw CC + state echo) → synapse-volume daemon
 ├── configs.py          # MODEP paths, patch-file dir/type maps, synapsin socket path
 ├── utils.py            # helpers
 ├── run_synapsepy.sh    # launch script (activate venv → python qt_main.py)
@@ -158,8 +160,8 @@ synapse/
 ├── fixtures/           # off-device dev fixtures (fake-backend JSON)
 ├── resources/          # images, fonts (VT323), icons
 ├── mod-tweaks/         # patched mod-ui source + deploy.sh (see below)
-├── deploy/             # on-device services (volume-service: soft master volume)
-├── tests/              # qt_smoke · taptempo_selftest · stress_add_test · cochlea_selftest (run from repo root)
+├── deploy/             # on-device services (volume-service: soft master volume · reflex-service: pedals)
+├── tests/              # qt_smoke · taptempo_selftest · cochlea_selftest · reflex_selftest (run from repo root)
 ├── tools/              # dev/bring-up scripts: dump_effects · hwitest · ADStest · test (obsolete — wvkbd retired)
 ├── docs/               # design / diagnosis / roadmap notes
 ├── REFERENCES.md       # external + live-system references

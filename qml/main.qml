@@ -746,11 +746,20 @@ Window {
                         width: parent.width; spacing: 16
                         property int  masterVol: 100
                         property bool volAvail: true
-                        // seed from the live mixer whenever this leaf opens
+                        // seed from the live volume daemon whenever this leaf opens
                         onVisibleChanged: if (visible) {
                             var v = view.masterVolume();
                             volAvail = v >= 0;
                             masterVol = v >= 0 ? v : 0;
+                        }
+                        // follow the daemon's applied-state echo (the reflex
+                        // pedal or any controller may move the volume) — but
+                        // never fight an active finger drag.
+                        Connections {
+                            target: view
+                            function onMasterVolumeEchoed(p) {
+                                if (!volDrag.pressed) configLeaf.masterVol = p;
+                            }
                         }
                         // Throttle CC writes DURING a drag: leading edge fires
                         // immediately, then flush the latest value at most every
@@ -801,6 +810,7 @@ Window {
                                                 volTrack.width * configLeaf.masterVol / 100 - width / 2))
                                 }
                                 MouseArea {
+                                    id: volDrag
                                     anchors.fill: parent; preventStealing: true
                                     function setFromX(mx) {
                                         var p = Math.max(0, Math.min(1, mx / volTrack.width));

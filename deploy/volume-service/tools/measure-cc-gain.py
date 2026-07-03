@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Measure jack_mix_box's MIDI-CC -> gain curve, to (re)calibrate the volume taper.
 
-Why: mastervolume.py inverts jack_mix_box's fader law to turn a slider % into a CC.
-That law (CC127 = 0 dB unity, ~0.5545 dB per CC step, CC0 = mute -- a linear-in-dB
-fader) was measured on this Pi. On another machine / a different jack_mixer build the
-scale may differ, so run this and copy the reported constants into mastervolume.py
-(_DB_PER_CC, _CC_UNITY).
+Why: the synapse-volume control daemon (volumectl.py) inverts jack_mix_box's fader
+law to turn a raw volume command into a mixer CC. That law (CC127 = 0 dB unity,
+~0.5545 dB per CC step, CC0 = mute -- a linear-in-dB fader) was measured on this
+Pi. On another machine / a different jack_mixer build the scale may differ, so run
+this and copy the reported constants into volumectl.py (DB_PER_CC, CC_UNITY).
 
 How: spawns its own jack_mix_box, feeds a 440 Hz sine into it via JACK, reads the
 output RMS at each CC, and fits dB = m*CC + b. Self-contained -- touches no other
@@ -69,7 +69,7 @@ try:
         ys = np.array([p[1] for p in pts], float)
         m, b = np.polyfit(xs, ys, 1)
         print("\nfit: dB = %.4f*CC %+.2f" % (m, b))
-        print("=> mastervolume.py:  _DB_PER_CC = %.4f   _CC_UNITY = %d"
+        print("=> volumectl.py:  DB_PER_CC = %.4f   CC_UNITY = %d"
               % (m, round((0.0 - b) / m)))
 finally:
     proc.terminate()

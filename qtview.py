@@ -78,6 +78,7 @@ class QtView(QObject):
     toastRequested = Signal(str)                     # transient on-screen message
     boardsChanged = Signal()                         # overview board-manager list changed
     banksChanged = Signal()                          # bank-manager lists changed
+    masterVolumeEchoed = Signal(int)                 # synapse-volume applied-state echo (pct)
 
     PARAM_THROTTLE_MS = 40   # max ~25 host writes/s during a knob drag
 
@@ -286,29 +287,43 @@ class QtView(QObject):
                 log.warning("%s failed: %s", cmd, exc)
         self.toastRequested.emit(f"{label} 실패 — 권한 확인 필요 (sudo/polkit)")
 
-    # ------------------------------------------ master volume (JACK gain stage)
+    # ------------------------------------- master volume (synapse-volume daemon)
     # Pisound's ALSA PCM control is driver read-only (access=r-------), so software
-    # volume can't live there. Instead a jack_mix_box gain client ("synapsevol",
-    # started by the synapse-mastervol service) sits in mod-monitor -> system:playback,
-    # and we drive its level with MIDI CC7 via mastervolume.MasterVolume. Lazily
-    # created so app startup never blocks on it.
+    # volume can't live there. Volume authority is the synapse-volume control
+    # daemon (synapse-mastervol service): it owns the taper and the jack_mix_box
+    # gain stage in mod-monitor -> system:playback. This app is just one of its
+    # controllers — mastervolume.MasterVolume sends raw CC commands and subscribes
+    # to the applied-state echo, so the slider follows the reflex pedal too.
+    # Lazily created so app startup never blocks on it.
     def _mastervol(self):
         mv = getattr(self, "_mastervol_ctl", None)
         if mv is None:
             from mastervolume import MasterVolume
             mv = self._mastervol_ctl = MasterVolume()
+            # Echo ticker: the JACK RT callback only parks the value; this GUI
+            # timer collects it and signals QML (same marshalling discipline as
+            # the level meter). Cheap int compare -> fine to run continuously.
+            t = self._mastervol_echo_timer = QTimer(self)
+            t.setInterval(150)
+            t.timeout.connect(self._poll_mastervol_echo)
+            t.start()
         return mv
+
+    def _poll_mastervol_echo(self):
+        pct = self._mastervol_ctl.poll_echo()
+        if pct is not None:
+            self.masterVolumeEchoed.emit(pct)
 
     @Slot(result=int)
     def masterVolume(self):
-        """Current master volume 0-100 (synapse-owned), or -1 if the gain client
-        isn't reachable (service not running / no JACK)."""
+        """Current master volume 0-100 (daemon echo, else last commanded), or -1
+        if the volume daemon isn't reachable (service not running / no JACK)."""
         mv = self._mastervol()
         return mv.get_percent() if mv.available() else -1
 
     @Slot(int)
     def setMasterVolume(self, pct):
-        """Drive the JACK gain stage to pct (0-100) via CC7."""
+        """Command the volume daemon to pct (0-100) as a raw linear CC."""
         self._mastervol().set_percent(pct)
 
     @Slot()
