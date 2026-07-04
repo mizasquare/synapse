@@ -22,9 +22,13 @@ synapse `model.py`/`modepctrl.py`/`plugincatalog.py`의 **실 페달보드·LV2 
 화이트리스트 자체는 언제든 catalog 툴로 재큐레이션 가능(증분 유지).
 
 ## C. 스텁된 인터랙션 우선순위 `[구현/일부 해결]`
-시안엔 있으나 아직 포팅 안 함 (토스트로 스텁): ~~피커(place/replace)~~ · **move** ·
+시안엔 있으나 아직 포팅 안 함 (토스트로 스텁): ~~피커(place/replace)~~ · ~~move~~ ·
 **보드/스냅샷 관리(rename/save/delete)** · **confirm 오버레이**. 로직은 시안에 다 있음.
 → 제안 순서: 피커 → move → 관리 → confirm.
+- **[해결] move** [사용자 설계]: 슬롯 메뉴 Move → 레벨0(체인) 복귀, 대상 노드만 5px
+  위로 오프셋(들고 있는 듯, 반전 셀). ENC0 회전=인접 슬롯과 swap(전체 체인 재드로),
+  ENC0 클릭=그 자리 착지(dirty, "MOVED"), ENC0 홀드=취소(move_from 복원). 하단 패널에
+  MOVING/노드명/슬롯/조작 힌트. `moving`/`move_from` 상태, `--walk`·렌더 검증됨.
 - **[해결] 피커(place/replace)**: `geco_whitelist.json`(큐레이션 8버킷) 로드.
   **상하 분할 레이아웃** [사용자 요청]:
   - 위: 노드 체인 — 대상 슬롯을 dashed 셀로, 들어갈 카테고리 약어 미리보기(라이브).

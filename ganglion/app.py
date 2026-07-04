@@ -10,12 +10,13 @@ Ported so far (the navigation spine + picker):
   depth -1 (glance: board/snapshot scroll) · slot menu (bypass/remove/back) ·
   picker (place/replace: split screen — chain on top, category|plugin strips
   below; ENC1 turns/selects, ENC0-hold backs — from the curated
-  geco_whitelist.json) · SYSTEM (ENC0 scroll-left-past-start) · TUNER (ENC1 hold) ·
-  COMBO (save).
+  geco_whitelist.json) · move (Move picks the node up at depth 0 — lifted 5px;
+  ENC0 shifts slots, click drops, hold cancels) · SYSTEM (ENC0
+  scroll-left-past-start) · TUNER (ENC1 hold) · COMBO (save).
 
-Stubbed with a toast + [DECISION] marker (see docs/decisions.md): move,
-board/snapshot manage (rename/save/delete), confirm overlay. The picker's placed
-nodes use per-bucket placeholder knobs — wiring to synapse's real
+Stubbed with a toast + [DECISION] marker (see docs/decisions.md): board/snapshot
+manage (rename/save/delete), confirm overlay. The picker's placed nodes use
+per-bucket placeholder knobs — wiring to synapse's real
 model/modepctrl/plugincatalog params is still pending.
 
 Run (needs a TTY):  python3 ganglion/app.py
@@ -150,6 +151,8 @@ class AppState:
     pick: str = ""            # ""=off, "cat"=category list, "fx"=plugin list
     pick_cat: int = 0
     pick_fx: int = 0
+    moving: bool = False      # picked-up node: ENC0 shifts slot, click drops
+    move_from: int = 0        # original index (ENC0-hold cancel restores it)
     tuner: bool = False
     tcents: int = 6
     tnote: str = "A"
@@ -215,6 +218,13 @@ class AppController:
                 st.snap = (st.snap + d) % len(SNAPS)
             return
         # depth 0
+        if st.moving:                        # picked-up node: ENC0 swaps with neighbour
+            if enc == 0:
+                j = st.node + d
+                if 0 <= j < len(st.board):
+                    st.board[st.node], st.board[j] = st.board[j], st.board[st.node]
+                    st.node = j
+            return
         if enc == 0:
             nn = st.node + d
             if nn < 0:                       # scroll left past chain start -> SYSTEM
@@ -277,6 +287,11 @@ class AppController:
             self._toast("TODO: manage " + ("board" if enc == 0 else "snap"))
             return
         # depth 0
+        if st.moving:                          # ENC0 click = drop here (commit)
+            if enc == 0:
+                st.moving, st.dirty = False, True
+                self._toast("MOVED")
+            return
         if enc == 0:
             st.menu_open, st.menu = True, 0
         elif not self._cur()["empty"]:
@@ -296,7 +311,9 @@ class AppController:
         elif act in ("place", "replace"):
             st.menu_open = False
             st.pick, st.pick_cat, st.pick_fx = "cat", 0, 0
-        else:  # move -> [DECISION] move not ported yet
+        elif act == "move":                    # back to chain, pick up this node
+            st.menu_open, st.moving, st.move_from = False, True, st.node
+        else:
             st.menu_open = False
             self._toast("TODO: " + act)
 
@@ -319,6 +336,12 @@ class AppController:
             if enc == 0:
                 st.pick = "cat" if st.pick == "fx" else ""
             return
+        if st.moving:                         # ENC0 hold = cancel move, restore position
+            if enc == 0:
+                node = st.board.pop(st.node)
+                st.board.insert(st.move_from, node)
+                st.node, st.moving = st.move_from, False
+            return
         if enc == 0:                          # ENC0 hold = zoom out one level
             if st.sys:
                 st.sys = False
@@ -332,6 +355,8 @@ class AppController:
             st.tuner = True
 
     def combo(self):
+        if self.st.moving or self.st.pick:
+            return
         self.st.depth, self.st.dirty = -1, False
         self._toast("SNAPSHOT SAVED")
 
@@ -381,18 +406,19 @@ def _chain(st):
         x = 2 + j * step
         cells.append((idx, x, x + cw - 1))
         sel = idx == st.node
+        cy = ty - 5 if (st.moving and sel) else ty   # lift the picked-up node
         if n["empty"]:
-            s.dashed(x, ty, cw, ch, on=2, off=2)
-            s.T("+", x + 8, ty + 8, 12, fill=1)
+            s.dashed(x, cy, cw, ch, on=2, off=2)
+            s.T("+", x + 8, cy + 8, 12, fill=1)
         elif sel:
-            s.box(x, ty, cw, ch, fill=True)
-            s.T(n["abbr"], x + 3, ty + 9, 12, fill=0)
+            s.box(x, cy, cw, ch, fill=True)
+            s.T(n["abbr"], x + 3, cy + 9, 12, fill=0)
         elif n["bypass"]:
-            s.dashed(x, ty, cw, ch, on=1, off=2)
-            s.T(n["abbr"], x + 3, ty + 9, 12)
+            s.dashed(x, cy, cw, ch, on=1, off=2)
+            s.T(n["abbr"], x + 3, cy + 9, 12)
         else:
-            s.box(x, ty, cw, ch)
-            s.T(n["abbr"], x + 3, ty + 9, 12)
+            s.box(x, cy, cw, ch)
+            s.T(n["abbr"], x + 3, cy + 9, 12)
     for a in range(len(cells) - 1):
         if cells[a + 1][1] - 1 >= cells[a][2] + 1:
             s.d.rectangle([cells[a][2] + 1, wy, cells[a + 1][1] - 1, wy], fill=1)
@@ -403,6 +429,14 @@ def _chain(st):
             s.d.rectangle([cells[-1][2] + 1, wy, WIDTH - 1, wy], fill=1)
     s.hline(0, 40, 128)
     n = st.board[st.node]
+    if st.moving:                              # move mode: instructions in place of knobs
+        s.T("MOVING", 4, 45, 16)
+        s.T(n["name"], 4, 66, 8)
+        s.T("SLOT %d/%d" % (st.node + 1, len(st.board)), 4, 78, 8)
+        s.T("e0 turn = shift", 4, 96, 8)
+        s.T("click drop  hold cancel", 4, 108, 8)
+        _toast_over(s, st)
+        return s.img
     if n["empty"]:
         s.T("EMPTY SLOT %d" % (st.node + 1), 6, 66, 12)
         s.T("CLICK e0 -> add FX", 6, 84, 8)
@@ -621,6 +655,8 @@ def leds(st):
         return ("purple", "purple")
     if st.pick:                               # ENC0=back(grey), ENC1=operate(cat colour)
         return ("grey", BUCKETCOL.get(st.wl[st.pick_cat]["key"], "amber"))
+    if st.moving:                             # ENC0 holds the node; ENC1 idle
+        return (BUCKETCOL.get(n["bucket"], "amber"), OFF)
     if st.sys:
         return ("grey", OFF)
     if st.depth == -1:
@@ -679,14 +715,22 @@ def _walk():
     do("s", "place")       # enc1 click: place node -> board[0] replaced
     do("w", "menu2")       # reopen menu on the freshly placed node
     do("w", "bypass2")     # bypass it (sanity: node model intact)
+    # move: pick up node 0, shift right two slots, drop
+    do("w", "menu3")       # slot menu on node 0
+    do("t", "to-move")     # menu 0 -> 1 (Move)
+    do("w", "pickup")      # exec -> moving (back at chain, node lifted)
+    print("      order   %s" % [b["abbr"] or "--" for b in c.st.board])
+    do("tt", "shift>>")    # enc0 turn x2: swap node 0 -> 2
+    print("      order   %s" % [b["abbr"] or "--" for b in c.st.board])
+    do("w", "drop")        # enc0 click: commit landing at slot 2
 
 
 def _snap(st):
     n = st.board[st.node]
     kv = fmt(n["knobs"][st.knob]) if not n["empty"] and n["knobs"] else "--"
-    return ("d=%d node=%d(%s) k=%d[%s] lock=%d dirty=%d menu=%d pick=%s sys=%d tun=%d pb=%d snap=%d toast=%r"
+    return ("d=%d node=%d(%s) k=%d[%s] lock=%d dirty=%d menu=%d pick=%s mv=%d sys=%d tun=%d pb=%d snap=%d toast=%r"
             % (st.depth, st.node, n["abbr"] or "--", st.knob, kv, st.locked, st.dirty,
-               st.menu_open, st.pick or "-", st.sys, st.tuner, st.pb, st.snap, st.toast))
+               st.menu_open, st.pick or "-", st.moving, st.sys, st.tuner, st.pb, st.snap, st.toast))
 
 
 def main(argv):
