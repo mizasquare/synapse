@@ -27,12 +27,16 @@ synapse `model.py`/`modepctrl.py`/`plugincatalog.py`의 **실 페달보드·LV2 
 ~~피커(place/replace)~~ · ~~move~~ · ~~보드/스냅샷 관리~~ · ~~confirm 오버레이~~.
 - **[해결] 보드/스냅샷 관리 + naming + confirm**: 글랜스(depth −1)에서 ENC0 클릭=보드
   관리, ENC1 클릭=스냅 관리 → **sub 서브메뉴**(Save/Save As/Rename/Delete/Back).
-  - **naming = synapse 단어장 재사용** [사용자 지시]: qtview/editor_bridge의 SAVE AS
-    모델(스테이지 용어 + '-' + 랜덤 접미사, 예 `Drive-cupcake`)을 그대로. 접미사 풀은
-    **동일 공유 리소스** `resources/snapshot_words.txt`(~6k, 캐시) 직접 로드 — synapse
-    코어 0줄 수정(그 로직은 순수계층 아닌 qtview/editor_bridge에 이미 각자 복제돼 있음).
-    2인코더 매핑: **ENC1=용어 순환(+새 접미사)·ENC0=접미사 리롤·ENC0 클릭=확정·홀드=취소**.
-    문자입력보다 이게 오히려 물리입력에 적합. NAME은 12px로 전체 표시, TERM은 칩.
+  - **naming = synapse 단어장 재사용** [사용자 지시]: 접미사 풀은 **동일 공유 리소스**
+    `resources/snapshot_words.txt`(~6k, 캐시) 직접 로드 — synapse 코어 0줄 수정(그 로직은
+    순수계층 아닌 qtview/editor_bridge에 이미 각자 복제돼 있음).
+    - **보드/스냅 스킴 분리** [사용자]: 둘 다 `용어-랜덤단어`면 위계가 안 살아서 스킴을 나눔.
+      **보드 = 스테이지용어-단어**(`Drive-seafloor`), **스냅 = 단어-요일**(`hospital-thursday`).
+      → 이름만 봐도 보드/스냅 구분됨.
+    - **2인코더 매핑(통일)** [사용자]: **ENC0=범주부 순환**(보드=용어 12개 / 스냅=요일 7개),
+      **ENC1 회전/클릭=랜덤단어 리롤**, ENC0 클릭=확정, ENC0 홀드=취소. 범주 변경 시 단어는
+      유지(리롤 안 함) — 마음에 드는 단어 두고 용어만 돌릴 수 있음. `name_cats`/`name_build`,
+      상태 `ncat`(범주)·`nrand`(단어). NAME 12px 전체표시, 범주부는 칩.
   - **confirm**: Delete → 오버레이(No/Yes), ENC0 회전=토글·클릭=선택·홀드=취소(No).
     마지막 1개는 삭제 불가("KEEP 1 MIN").
   - 상태: `sub`/`sub_idx`·`naming`("which:mode")·`nterm`/`nname`·`confirm`("del:which")/`cyes`.

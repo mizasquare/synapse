@@ -140,13 +140,17 @@ SNAPS = ["Default", "Lead Boost", "Ambient"]
 SYSITEMS = ["Tuner", "Brightness", "MIDI Ch", "About", "< Back"]
 
 # ---- SAVE AS naming (reuses synapse's word bank; 0 core edits) --------------
-# Mirrors qtview/editor_bridge: a stage term + '-' + a random quirky suffix
-# ("Drive-cupcake"). On 2 encoders this beats char entry: ENC1 cycles the term,
-# ENC0 re-rolls the suffix, click accepts. The ~6k-word suffix pool is the SAME
-# shared resource file synapse reads (resources/snapshot_words.txt).
+# Reuses synapse's SAVE AS word pool (qtview/editor_bridge), the SAME shared
+# resource file (resources/snapshot_words.txt, ~6k words). On 2 encoders this
+# beats char entry: ENC0 dials the categorical part, ENC1 re-rolls the random
+# part, ENC0 click accepts. Boards and snapshots use DIFFERENT schemes so their
+# names read as a hierarchy at a glance:
+#   board = stage term + '-' + random word   ("Drive-cupcake")
+#   snap  = random word + '-' + weekday       ("hospital-sunday")
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TERMS = ["Clean", "Crunch", "Drive", "Lead", "Rhythm", "Solo",
          "Verse", "Chorus", "Bridge", "Boost", "Ambient", "Heavy"]
+DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 _WORDS_PATH = os.path.join(_REPO, "resources", "snapshot_words.txt")
 _WORDS_FALLBACK = ["chainsaw", "cupcake", "walrus", "thunder", "pickle",
                    "comet", "goblin", "biscuit", "tornado", "noodle"]
@@ -167,16 +171,18 @@ def _load_words():
     return _words
 
 
-def suggest_name(term, existing=(), rng=None):
-    """``term`` + '-' + a random suffix not already in ``existing``."""
-    rng = rng or _rng
-    words = _load_words()
-    existing = set(existing)
-    for _ in range(12):
-        name = "%s-%s" % (term, rng.choice(words))
-        if name not in existing:
-            return name
-    return "%s-%s" % (term, rng.choice(words))
+def _rand_word(rng=None):
+    return (rng or _rng).choice(_load_words())
+
+
+def name_cats(which):
+    """The categorical (ENC0) options: stage terms for boards, weekdays for snaps."""
+    return TERMS if which == "board" else DAYS
+
+
+def name_build(which, ncat, rand):
+    """Assemble a name from its categorical index + random word (per-scheme order)."""
+    return "%s-%s" % (TERMS[ncat], rand) if which == "board" else "%s-%s" % (rand, DAYS[ncat])
 
 
 # Board/snapshot manage submenu (decision C: sub). Same set for both.
@@ -207,8 +213,9 @@ class AppState:
     sub: str = ""             # ""=off, "board"/"snap": manage submenu open
     sub_idx: int = 0
     naming: str = ""          # ""=off, "<which>:<mode>" e.g. "board:saveas"
-    nterm: int = 0            # index into TERMS
-    nname: str = ""           # the currently suggested "Term-suffix"
+    ncat: int = 0             # ENC0 categorical index (TERMS for board, DAYS for snap)
+    nrand: str = ""           # ENC1 random word (kept across term/day changes)
+    nname: str = ""           # the assembled name (name_build)
     confirm: str = ""         # ""=off, or pending action e.g. "del:board"
     cyes: bool = False        # confirm overlay highlight (No/Yes)
     dirty: bool = False
@@ -258,11 +265,12 @@ class AppController:
                 st.cyes = not st.cyes
             return
         if st.naming:
-            if enc == 1:                       # ENC1 cycles the stage term (fresh suffix)
-                st.nterm = (st.nterm + d) % len(TERMS)
-                self._reroll()
-            else:                              # ENC0 re-rolls the suffix
-                self._reroll()
+            if enc == 0:                       # ENC0 cycles the categorical (term/day)
+                which = st.naming.split(":")[0]
+                st.ncat = (st.ncat + d) % len(name_cats(which))
+                self._rebuild_name(reroll=False)
+            else:                              # ENC1 re-rolls the random word
+                self._rebuild_name(reroll=True)
             return
         if st.sub:
             st.sub_idx = (st.sub_idx + d) % len(SUB_ACTIONS)
@@ -338,8 +346,8 @@ class AppController:
         if st.naming:
             if enc == 0:                       # ENC0 click = accept the name
                 self._name_accept()
-            else:                              # ENC1 click = re-roll suffix
-                self._reroll()
+            else:                              # ENC1 click = re-roll random word
+                self._rebuild_name(reroll=True)
             return
         if st.sub:
             if enc == 0:
@@ -438,14 +446,27 @@ class AppController:
 
     def _name_open(self, which, mode):
         st = self.st
-        st.sub, st.naming, st.nterm = "", "%s:%s" % (which, mode), 0
-        self._reroll()
+        st.sub, st.naming, st.ncat = "", "%s:%s" % (which, mode), 0
+        self._rebuild_name(reroll=True)
 
-    def _reroll(self):
+    def _rebuild_name(self, reroll):
+        """Re-assemble nname from ncat + nrand; reroll the random word if asked or
+        on a name collision. Boards read Term-word, snaps read word-day."""
         st = self.st
-        which = st.naming.split(":")[0]
-        lst, _ = self._lst(which)
-        st.nname = suggest_name(TERMS[st.nterm], existing=lst, rng=_rng)
+        which, mode = st.naming.split(":")
+        lst, idx = self._lst(which)
+        taken = set(lst)
+        if mode == "rename":
+            taken.discard(lst[idx])
+        for _ in range(12):
+            if reroll or not st.nrand:
+                st.nrand = _rand_word(_rng)
+            cand = name_build(which, st.ncat, st.nrand)
+            if cand not in taken:
+                st.nname = cand
+                return
+            reroll = True                      # collision -> force a fresh word
+        st.nname = cand
 
     def _name_accept(self):
         st = self.st
@@ -676,14 +697,15 @@ def _naming(st):
     s = Screen()
     which, mode = st.naming.split(":")
     head = ("RENAME " if mode == "rename" else "SAVE AS ") + ("BOARD" if which == "board" else "SNAP")
+    cat_label, cat_val = ("TERM", TERMS[st.ncat]) if which == "board" else ("DAY", DAYS[st.ncat])
     s.T(head, 6, 4, 8, ls=1)
     s.hline(0, 16, 128)
-    s.T("TERM  (e1)", 6, 22, 6)
-    s.chip(TERMS[st.nterm], 6, 30, 74, 16, 8)
+    s.T("%s  (e0)" % cat_label, 6, 22, 6)
+    s.chip(cat_val, 6, 30, 90, 16, 8)
     s.T("NAME", 6, 52, 6)
-    s.T(_fit(s, st.nname, 12, 122), 6, 62, 12)  # 12px so full Term-suffix fits
+    s.T(_fit(s, st.nname, 12, 122), 6, 62, 12)  # 12px so the full name fits
     s.hline(0, 84, 128)
-    s.T("e1 term   e0 reroll", 5, 104, 6)
+    s.T("e0 %s   e1 reroll" % cat_label.lower(), 5, 104, 6)
     s.T("e0 click OK   hold X", 5, 114, 6)
     _toast_over(s, st)
     return s.img
@@ -958,16 +980,25 @@ def _walk():
     do("tt", "shift>>")    # enc0 turn x2: swap node 0 -> 2
     print("      order   %s" % [b["abbr"] or "--" for b in c.st.board])
     do("w", "drop")        # enc0 click: commit landing at slot 2
-    # board/snapshot manage: glance -> board submenu -> Save As (name suggester)
+    # board Save As (board scheme = Term-word): ENC0 dials term, ENC1 rerolls word
     do("e", "glance")      # enc0 hold: depth 0 -> -1
     do("w", "board-sub")   # enc0 click: open BOARD manage submenu
     do("t", "sub>")        # enc0 turn: Save -> Save As
-    do("w", "saveas")      # enc0 click: -> name suggester (Term-suffix)
-    do("gg", "term>>")     # enc1 turn x2: cycle stage term (fresh suffix each)
-    do("t", "reroll")      # enc0 turn: re-roll suffix
-    print("      name    %r  (%d boards)" % (c.st.nname, len(c.st.boards)))
+    do("w", "saveas")      # enc0 click: -> name suggester
+    do("tt", "term>>")     # enc0 turn x2: cycle stage term (word kept)
+    do("g", "reroll")      # enc1 turn: re-roll the random word
+    print("      board-name %r  (%d boards)" % (c.st.nname, len(c.st.boards)))
     do("w", "accept")      # enc0 click: insert new board, select it
     print("      boards  %s pb=%d" % (c.st.boards, c.st.pb))
+    # snapshot Save As (snap scheme = word-day): ENC0 dials weekday, ENC1 rerolls word
+    do("s", "snap-sub")    # enc1 click: open SNAP manage submenu
+    do("t", "sub>")        # enc0 turn: Save -> Save As
+    do("w", "snap-saveas") # enc0 click: -> name suggester (word-day)
+    do("ttt", "day>>>")    # enc0 turn x3: cycle weekday
+    do("g", "reroll")      # enc1 turn: re-roll the random word
+    print("      snap-name  %r  (%d snaps)" % (c.st.nname, len(c.st.snaps)))
+    do("w", "accept-snap") # enc0 click: insert new snap
+    print("      snaps   %s snap=%d" % (c.st.snaps, c.st.snap))
     # delete the new board (confirm overlay)
     do("w", "board-sub2")  # open submenu on the new board
     do("ttt", "to-del")    # Save -> SaveAs -> Rename -> Delete
