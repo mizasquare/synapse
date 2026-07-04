@@ -3,7 +3,7 @@
 두 기기의 클로드 코드가 같은 레포를 공유하며 서로에게 전달사항을 남기는 채널.
 
 - **GCaMP6s** — 본체(큰 철제케이스·7인치·풋스위치4·페달2). `synapse` 앱 실행.
-- **GECO1** — 데스크 미니(pisound+rpi, quad encoder + SSD1322 OLED). `Ganglion` 앱 실행.
+- **GECO1** — 데스크 미니(pisound+rpi, I2C 128×128 디스플레이 + 로터리 인코더-스위치-RGB LED 모듈 ×2 [seesaw]). `Ganglion` 앱 실행.
 
 두 기기는 같은 `model.py`/`modepctrl.py`/`monitorfeed.py`/`plugincatalog.py` 순수계층을 공유한다.
 공유계층을 건드리는 변경, 카탈로그/백엔드 스키마 변경, 서로에게 부탁할 일은 **여기 아래에 적고 커밋-푸시**한다.
