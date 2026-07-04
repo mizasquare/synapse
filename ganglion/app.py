@@ -190,6 +190,12 @@ SUB_ACTIONS = [("Save", "save"), ("Save As", "saveas"), ("Rename", "rename"),
                ("Delete", "delete"), ("Back", "back")]
 
 
+def _op(which):
+    """The operating encoder for a manage context: boards ride ENC0 (top band),
+    snapshots ride ENC1 (bottom band) — matching which encoder opened it."""
+    return 0 if which == "board" else 1
+
+
 @dataclass
 class AppState:
     depth: int = 0            # 0 = chain, -1 = board/snapshot glance
@@ -260,8 +266,8 @@ class AppController:
         st = self.st
         if st.tuner:
             return
-        if st.confirm:                         # ENC0 toggles No/Yes
-            if enc == 0:
+        if st.confirm:                         # the opening encoder toggles No/Yes
+            if enc == _op(st.confirm.split(":")[1]):
                 st.cyes = not st.cyes
             return
         if st.naming:
@@ -272,8 +278,9 @@ class AppController:
             else:                              # ENC1 re-rolls the random word
                 self._rebuild_name(reroll=True)
             return
-        if st.sub:
-            st.sub_idx = (st.sub_idx + d) % len(SUB_ACTIONS)
+        if st.sub:                             # the encoder that opened it operates it
+            if enc == _op(st.sub):
+                st.sub_idx = (st.sub_idx + d) % len(SUB_ACTIONS)
             return
         if st.pick:
             if enc == 1:                       # ENC1 turns the active strip
@@ -336,12 +343,14 @@ class AppController:
         if st.tuner:
             st.tuner = False
             return
-        if st.confirm:                         # ENC0 acts on the highlighted option
-            if enc == 0:
+        if st.confirm:                         # opening encoder acts; the other cancels
+            if enc == _op(st.confirm.split(":")[1]):
                 if st.cyes:
                     self._confirm_exec()
                 else:
                     st.confirm = ""
+            else:
+                st.confirm = ""
             return
         if st.naming:
             if enc == 0:                       # ENC0 click = accept the name
@@ -349,8 +358,8 @@ class AppController:
             else:                              # ENC1 click = re-roll random word
                 self._rebuild_name(reroll=True)
             return
-        if st.sub:
-            if enc == 0:
+        if st.sub:                             # opening encoder picks; the other backs
+            if enc == _op(st.sub):
                 self._sub_act(SUB_ACTIONS[st.sub_idx][1])
             else:
                 st.sub = ""
@@ -688,7 +697,8 @@ def _sub(st):
             s.T(label, 9, y, 12, fill=0)
         else:
             s.T(label, 9, y, 12)
-    s.T("e0 pick   e0hold back", 5, 120, 6)
+    opn = "e0" if which == "board" else "e1"
+    s.T("%s turn/click   e0hold back" % opn, 5, 120, 6)
     _toast_over(s, st)
     return s.img
 
@@ -726,6 +736,8 @@ def _confirm(st):
         else:
             s.box(x, 84, 44, 16)
             s.T(label, x + (44 - int(s.Tw(8, label))) // 2, 88, 8)
+    opn = "e0" if which == "board" else "e1"
+    s.T("%s turn/click   e0hold No" % opn, 8, 110, 6)
     return s.img
 
 
@@ -903,12 +915,12 @@ def leds(st):
     n = st.board[st.node]
     if st.tuner:
         return ("purple", "purple")
-    if st.confirm:                            # delete danger
-        return ("red", OFF)
-    if st.naming:                             # ENC0 reroll/ok, ENC1 term
+    if st.confirm:                            # delete danger on the operating encoder
+        return ("red", OFF) if _op(st.confirm.split(":")[1]) == 0 else (OFF, "red")
+    if st.naming:                             # ENC0 term/day + accept, ENC1 reroll
         return ("green", "blue")
-    if st.sub:                                # manage submenu
-        return ("blue", OFF)
+    if st.sub:                                # manage submenu on the opening encoder
+        return ("blue", OFF) if _op(st.sub) == 0 else (OFF, "blue")
     if st.pick:                               # ENC0=back(grey), ENC1=operate(cat colour)
         return ("grey", BUCKETCOL.get(st.wl[st.pick_cat]["key"], "amber"))
     if st.moving:                             # ENC0 holds the node; ENC1 idle
@@ -990,14 +1002,14 @@ def _walk():
     print("      board-name %r  (%d boards)" % (c.st.nname, len(c.st.boards)))
     do("w", "accept")      # enc0 click: insert new board, select it
     print("      boards  %s pb=%d" % (c.st.boards, c.st.pb))
-    # snapshot Save As (snap scheme = word-day): ENC0 dials weekday, ENC1 rerolls word
+    # snapshot manage is operated by ENC1 (the encoder that opened it)
     do("s", "snap-sub")    # enc1 click: open SNAP manage submenu
-    do("t", "sub>")        # enc0 turn: Save -> Save As
-    do("w", "snap-saveas") # enc0 click: -> name suggester (word-day)
-    do("ttt", "day>>>")    # enc0 turn x3: cycle weekday
+    do("g", "sub>")        # enc1 turn: Save -> Save As
+    do("s", "snap-saveas") # enc1 click: -> name suggester (word-day)
+    do("ttt", "day>>>")    # enc0 turn x3: cycle weekday (naming: ENC0 categorical)
     do("g", "reroll")      # enc1 turn: re-roll the random word
     print("      snap-name  %r  (%d snaps)" % (c.st.nname, len(c.st.snaps)))
-    do("w", "accept-snap") # enc0 click: insert new snap
+    do("w", "accept-snap") # enc0 click: accept the name (naming: ENC0 = OK)
     print("      snaps   %s snap=%d" % (c.st.snaps, c.st.snap))
     # delete the new board (confirm overlay)
     do("w", "board-sub2")  # open submenu on the new board

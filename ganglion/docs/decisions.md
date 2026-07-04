@@ -37,8 +37,12 @@ synapse `model.py`/`modepctrl.py`/`plugincatalog.py`의 **실 페달보드·LV2 
       **ENC1 회전/클릭=랜덤단어 리롤**, ENC0 클릭=확정, ENC0 홀드=취소. 범주 변경 시 단어는
       유지(리롤 안 함) — 마음에 드는 단어 두고 용어만 돌릴 수 있음. `name_cats`/`name_build`,
       상태 `ncat`(범주)·`nrand`(단어). NAME 12px 전체표시, 범주부는 칩.
-  - **confirm**: Delete → 오버레이(No/Yes), ENC0 회전=토글·클릭=선택·홀드=취소(No).
-    마지막 1개는 삭제 불가("KEEP 1 MIN").
+  - **confirm**: Delete → 오버레이(No/Yes). 마지막 1개는 삭제 불가("KEEP 1 MIN").
+  - **[해결] 연-인코더가 조작한다** [사용자 버그리포트]: 서브메뉴/confirm은 **그걸 연
+    인코더**가 조작한다. 보드=ENC0(글랜스 상단밴드), 스냅=ENC1(하단밴드)로 열리므로
+    각각 그 인코더의 회전=이동·클릭=선택. (버그: 스냅을 ENC1로 열었는데 서브에선 ENC1
+    클릭이 back이라 튕긴 것처럼 느껴짐.) back은 ENC0 홀드로 통일, 반대 인코더 클릭도 back.
+    `_op(which)`로 판별(새 상태 없음), 푸터/LED도 연-인코더 반영.
   - 상태: `sub`/`sub_idx`·`naming`("which:mode")·`nterm`/`nname`·`confirm`("del:which")/`cyes`.
     보드/스냅 이름은 이제 AppState `boards`/`snaps`(모듈 상수 PBS/SNAPS 복제) — 뮤테이션 격리.
     `--walk`(Save As→삭제 시퀀스)·렌더 검증됨. 랜덤은 `_rng`(walk에서 seed).
