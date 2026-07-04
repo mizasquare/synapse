@@ -8,7 +8,8 @@ mockup's executable spec (GECO OLED 2a) is the reference.
 Ported so far (the navigation spine + picker):
   depth 0 (chain nav · knob focus/lock/adjust · ENC0 slot menu · ENC0-hold up) ·
   depth -1 (glance: board/snapshot scroll) · slot menu (bypass/remove/back) ·
-  picker (place/replace: category list -> plugin list -> place, from the curated
+  picker (place/replace: split screen — chain on top, category|plugin strips
+  below; ENC1 turns/selects, ENC0-hold backs — from the curated
   geco_whitelist.json) · SYSTEM (ENC0 scroll-left-past-start) · TUNER (ENC1 hold) ·
   COMBO (save).
 
@@ -195,10 +196,11 @@ class AppController:
         if st.tuner:
             return
         if st.pick:
-            if st.pick == "cat":
-                st.pick_cat = (st.pick_cat + d) % len(st.wl)
-            else:
-                st.pick_fx = (st.pick_fx + d) % len(st.wl[st.pick_cat]["plugins"])
+            if enc == 1:                       # ENC1 turns the active strip
+                if st.pick == "cat":
+                    st.pick_cat = (st.pick_cat + d) % len(st.wl)
+                else:
+                    st.pick_fx = (st.pick_fx + d) % len(st.wl[st.pick_cat]["plugins"])
             return
         if st.sys:
             st.sys_idx = (st.sys_idx + d) % len(SYSITEMS)
@@ -248,7 +250,7 @@ class AppController:
             st.tuner = False
             return
         if st.pick:
-            if enc == 0:
+            if enc == 1:                       # ENC1 click = select / place
                 if st.pick == "cat":
                     st.pick, st.pick_fx = "fx", 0
                 else:
@@ -257,9 +259,7 @@ class AppController:
                     st.board[st.node] = make_node(cat, plug)
                     st.pick, st.knob, st.dirty = "", 0, True
                     self._toast(plug["display"] + " placed")
-            else:                              # ENC1 click = back one level
-                st.pick = "cat" if st.pick == "fx" else ""
-            return
+            return                             # ENC0 click = no-op (hold = back)
         if st.sys:
             if enc == 0:
                 self._sys_act()
@@ -315,8 +315,9 @@ class AppController:
         if st.tuner:
             st.tuner = False
             return
-        if st.pick:                           # hold backs out of the picker
-            st.pick = "cat" if st.pick == "fx" else ""
+        if st.pick:                           # ENC0 hold = back (consistent); ENC1 hold = no-op
+            if enc == 0:
+                st.pick = "cat" if st.pick == "fx" else ""
             return
         if enc == 0:                          # ENC0 hold = zoom out one level
             if st.sys:
@@ -472,39 +473,84 @@ def _menu(st):
     return s.img
 
 
-def _vlist(s, items, sel, y0=20, vis=5, rh=18):
-    """Windowed vertical list: selection inverted, edge arrows when clipped."""
+def _fit(s, txt, size, maxw):
+    """Truncate txt so it fits maxw px at the given tier."""
+    if s.Tw(size, txt) <= maxw:
+        return txt
+    while txt and s.Tw(size, txt) > maxw:
+        txt = txt[:-1]
+    return txt
+
+
+def _striplist(s, items, sel, x, w, y0, active, size=8, vis=5, rh=14):
+    """Windowed list inside [x, x+w). Focus ring = filled; locked = hollow."""
     n = len(items)
     start = 0 if n <= vis else max(0, min(sel - vis // 2, n - vis))
     for r in range(min(vis, n)):
         i = start + r
         y = y0 + r * rh
-        if i == sel:
-            s.box(3, y - 2, 122, rh - 3, fill=True)
-            s.T(items[i], 8, y, 12, fill=0)
+        lbl = _fit(s, items[i], size, w - 7)
+        if i == sel and active:
+            s.box(x, y - 1, w, rh - 2, fill=True)
+            s.T(lbl, x + 3, y + 1, size, fill=0)
+        elif i == sel:                          # inactive strip: hollow marker
+            s.box(x, y - 1, w, rh - 2)
+            s.T(lbl, x + 3, y + 1, size)
         else:
-            s.T(items[i], 8, y, 12)
+            s.T(lbl, x + 3, y + 1, size)
     if start > 0:
-        s.T("^", 118, y0 - 1, 6)
+        s.T("^", x + w - 8, y0 - 1, 6)
     if start + vis < n:
-        s.T("v", 118, y0 + (vis - 1) * rh + 1, 6)
+        s.T("v", x + w - 8, y0 + (vis - 1) * rh, 6)
+
+
+def _pick_chain(s, st):
+    """Top band: the node chain with the target slot showing the pending FX."""
+    s.T("PLACE", 4, 1, 8, ls=1)
+    s.T(_fit(s, st.wl[st.pick_cat]["key"], 8, 56), 46, 1, 8)
+    s.T("SL%d" % (st.node + 1), 106, 2, 6)
+    step, cw, ty, ch = 25, 23, 12, 20
+    wy = ty + ch // 2
+    cells = []
+    pend = st.wl[st.pick_cat]["abbr"]
+    for j in range(5):
+        idx = st.node - 2 + j
+        if idx < 0 or idx >= len(st.board):
+            continue
+        n = st.board[idx]
+        x = 2 + j * step
+        cells.append((idx, x, x + cw - 1))
+        if idx == st.node:                      # target slot: incoming FX preview
+            s.dashed(x, ty, cw, ch, on=2, off=2)
+            s.T(pend, x + 3, ty + 7, 12)
+        elif n["empty"]:
+            s.dashed(x, ty, cw, ch, on=1, off=2)
+        else:
+            s.box(x, ty, cw, ch)
+            s.T(n["abbr"], x + 3, ty + 7, 12)
+    for a in range(len(cells) - 1):
+        if cells[a + 1][1] - 1 >= cells[a][2] + 1:
+            s.d.rectangle([cells[a][2] + 1, wy, cells[a + 1][1] - 1, wy], fill=1)
+    if cells:
+        if cells[0][0] > 0:
+            s.d.rectangle([0, wy, cells[0][1] - 1, wy], fill=1)
+        if cells[-1][0] < len(st.board) - 1:
+            s.d.rectangle([cells[-1][2] + 1, wy, WIDTH - 1, wy], fill=1)
 
 
 def _pick(st):
     s = Screen()
-    if st.pick == "cat":
-        s.T("PLACE FX", 6, 4, 8, ls=1)
-        s.T("SL%d" % (st.node + 1), 104, 5, 6)
-        s.hline(0, 15, 128)
-        _vlist(s, ["%-4s%s" % (b["abbr"], b["key"]) for b in st.wl], st.pick_cat)
-        s.T("e0 open  e1 back", 5, 120, 6)
-    else:
-        cat = st.wl[st.pick_cat]
-        s.T(cat["key"].upper(), 6, 4, 8, ls=1)
-        s.T("%d/%d" % (st.pick_fx + 1, len(cat["plugins"])), 96, 5, 6)
-        s.hline(0, 15, 128)
-        _vlist(s, [p["display"] for p in cat["plugins"]], st.pick_fx)
-        s.T("e0 place  e1 back", 5, 120, 6)
+    _pick_chain(s, st)
+    s.hline(0, 38, 128)
+    by = 44
+    on_cat = st.pick == "cat"
+    # left strip: category abbrs (matches node-strip abbrs)
+    _striplist(s, [b["abbr"] for b in st.wl], st.pick_cat, 0, 40, by, active=on_cat, size=12)
+    s.d.rectangle([41, by - 2, 41, 115], fill=1)
+    # right strip: plugins of the hovered/locked category (preview until locked)
+    plugs = [p["display"] for p in st.wl[st.pick_cat]["plugins"]]
+    _striplist(s, plugs, -1 if on_cat else st.pick_fx, 45, 83, by, active=not on_cat, size=8)
+    s.T("e1 turn/sel   e0hold back", 4, 120, 6)
     _toast_over(s, st)
     return s.img
 
@@ -552,8 +598,8 @@ def leds(st):
     n = st.board[st.node]
     if st.tuner:
         return ("purple", "purple")
-    if st.pick:
-        return (BUCKETCOL.get(st.wl[st.pick_cat]["key"], "grey"), "amber")
+    if st.pick:                               # ENC0=back(grey), ENC1=operate(cat colour)
+        return ("grey", BUCKETCOL.get(st.wl[st.pick_cat]["key"], "amber"))
     if st.sys:
         return ("grey", OFF)
     if st.depth == -1:
@@ -600,14 +646,16 @@ def _walk():
     do("r", "sys")         # one more left past start -> SYSTEM
     do("w", "sys-exec")    # SYSTEM item 0 = Tuner -> tuner
     do("w", "tuner-exit")  # click exits tuner
-    # picker: replace node 0 -> pick category -> pick plugin -> place
+    # picker (ENC1 operates, ENC0-hold backs): replace node 0
     do("w", "menu")        # enc0 click: slot menu on node 0
-    do("tt", "to-replace") # menu 0 -> 2 (Replace)
-    do("w", "pick-cat")    # exec -> picker category list
-    do("ttt", "cat>")      # scroll categories (Dynamics -> Amp)
-    do("w", "pick-fx")     # enc0 click: drill into plugin list
-    do("t", "fx>")         # scroll plugins
-    do("w", "place")       # enc0 click: place node -> board[0] replaced
+    do("tt", "to-replace") # enc0 turn: menu 0 -> 2 (Replace)
+    do("w", "pick-cat")    # enc0 click: exec -> picker (cat strip)
+    do("gg", "cat>")       # enc1 turn: scroll categories (Dynamics -> Pedal)
+    do("s", "pick-fx")     # enc1 click: lock category -> plugin strip
+    do("e", "back-cat")    # enc0 hold: back to category strip
+    do("s", "pick-fx2")    # enc1 click: into plugins again
+    do("g", "fx>")         # enc1 turn: scroll plugins
+    do("s", "place")       # enc1 click: place node -> board[0] replaced
     do("w", "menu2")       # reopen menu on the freshly placed node
     do("w", "bypass2")     # bypass it (sanity: node model intact)
 

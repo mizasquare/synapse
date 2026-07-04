@@ -25,11 +25,15 @@ synapse `model.py`/`modepctrl.py`/`plugincatalog.py`의 **실 페달보드·LV2 
 시안엔 있으나 아직 포팅 안 함 (토스트로 스텁): ~~피커(place/replace)~~ · **move** ·
 **보드/스냅샷 관리(rename/save/delete)** · **confirm 오버레이**. 로직은 시안에 다 있음.
 → 제안 순서: 피커 → move → 관리 → confirm.
-- **[해결] 피커(place/replace)**: `geco_whitelist.json`(큐레이션 8버킷) 로드 →
-  카테고리 리스트(`pick='cat'`) → 플러그인 리스트(`pick='fx'`) → 배치.
-  ENC0 클릭=드릴/배치, ENC1 클릭·홀드=백. 윈도잉 리스트(`_vlist`, 5행+엣지 화살표).
-  배치 노드는 버킷별 **플레이스홀더 노브 템플릿**(`_KNOB_TMPL`) — 실 LV2 파라미터
-  배선은 A/B/E와 함께 (placed node의 name=display, abbr=버킷 약어). 렌더·`--walk` 검증됨.
+- **[해결] 피커(place/replace)**: `geco_whitelist.json`(큐레이션 8버킷) 로드.
+  **상하 분할 레이아웃** [사용자 요청]:
+  - 위: 노드 체인 — 대상 슬롯을 dashed 셀로, 들어갈 카테고리 약어 미리보기(라이브).
+  - 아래: 좌(카테고리 약어 스트립)·우(플러그인 스트립). 포커스=채운 박스, 잠금=빈 박스.
+  - **ENC1 전담**: 회전=스크롤, 클릭=select(cat→fx→배치). **ENC1 홀드=없음**.
+  - **ENC0 홀드=백** (일관성; fx→cat→나가기). ENC0 회전/클릭=무동작.
+  `_pick_chain`/`_striplist`/`_fit`(폭 맞춤 잘림). 배치 노드는 버킷별 **플레이스홀더
+  노브 템플릿**(`_KNOB_TMPL`) — 실 LV2 파라미터 배선은 A/B/E와 함께
+  (placed node의 name=display, abbr=버킷 약어). 렌더·`--walk` 검증됨.
 
 ## D. 회전 가속(accel)을 값 조절에 반영할지 `[사용자]`
 현재 `feed()`에서 Rotate.delta를 **부호로만** 축약 → 1디텐트=1스텝(노드 이동·값 조절 공통).
