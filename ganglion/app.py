@@ -482,26 +482,35 @@ def _fit(s, txt, size, maxw):
     return txt
 
 
+def _window(n, sel, vis):
+    return 0 if n <= vis else max(0, min(sel - vis // 2, n - vis))
+
+
+def _caret(s, cx, y, up):
+    """A 5x3 scroll triangle centred on cx (points up if ``up``)."""
+    for k in range(3):
+        half = k if up else 2 - k
+        s.d.rectangle([cx - half, y + k, cx + half, y + k], fill=1)
+
+
 def _striplist(s, items, sel, x, w, y0, active, size=8, vis=5, rh=14):
-    """Windowed list inside [x, x+w). Focus ring = filled; locked = hollow."""
+    """Windowed list inside [x, x+w). Focus ring = filled; locked = hollow.
+    Scroll carets are drawn by the caller (in the gaps) so text keeps full width."""
     n = len(items)
-    start = 0 if n <= vis else max(0, min(sel - vis // 2, n - vis))
+    pad = max(1, (rh - 2 - round(fs(size) * 0.72)) // 2)   # center ink in the row
+    start = _window(n, sel, vis)
     for r in range(min(vis, n)):
         i = start + r
         y = y0 + r * rh
-        lbl = _fit(s, items[i], size, w - 7)
+        lbl = _fit(s, items[i], size, w - 6)
         if i == sel and active:
             s.box(x, y - 1, w, rh - 2, fill=True)
-            s.T(lbl, x + 3, y + 1, size, fill=0)
+            s.T(lbl, x + 3, y + pad, size, fill=0)
         elif i == sel:                          # inactive strip: hollow marker
             s.box(x, y - 1, w, rh - 2)
-            s.T(lbl, x + 3, y + 1, size)
+            s.T(lbl, x + 3, y + pad, size)
         else:
-            s.T(lbl, x + 3, y + 1, size)
-    if start > 0:
-        s.T("^", x + w - 8, y0 - 1, 6)
-    if start + vis < n:
-        s.T("v", x + w - 8, y0 + (vis - 1) * rh, 6)
+            s.T(lbl, x + 3, y + pad, size)
 
 
 def _pick_chain(s, st):
@@ -544,12 +553,24 @@ def _pick(st):
     s.hline(0, 38, 128)
     by = 44
     on_cat = st.pick == "cat"
-    # left strip: category abbrs (matches node-strip abbrs)
-    _striplist(s, [b["abbr"] for b in st.wl], st.pick_cat, 0, 40, by, active=on_cat, size=12)
-    s.d.rectangle([41, by - 2, 41, 115], fill=1)
+    # left strip: category abbrs, big font (matches node-strip abbrs), 4 rows
+    cats = [b["abbr"] for b in st.wl]
+    _striplist(s, cats, st.pick_cat, 0, 48, by, active=on_cat, size=16, vis=4, rh=17)
+    s.d.rectangle([49, by - 2, 49, 115], fill=1)
     # right strip: plugins of the hovered/locked category (preview until locked)
     plugs = [p["display"] for p in st.wl[st.pick_cat]["plugins"]]
-    _striplist(s, plugs, -1 if on_cat else st.pick_fx, 45, 83, by, active=not on_cat, size=8)
+    _striplist(s, plugs, -1 if on_cat else st.pick_fx, 51, 77, by, active=not on_cat, size=8)
+    # scroll carets in the gaps above/below each strip (no per-row text collision)
+    lstart = _window(len(cats), st.pick_cat, 4)
+    rstart = _window(len(plugs), 0 if on_cat else st.pick_fx, 5)
+    if lstart > 0:
+        _caret(s, 24, 40, True)
+    if lstart + 4 < len(cats):
+        _caret(s, 24, 114, False)
+    if rstart > 0:
+        _caret(s, 89, 40, True)
+    if rstart + 5 < len(plugs):
+        _caret(s, 89, 114, False)
     s.T("e1 turn/sel   e0hold back", 4, 120, 6)
     _toast_over(s, st)
     return s.img
