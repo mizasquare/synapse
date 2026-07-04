@@ -17,7 +17,9 @@ from GECO.
 
 Commands:
     sync      fetch source, apply add/remove delta, keep existing curation
-    curate    interactively bucket the plugins that still need it (new by default)
+    curate    interactively bucket the plugins that still need it (new by default;
+              prompts a short alias for names too long for the chain's name band)
+    alias     set/edit short display aliases in bulk (--long = only overlong names)
     list      show the catalog grouped by bucket
     status    counts: total / by bucket / uncurated / removed
     export    write the human doc (--md) and/or the app whitelist (--app)
@@ -45,6 +47,12 @@ BUCKETS = [("Dynamics", "DYN"), ("Filter", "FLT"), ("Pedal", "PDL"), ("Amp", "AM
 ORDER = [k for k, _ in BUCKETS]
 ABBR = dict(BUCKETS)
 HIDDEN = "Unused"
+NAME_FIT = 12   # chars that fit the chain bottom band (16px); longer -> want an alias
+
+
+def disp(e):
+    """The name GECO shows — alias if set, else the full plugin name."""
+    return e.get("alias") or e["name"]
 
 
 def geco_bucket(name, lv2):
@@ -133,7 +141,7 @@ def cmd_sync(args):
         else:
             pl[uri] = {"name": p["name"], "brand": p["brand"], "lv2": p["lv2"],
                        "bucket": geco_bucket(p["name"], p["lv2"]),
-                       "curated": False, "present": True}
+                       "alias": None, "curated": False, "present": True}
             added.append(uri)
     for uri, e in pl.items():
         if uri not in src_by:
@@ -168,6 +176,21 @@ def _targets(pl, all_):
             if e.get("present") and (all_ or not e.get("curated"))]
 
 
+def _prompt_alias(e):
+    cur = e.get("alias")
+    raw = input("       long name -> alias (Enter=%s, -=clear): "
+                % (("keep '%s'" % cur) if cur else "keep full")).strip()
+    if raw == "-":
+        if e.get("alias") is None:
+            return False
+        e["alias"] = None
+        return True
+    if raw:
+        e["alias"] = raw
+        return True
+    return False
+
+
 def cmd_curate(args):
     cat = load_catalog()
     pl = cat["plugins"]
@@ -183,16 +206,19 @@ def cmd_curate(args):
     try:
         for i, (uri, e) in enumerate(targets):
             sug = e["bucket"]
+            al = ("  alias:'%s'" % e["alias"]) if e.get("alias") else ""
             print("[%d/%d] %s  %s" % (i + 1, len(targets), e["name"],
                                       ("· " + e["brand"]) if e["brand"] else ""))
-            print("       LV2:%s   suggested -> %s" % ("/".join(e["lv2"]) or "-", sug))
+            print("       LV2:%s   suggested -> %s%s" % ("/".join(e["lv2"]) or "-", sug, al))
+            action = None
             while True:
                 raw = input("       > ").strip()
                 if raw == "":
                     e["curated"] = True
-                    changed = True
+                    changed = action = True
                     break
                 if raw in ("s", "S"):
+                    action = "skip"
                     break
                 if raw in ("q", "Q"):
                     if changed:
@@ -202,16 +228,55 @@ def cmd_curate(args):
                 if raw.isdigit() and 1 <= int(raw) <= len(ORDER):
                     e["bucket"] = ORDER[int(raw) - 1]
                     e["curated"] = True
-                    changed = True
+                    changed = action = True
                     print("       -> %s" % e["bucket"])
                     break
                 print("       ? enter a number 1-%d, Enter, s, or q" % len(ORDER))
+            # long names don't fit the chain's bottom band -> offer a short alias
+            if action is True and e["bucket"] != HIDDEN and len(e["name"]) > NAME_FIT:
+                if _prompt_alias(e):
+                    changed = True
             print()
     except (EOFError, KeyboardInterrupt):
         print()
     if changed:
         save_catalog(cat)
     print("done. curated %d." % sum(1 for _, e in targets if e.get("curated")))
+
+
+def cmd_alias(args):
+    """Set/edit short display aliases (bulk), e.g. for long plugin names."""
+    cat = load_catalog()
+    pl = cat["plugins"]
+    tgt = [(u, e) for u, e in pl.items() if e.get("present") and e["bucket"] != HIDDEN]
+    if args.long:
+        tgt = [t for t in tgt if len(t[1]["name"]) > NAME_FIT]
+    tgt.sort(key=lambda t: t[1]["name"].lower())
+    if not tgt:
+        print("no plugins to alias.")
+        return
+    print("%d plugin(s).  Enter=keep · text=set alias · -=clear · q=save&quit\n" % len(tgt))
+    changed = False
+    try:
+        for u, e in tgt:
+            cur = e.get("alias")
+            flag = "  (%d chars, long)" % len(e["name"]) if len(e["name"]) > NAME_FIT else ""
+            raw = input("%s%s\n  [%s] alias> " % (e["name"], flag, cur or "—")).strip()
+            if raw in ("q", "Q"):
+                break
+            if raw == "-":
+                if cur is not None:
+                    e["alias"] = None
+                    changed = True
+            elif raw:
+                e["alias"] = raw
+                changed = True
+            print()
+    except (EOFError, KeyboardInterrupt):
+        print()
+    if changed:
+        save_catalog(cat)
+    print("saved." if changed else "no changes.")
 
 
 def _group(pl):
@@ -238,7 +303,8 @@ def cmd_list(args):
         print("## %s — %s (%d)" % (ABBR.get(b, "?"), b, len(items)))
         for e in sorted(items, key=lambda x: x["name"].lower()):
             mark = " " if e.get("curated") else "~"
-            print("  %s %-34s %s" % (mark, e["name"][:34], ("· " + e["brand"]) if e["brand"] else ""))
+            nm = e["name"] + ((" ->" + e["alias"]) if e.get("alias") else "")
+            print("  %s %-40s %s" % (mark, nm[:40], ("· " + e["brand"]) if e["brand"] else ""))
     absent = [e for e in cat["plugins"].values() if not e.get("present")]
     if absent:
         print("\n(absent, kept: %s)" % ", ".join(e["name"] for e in absent))
@@ -275,7 +341,8 @@ def cmd_export(args):
                                                 "  [hidden]" if b == HIDDEN else ""))
             for e in sorted(items, key=lambda x: x["name"].lower()):
                 m = " " if e.get("curated") else "~"
-                lines.append("- %s **%s**%s · LV2:%s" % (m, e["name"],
+                al = (" → **%s**" % e["alias"]) if e.get("alias") else ""
+                lines.append("- %s **%s**%s%s · LV2:%s" % (m, e["name"], al,
                              (" · " + e["brand"]) if e["brand"] else "", "/".join(e["lv2"]) or "-"))
             lines.append("")
         with open(args.md, "w", encoding="utf-8") as f:
@@ -291,7 +358,8 @@ def cmd_export(args):
             if not items:
                 continue
             out["buckets"].append({"key": b, "abbr": ABBR[b],
-                "plugins": [{"name": e["name"], "uri": u, "brand": e["brand"]}
+                "plugins": [{"name": e["name"], "uri": u, "brand": e["brand"],
+                             "alias": e.get("alias"), "display": disp(e)}
                             for u, e in cat["plugins"].items()
                             if e.get("present") and e.get("curated")
                             and e["bucket"] == b]})
@@ -318,9 +386,13 @@ def main():
     s.add_argument("--prune", action="store_true", help="delete absent plugins instead of keeping them")
     s.set_defaults(fn=cmd_sync)
 
-    c = sub.add_parser("curate", help="interactively bucket plugins")
+    c = sub.add_parser("curate", help="interactively bucket plugins (asks alias for long names)")
     c.add_argument("--all", action="store_true", help="review every plugin, not just uncurated")
     c.set_defaults(fn=cmd_curate)
+
+    a = sub.add_parser("alias", help="set/edit short display aliases (bulk)")
+    a.add_argument("--long", action="store_true", help="only plugins whose name is too long to fit")
+    a.set_defaults(fn=cmd_alias)
 
     sub.add_parser("list", help="show catalog grouped by bucket").set_defaults(fn=cmd_list)
     sub.add_parser("status", help="counts").set_defaults(fn=cmd_status)
