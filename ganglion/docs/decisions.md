@@ -14,6 +14,8 @@ SYSTEM, TUNER, COMBO 저장, 노브 focus/lock/adjust, **플러그인 피커(pla
 synapse `model.py`/`modepctrl.py`/`plugincatalog.py`의 **실 페달보드·LV2 플러그인·파라미터 get/set**에
 붙어야 함. 언제 붙일지(하드웨어 후 vs 지금), 그리고 우리 노브 dict ↔ synapse 파라미터 모델 매핑 방식.
 → 기본값: 당분간 self-contained 샘플로 스파인 완성, 통합은 별도 단계.
+- 하위 과제: **move 실시간 재배선** — C의 move 메모 참조(들고 이동 매 스텝마다
+  disconnect/reconnect, 취소 시 원복).
 
 ## B. 플러그인 화이트리스트 `[사용자]`
 시안 `WL`(카테고리×승인 플러그인) → 이제 `tools/catalog.py`로 큐레이션한
@@ -29,6 +31,11 @@ synapse `model.py`/`modepctrl.py`/`plugincatalog.py`의 **실 페달보드·LV2 
   위로 오프셋(들고 있는 듯, 반전 셀). ENC0 회전=인접 슬롯과 swap(전체 체인 재드로),
   ENC0 클릭=그 자리 착지(dirty, "MOVED"), ENC0 홀드=취소(move_from 복원). 하단 패널에
   MOVING/노드명/슬롯/조작 힌트. `moving`/`move_from` 상태, `--walk`·렌더 검증됨.
+  - **[사용자 메모] 실배선 시 move 중 재배선은 실시간**: 지금은 board 리스트 swap만
+    (드롭 때 커밋 개념). 실 모델 연결(→A) 후에는 노드를 들고 이동하는 **매 스텝마다**
+    modep 그래프를 disconnect/reconnect 해서 순서 변경에 따른 음색 변화를 즉시 들을 수
+    있게 한다. 취소(홀드) 시엔 원래 배선으로 복원. → move 커밋/취소를 실 그래프 연산에
+    매핑하는 게 A의 하위 과제.
 - **[해결] 피커(place/replace)**: `geco_whitelist.json`(큐레이션 8버킷) 로드.
   **상하 분할 레이아웃** [사용자 요청]:
   - 위: 노드 체인 — 대상 슬롯을 dashed 셀로, 들어갈 카테고리 약어 미리보기(라이브).
