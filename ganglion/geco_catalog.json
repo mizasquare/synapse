@@ -1,0 +1,835 @@
+{
+  "buckets": [
+    {
+      "key": "Dynamics",
+      "abbr": "DYN"
+    },
+    {
+      "key": "Filter",
+      "abbr": "FLT"
+    },
+    {
+      "key": "Pedal",
+      "abbr": "PDL"
+    },
+    {
+      "key": "Amp",
+      "abbr": "AMP"
+    },
+    {
+      "key": "Cab",
+      "abbr": "CAB"
+    },
+    {
+      "key": "Mod",
+      "abbr": "MOD"
+    },
+    {
+      "key": "Spatial",
+      "abbr": "SPC"
+    },
+    {
+      "key": "Utils",
+      "abbr": "UTL"
+    },
+    {
+      "key": "Unused",
+      "abbr": "--"
+    }
+  ],
+  "plugins": {
+    "http://aidadsp.cc/plugins/aidadsp-bundle/rt-neural-generic": {
+      "name": "AIDA-X",
+      "brand": "Aida DSP",
+      "lv2": [
+        "Simulator"
+      ],
+      "bucket": "Amp",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://code.google.com/p/amsynth/amsynth": {
+      "name": "amsynth",
+      "brand": "Dowell",
+      "lv2": [
+        "Generator",
+        "Instrument"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://devcurmudgeon.com/alo": {
+      "name": "ALO",
+      "brand": "",
+      "lv2": [
+        "Utility"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://distrho.sf.net/plugins/3BandEQ": {
+      "name": "3 Band EQ",
+      "brand": "DISTRHO",
+      "lv2": [
+        "Filter",
+        "Equaliser"
+      ],
+      "bucket": "Filter",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://distrho.sf.net/plugins/Kars": {
+      "name": "Kars",
+      "brand": "DISTRHO",
+      "lv2": [
+        "Generator",
+        "Instrument"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://distrho.sf.net/plugins/Nekobi": {
+      "name": "Nekobi",
+      "brand": "DISTRHO",
+      "lv2": [
+        "Generator",
+        "Instrument"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://gareus.org/oss/lv2/fat1": {
+      "name": "Autotune",
+      "brand": "x42",
+      "lv2": [
+        "Spectral",
+        "Pitch Shifter"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://gareus.org/oss/lv2/modmeter": {
+      "name": "Level Meter",
+      "brand": "x42",
+      "lv2": [
+        "Utility"
+      ],
+      "bucket": "Utils",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://gareus.org/oss/lv2/modspectre": {
+      "name": "Spectrum Analyzer",
+      "brand": "x42",
+      "lv2": [
+        "Utility"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://gareus.org/oss/lv2/stepseq#s8n8": {
+      "name": "MIDI Step Sequencer8x8",
+      "brand": "x42",
+      "lv2": [
+        "MIDI"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://gareus.org/oss/lv2/tuna#mod": {
+      "name": "Instrument Tuner",
+      "brand": "x42",
+      "lv2": [
+        "Utility",
+        "Analyser"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://gareus.org/oss/lv2/zeroconvolv#CfgMono": {
+      "name": "x42 - IR Convolver Mono",
+      "brand": "x42",
+      "lv2": [
+        "Reverb"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://gareus.org/oss/lv2/zeroconvolv#CfgStereo": {
+      "name": "x42 - IR Convolver Stereo",
+      "brand": "x42",
+      "lv2": [
+        "Reverb"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://github.com/Dougal-s/Aether": {
+      "name": "Aether",
+      "brand": "Dougal Stewart",
+      "lv2": [
+        "Reverb"
+      ],
+      "bucket": "Spatial",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://github.com/mikeoliphant/neural-amp-modeler-lv2": {
+      "name": "Neural Amp Modeler",
+      "brand": "Mike Oliphant",
+      "lv2": [
+        "Simulator"
+      ],
+      "bucket": "Amp",
+      "alias": "NAM",
+      "curated": true,
+      "present": true
+    },
+    "http://guitarix.sourceforge.net/plugins/gx_compressor#_compressor": {
+      "name": "GxCompressor",
+      "brand": "Guitarix team",
+      "lv2": [
+        "Dynamics",
+        "Compressor"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://guitarix.sourceforge.net/plugins/gx_cstb_#_cstb_": {
+      "name": "GxColorSoundTonebender",
+      "brand": "Guitarix",
+      "lv2": [
+        "Distortion"
+      ],
+      "bucket": "Pedal",
+      "alias": "Gx ToneBlender",
+      "curated": true,
+      "present": true
+    },
+    "http://guitarix.sourceforge.net/plugins/gx_expander#_expander": {
+      "name": "GxExpander",
+      "brand": "Guitarix team",
+      "lv2": [
+        "Dynamics",
+        "Expander"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://guitarix.sourceforge.net/plugins/gx_mbcompressor_#_mbcompressor_": {
+      "name": "GxMultiBandCompressor",
+      "brand": "Guitarix team",
+      "lv2": [
+        "Dynamics",
+        "Compressor"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://guitarix.sourceforge.net/plugins/gx_phaser#_phaser": {
+      "name": "GxPhaser",
+      "brand": "Guitarix team",
+      "lv2": [
+        "Modulator",
+        "Phaser"
+      ],
+      "bucket": "Mod",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://guitarix.sourceforge.net/plugins/gx_quack_#_quack_": {
+      "name": "GxQuack",
+      "brand": "Guitarix",
+      "lv2": [
+        "Filter"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://guitarix.sourceforge.net/plugins/gx_redeye#vibrochump": {
+      "name": "GxRedeye Vibro Chump",
+      "brand": "Guitarix",
+      "lv2": [
+        "Simulator"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://guitarix.sourceforge.net/plugins/gx_slowgear_#_slowgear_": {
+      "name": "GxSlowGear",
+      "brand": "Guitarix",
+      "lv2": [
+        "Dynamics",
+        "Gate"
+      ],
+      "bucket": "Dynamics",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://guitarix.sourceforge.net/plugins/gx_studiopre#studiopre": {
+      "name": "GxAlembic",
+      "brand": "Guitarix",
+      "lv2": [
+        "Simulator"
+      ],
+      "bucket": "Amp",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://guitarix.sourceforge.net/plugins/gx_tremolo#_tremolo": {
+      "name": "GxTremolo",
+      "brand": "Guitarix team",
+      "lv2": [
+        "Modulator"
+      ],
+      "bucket": "Mod",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://guitarix.sourceforge.net/plugins/gxtubevibrato#tubevibrato": {
+      "name": "GxTubeVibrato",
+      "brand": "Guitarix team",
+      "lv2": [
+        "Modulator"
+      ],
+      "bucket": "Mod",
+      "alias": "GxVibrato",
+      "curated": true,
+      "present": true
+    },
+    "http://hippie.lt/lv2/gate": {
+      "name": "abGate",
+      "brand": "A. Bruzas",
+      "lv2": [
+        "Dynamics",
+        "Gate"
+      ],
+      "bucket": "Dynamics",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://kxstudio.sf.net/carla/plugins/audiofile": {
+      "name": "Audio File",
+      "brand": "falkTX",
+      "lv2": [
+        "Utility"
+      ],
+      "bucket": "Utils",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://kxstudio.sf.net/carla/plugins/midifile": {
+      "name": "MIDI File",
+      "brand": "falkTX",
+      "lv2": [
+        "Utility"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/caps/Click": {
+      "name": "C* Click - Metronome",
+      "brand": "CAPS",
+      "lv2": [
+        "Utility"
+      ],
+      "bucket": "Utils",
+      "alias": "C* Metronome",
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/caps/Noisegate": {
+      "name": "C* Noisegate - Attenuate noise resident in silence",
+      "brand": "CAPS",
+      "lv2": [
+        "Utility"
+      ],
+      "bucket": "Utils",
+      "alias": "NoiseGate",
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/caps/PhaserII": {
+      "name": "C* PhaserII - Mono phaser modulated by a Lorenz fractal",
+      "brand": "CAPS",
+      "lv2": [
+        "Modulator",
+        "Phaser"
+      ],
+      "bucket": "Mod",
+      "alias": "C*Phaser",
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/caps/Plate": {
+      "name": "C* Plate - Versatile plate reverb",
+      "brand": "CAPS",
+      "lv2": [
+        "Reverb"
+      ],
+      "bucket": "Spatial",
+      "alias": "C* Plate",
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/caps/Wider": {
+      "name": "C* Wider - Stereo image Synthesis",
+      "brand": "CAPS",
+      "lv2": [
+        "Spatial"
+      ],
+      "bucket": "Utils",
+      "alias": "C* Wider",
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/mda/Combo": {
+      "name": "MDA Combo",
+      "brand": "MDA",
+      "lv2": [
+        "Simulator"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/mda/Stereo": {
+      "name": "MDA Stereo",
+      "brand": "MDA",
+      "lv2": [
+        "Spatial"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/mda/VocInput": {
+      "name": "MDA VocInput",
+      "brand": "MDA",
+      "lv2": [
+        "Spectral"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/mod-devel/2Voices": {
+      "name": "2Voices",
+      "brand": "MOD",
+      "lv2": [
+        "Spectral"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/mod-devel/Advanced-Compressor": {
+      "name": "Compressor Advanced",
+      "brand": "MOD",
+      "lv2": [
+        "Dynamics"
+      ],
+      "bucket": "Dynamics",
+      "alias": "Comp ADV",
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/mod-devel/BandPassFilter": {
+      "name": "BandPassFilter",
+      "brand": "MOD",
+      "lv2": [
+        "Filter"
+      ],
+      "bucket": "Filter",
+      "alias": "BandPass",
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/mod-devel/Capo": {
+      "name": "Capo",
+      "brand": "MOD",
+      "lv2": [
+        "Spectral"
+      ],
+      "bucket": "Utils",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/mod-devel/CrossOver2": {
+      "name": "CrossOver 2",
+      "brand": "MOD",
+      "lv2": [
+        "Filter"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/mod-devel/CrossOver3": {
+      "name": "CrossOver 3",
+      "brand": "MOD",
+      "lv2": [
+        "Filter"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/mod-devel/Gain": {
+      "name": "Gain",
+      "brand": "MOD",
+      "lv2": [
+        "Utility"
+      ],
+      "bucket": "Utils",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/mod-devel/Gain2x2": {
+      "name": "Gain 2x2",
+      "brand": "MOD",
+      "lv2": [
+        "Utility"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/mod-devel/Harmonizer": {
+      "name": "Harmonizer",
+      "brand": "MOD",
+      "lv2": [
+        "Spectral"
+      ],
+      "bucket": "Mod",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/mod-devel/cabsim-IR-loader": {
+      "name": "IR loader cabsim",
+      "brand": "MOD",
+      "lv2": [
+        "Simulator"
+      ],
+      "bucket": "Cab",
+      "alias": "IR CABsim",
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/tap/doubler": {
+      "name": "TAP Fractal Doubler",
+      "brand": "TAP",
+      "lv2": [
+        "Spectral"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/tap/rotspeak": {
+      "name": "TAP Rotary Speaker",
+      "brand": "TAP",
+      "lv2": [
+        "Modulator"
+      ],
+      "bucket": "Mod",
+      "alias": "TAP Rotary",
+      "curated": true,
+      "present": true
+    },
+    "http://moddevices.com/plugins/tap/vibrato": {
+      "name": "TAP Vibrato",
+      "brand": "TAP",
+      "lv2": [
+        "Modulator"
+      ],
+      "bucket": "Mod",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://remaincalm.org/plugins/floaty": {
+      "name": "floaty",
+      "brand": "remaincalm.org",
+      "lv2": [
+        "Delay"
+      ],
+      "bucket": "Spatial",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://remaincalm.org/plugins/mud": {
+      "name": "mud",
+      "brand": "remaincalm.org",
+      "lv2": [
+        "Filter"
+      ],
+      "bucket": "Filter",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://ssj71.github.io/infamousPlugins/plugs.html#powercut": {
+      "name": "the infamous power cut",
+      "brand": "infamous",
+      "lv2": [
+        "Modulator"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "http://www.openavproductions.com/artyfx#bitta": {
+      "name": "Bitta",
+      "brand": "OpenAV",
+      "lv2": [
+        "Distortion"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "https://ca9.eu/lv2/bolliedelay": {
+      "name": "Bollie Delay",
+      "brand": "Bollie",
+      "lv2": [
+        "Delay"
+      ],
+      "bucket": "Spatial",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "https://github.com/brummer10/HarmonicExciter": {
+      "name": "Harmonic Exciter",
+      "brand": "brummer",
+      "lv2": [
+        "Dynamics"
+      ],
+      "bucket": "Pedal",
+      "alias": "Harmonic Exc",
+      "curated": true,
+      "present": true
+    },
+    "https://github.com/brummer10/screcord#mono_record": {
+      "name": "Record-Mono",
+      "brand": "brummer",
+      "lv2": [
+        "Utility"
+      ],
+      "bucket": "Utils",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "https://github.com/brummer10/screcord#quad_record": {
+      "name": "Record-Quad",
+      "brand": "brummer",
+      "lv2": [
+        "Utility"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "https://github.com/brummer10/screcord#stereo_record": {
+      "name": "Record-Stereo",
+      "brand": "brummer",
+      "lv2": [
+        "Utility"
+      ],
+      "bucket": "Utils",
+      "alias": "Recordx2",
+      "curated": true,
+      "present": true
+    },
+    "https://github.com/jatinchowdhury18/KlonCentaur": {
+      "name": "ChowCentaur",
+      "brand": "chowdsp",
+      "lv2": [
+        "Distortion"
+      ],
+      "bucket": "Pedal",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "https://github.com/michaelwillis/dragonfly-reverb": {
+      "name": "Dragonfly Hall Reverb",
+      "brand": "Dragonfly",
+      "lv2": [
+        "Reverb"
+      ],
+      "bucket": "Spatial",
+      "alias": "DF Hall Reverb",
+      "curated": true,
+      "present": true
+    },
+    "https://hannesbraun.net/ns/lv2/airwindows/adclip7": {
+      "name": "ADClip7",
+      "brand": "Hannes Braun",
+      "lv2": [],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "https://hannesbraun.net/ns/lv2/airwindows/capacitor2": {
+      "name": "Capacitor2",
+      "brand": "Hannes Braun",
+      "lv2": [
+        "Filter"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "https://hannesbraun.net/ns/lv2/airwindows/starchild": {
+      "name": "StarChild",
+      "brand": "Airwindows",
+      "lv2": [
+        "Reverb"
+      ],
+      "bucket": "Spatial",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "https://mod.audio/plugins/CabinetLoader": {
+      "name": "Cabinet Loader",
+      "brand": "MOD",
+      "lv2": [
+        "Simulator"
+      ],
+      "bucket": "Cab",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "https://mod.audio/plugins/ConvolutionLoader": {
+      "name": "Convolution Loader",
+      "brand": "MOD",
+      "lv2": [
+        "Reverb"
+      ],
+      "bucket": "Spatial",
+      "alias": "Cnv Loader",
+      "curated": true,
+      "present": true
+    },
+    "urn:brummer:bluesbreaker": {
+      "name": "bluesbreaker",
+      "brand": "brummer",
+      "lv2": [
+        "Distortion"
+      ],
+      "bucket": "Pedal",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "urn:distrho:a-fluidsynth": {
+      "name": "DIE Fluid Synth",
+      "brand": "DISTRHO",
+      "lv2": [
+        "Generator",
+        "Instrument"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    },
+    "urn:dragonfly:early": {
+      "name": "Dragonfly Early Reflections",
+      "brand": "Dragonfly",
+      "lv2": [
+        "Reverb"
+      ],
+      "bucket": "Spatial",
+      "alias": "DF Eearly Refl",
+      "curated": true,
+      "present": true
+    },
+    "urn:dragonfly:plate": {
+      "name": "Dragonfly Plate Reverb",
+      "brand": "Dragonfly",
+      "lv2": [
+        "Reverb"
+      ],
+      "bucket": "Spatial",
+      "alias": "DF Plate Reverb",
+      "curated": true,
+      "present": true
+    },
+    "urn:dragonfly:room": {
+      "name": "Dragonfly Room Reverb",
+      "brand": "Dragonfly",
+      "lv2": [
+        "Reverb"
+      ],
+      "bucket": "Unused",
+      "alias": null,
+      "curated": true,
+      "present": true
+    }
+  }
+}

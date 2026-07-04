@@ -5,19 +5,23 @@ Consumes the shared input events (``Rotate``/``Press``/``Combo`` from
 ``ganglion.render``. This is the live controller with a real knob model; the
 mockup's executable spec (GECO OLED 2a) is the reference.
 
-Ported this pass (the navigation spine):
+Ported so far (the navigation spine + picker):
   depth 0 (chain nav · knob focus/lock/adjust · ENC0 slot menu · ENC0-hold up) ·
   depth -1 (glance: board/snapshot scroll) · slot menu (bypass/remove/back) ·
-  SYSTEM (ENC0 scroll-left-past-start) · TUNER (ENC1 hold) · COMBO (save).
+  picker (place/replace: category list -> plugin list -> place, from the curated
+  geco_whitelist.json) · SYSTEM (ENC0 scroll-left-past-start) · TUNER (ENC1 hold) ·
+  COMBO (save).
 
-Stubbed with a toast + [DECISION] marker (see docs/decisions.md): plugin picker
-(place/replace), move, board/snapshot manage (rename/save/delete), confirm
-overlay. Wiring to synapse's real model/modepctrl/plugincatalog is also pending.
+Stubbed with a toast + [DECISION] marker (see docs/decisions.md): move,
+board/snapshot manage (rename/save/delete), confirm overlay. The picker's placed
+nodes use per-bucket placeholder knobs — wiring to synapse's real
+model/modepctrl/plugincatalog params is still pending.
 
 Run (needs a TTY):  python3 ganglion/app.py
 Scripted check:      python3 ganglion/app.py --walk
 """
 
+import json
 import os
 import sys
 
@@ -35,9 +39,12 @@ BG = 0
 BUCKET = {"Drive": "DRV", "Comp": "CMP", "Amp·Cab": "AMP", "Delay": "DLY",
           "Reverb": "RVB", "EQ": "EQ", "Mod": "MOD", "Filter": "FLT"}
 # ENC0 LED per effect category (design leds()); ENC1/state colours below.
+# Old sample-board bucket names + the live GECO whitelist keys share this map.
 BUCKETCOL = {"Drive": "amber", "Comp": "green", "Amp·Cab": "amber",
              "Delay": "purple", "Reverb": "blue", "EQ": "blue", "Mod": "purple",
-             "Filter": "blue", "Utility": "grey"}
+             "Filter": "blue", "Utility": "grey",
+             "Dynamics": "green", "Pedal": "amber", "Amp": "amber", "Cab": "amber",
+             "Spatial": "blue", "Utils": "grey"}
 
 
 def K(n, v, mn, mx, u="", k="dial", scale=None):
@@ -84,6 +91,46 @@ def _empty():
     return {"name": "", "abbr": "", "bucket": "", "bypass": False, "empty": True, "knobs": []}
 
 
+# ---- plugin whitelist + node factory (port of the mockup's WL/makeNode) ----
+# Curated by tools/catalog.py -> geco_whitelist.json (8 GECO buckets). The knob
+# templates below are placeholders keyed by bucket until the synapse model/LV2
+# param wiring lands (decisions.md A/B/E) — a placed node gets its bucket's dials.
+_WL_FALLBACK = [
+    {"key": "Pedal", "abbr": "PDL",
+     "plugins": [{"display": "Overdrive", "name": "Overdrive", "uri": "", "brand": "", "alias": None}]},
+    {"key": "Amp", "abbr": "AMP",
+     "plugins": [{"display": "Amp Sim", "name": "Amp Sim", "uri": "", "brand": "", "alias": None}]},
+]
+
+_KNOB_TMPL = {
+    "Dynamics": lambda: [K("Thresh", -24, -60, 0, "dB"), K("Ratio", 4, 1, 20, ":1"),
+                         K("Attack", 12, 1, 100, "ms"), K("Makeup", 6, 0, 24, "dB")],
+    "Filter": lambda: [K("Freq", 800, 20, 12000, "Hz"), K("Q", 1.0, .1, 10), K("Gain", 0, -24, 24, "dB")],
+    "Pedal": lambda: [K("Gain", .6, 0, 1), K("Tone", .5, 0, 1), K("Level", .7, 0, 1)],
+    "Amp": lambda: [K("Input", -6, -20, 20, "dB"), K("Gain", .5, 0, 1), K("Output", -3, -20, 20, "dB")],
+    "Cab": lambda: [K("Level", .8, 0, 1)],
+    "Mod": lambda: [K("Rate", 1.2, .1, 10, "Hz"), K("Depth", 50, 0, 100, "%"), K("Mix", 40, 0, 100, "%")],
+    "Spatial": lambda: [K("Time", 380, 20, 1200, "ms"), K("Fdbk", 42, 0, 100, "%"), K("Mix", 28, 0, 100, "%")],
+    "Utils": lambda: [K("Level", .7, 0, 1)],
+}
+
+
+def load_whitelist():
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "geco_whitelist.json")
+    try:
+        with open(path) as f:
+            buckets = json.load(f)["buckets"]
+        return buckets if buckets else _WL_FALLBACK
+    except (OSError, ValueError, KeyError):
+        return _WL_FALLBACK
+
+
+def make_node(cat, plug):
+    tmpl = _KNOB_TMPL.get(cat["key"], lambda: [K("Level", .7, 0, 1)])
+    return {"name": plug["display"], "abbr": cat["abbr"], "bucket": cat["key"],
+            "bypass": False, "empty": False, "knobs": tmpl()}
+
+
 PBS = ["Lead Joyful", "Clean Verse", "Ambient Cathedral Wash"]
 SNAPS = ["Default", "Lead Boost", "Ambient"]
 SYSITEMS = ["Tuner", "Brightness", "MIDI Ch", "About", "< Back"]
@@ -99,6 +146,9 @@ class AppState:
     menu: int = 0
     sys: bool = False
     sys_idx: int = 0
+    pick: str = ""            # ""=off, "cat"=category list, "fx"=plugin list
+    pick_cat: int = 0
+    pick_fx: int = 0
     tuner: bool = False
     tcents: int = 6
     tnote: str = "A"
@@ -107,6 +157,7 @@ class AppState:
     dirty: bool = False
     toast: str = ""
     board: list = field(default_factory=make_board)
+    wl: list = field(default_factory=load_whitelist)
 
 
 class AppController:
@@ -142,6 +193,12 @@ class AppController:
     def rot(self, enc, d):
         st = self.st
         if st.tuner:
+            return
+        if st.pick:
+            if st.pick == "cat":
+                st.pick_cat = (st.pick_cat + d) % len(st.wl)
+            else:
+                st.pick_fx = (st.pick_fx + d) % len(st.wl[st.pick_cat]["plugins"])
             return
         if st.sys:
             st.sys_idx = (st.sys_idx + d) % len(SYSITEMS)
@@ -190,6 +247,19 @@ class AppController:
         if st.tuner:
             st.tuner = False
             return
+        if st.pick:
+            if enc == 0:
+                if st.pick == "cat":
+                    st.pick, st.pick_fx = "fx", 0
+                else:
+                    cat = st.wl[st.pick_cat]
+                    plug = cat["plugins"][st.pick_fx]
+                    st.board[st.node] = make_node(cat, plug)
+                    st.pick, st.knob, st.dirty = "", 0, True
+                    self._toast(plug["display"] + " placed")
+            else:                              # ENC1 click = back one level
+                st.pick = "cat" if st.pick == "fx" else ""
+            return
         if st.sys:
             if enc == 0:
                 self._sys_act()
@@ -223,7 +293,10 @@ class AppController:
         elif act == "remove":
             st.board[st.node] = _empty()
             st.menu_open, st.knob, st.dirty = False, 0, True
-        else:  # place / replace / move -> [DECISION] picker & move not ported
+        elif act in ("place", "replace"):
+            st.menu_open = False
+            st.pick, st.pick_cat, st.pick_fx = "cat", 0, 0
+        else:  # move -> [DECISION] move not ported yet
             st.menu_open = False
             self._toast("TODO: " + act)
 
@@ -241,6 +314,9 @@ class AppController:
         st = self.st
         if st.tuner:
             st.tuner = False
+            return
+        if st.pick:                           # hold backs out of the picker
+            st.pick = "cat" if st.pick == "fx" else ""
             return
         if enc == 0:                          # ENC0 hold = zoom out one level
             if st.sys:
@@ -266,6 +342,8 @@ class AppController:
 def render(st):
     if st.tuner:
         return _tuner(st)
+    if st.pick:
+        return _pick(st)
     if st.sys:
         return _sys(st)
     if st.menu_open:
@@ -394,6 +472,43 @@ def _menu(st):
     return s.img
 
 
+def _vlist(s, items, sel, y0=20, vis=5, rh=18):
+    """Windowed vertical list: selection inverted, edge arrows when clipped."""
+    n = len(items)
+    start = 0 if n <= vis else max(0, min(sel - vis // 2, n - vis))
+    for r in range(min(vis, n)):
+        i = start + r
+        y = y0 + r * rh
+        if i == sel:
+            s.box(3, y - 2, 122, rh - 3, fill=True)
+            s.T(items[i], 8, y, 12, fill=0)
+        else:
+            s.T(items[i], 8, y, 12)
+    if start > 0:
+        s.T("^", 118, y0 - 1, 6)
+    if start + vis < n:
+        s.T("v", 118, y0 + (vis - 1) * rh + 1, 6)
+
+
+def _pick(st):
+    s = Screen()
+    if st.pick == "cat":
+        s.T("PLACE FX", 6, 4, 8, ls=1)
+        s.T("SL%d" % (st.node + 1), 104, 5, 6)
+        s.hline(0, 15, 128)
+        _vlist(s, ["%-4s%s" % (b["abbr"], b["key"]) for b in st.wl], st.pick_cat)
+        s.T("e0 open  e1 back", 5, 120, 6)
+    else:
+        cat = st.wl[st.pick_cat]
+        s.T(cat["key"].upper(), 6, 4, 8, ls=1)
+        s.T("%d/%d" % (st.pick_fx + 1, len(cat["plugins"])), 96, 5, 6)
+        s.hline(0, 15, 128)
+        _vlist(s, [p["display"] for p in cat["plugins"]], st.pick_fx)
+        s.T("e0 place  e1 back", 5, 120, 6)
+    _toast_over(s, st)
+    return s.img
+
+
 def _sys(st):
     s = Screen()
     s.T("SYSTEM", 6, 4, 8, ls=1)
@@ -437,6 +552,8 @@ def leds(st):
     n = st.board[st.node]
     if st.tuner:
         return ("purple", "purple")
+    if st.pick:
+        return (BUCKETCOL.get(st.wl[st.pick_cat]["key"], "grey"), "amber")
     if st.sys:
         return ("grey", OFF)
     if st.depth == -1:
@@ -483,14 +600,24 @@ def _walk():
     do("r", "sys")         # one more left past start -> SYSTEM
     do("w", "sys-exec")    # SYSTEM item 0 = Tuner -> tuner
     do("w", "tuner-exit")  # click exits tuner
+    # picker: replace node 0 -> pick category -> pick plugin -> place
+    do("w", "menu")        # enc0 click: slot menu on node 0
+    do("tt", "to-replace") # menu 0 -> 2 (Replace)
+    do("w", "pick-cat")    # exec -> picker category list
+    do("ttt", "cat>")      # scroll categories (Dynamics -> Amp)
+    do("w", "pick-fx")     # enc0 click: drill into plugin list
+    do("t", "fx>")         # scroll plugins
+    do("w", "place")       # enc0 click: place node -> board[0] replaced
+    do("w", "menu2")       # reopen menu on the freshly placed node
+    do("w", "bypass2")     # bypass it (sanity: node model intact)
 
 
 def _snap(st):
     n = st.board[st.node]
     kv = fmt(n["knobs"][st.knob]) if not n["empty"] and n["knobs"] else "--"
-    return ("d=%d node=%d(%s) k=%d[%s] lock=%d dirty=%d menu=%d sys=%d tun=%d pb=%d snap=%d toast=%r"
+    return ("d=%d node=%d(%s) k=%d[%s] lock=%d dirty=%d menu=%d pick=%s sys=%d tun=%d pb=%d snap=%d toast=%r"
             % (st.depth, st.node, n["abbr"] or "--", st.knob, kv, st.locked, st.dirty,
-               st.menu_open, st.sys, st.tuner, st.pb, st.snap, st.toast))
+               st.menu_open, st.pick or "-", st.sys, st.tuner, st.pb, st.snap, st.toast))
 
 
 def main(argv):

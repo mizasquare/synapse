@@ -1,0 +1,332 @@
+{
+  "buckets": [
+    {
+      "key": "Dynamics",
+      "abbr": "DYN",
+      "plugins": [
+        {
+          "name": "GxSlowGear",
+          "uri": "http://guitarix.sourceforge.net/plugins/gx_slowgear_#_slowgear_",
+          "brand": "Guitarix",
+          "alias": null,
+          "display": "GxSlowGear"
+        },
+        {
+          "name": "abGate",
+          "uri": "http://hippie.lt/lv2/gate",
+          "brand": "A. Bruzas",
+          "alias": null,
+          "display": "abGate"
+        },
+        {
+          "name": "Compressor Advanced",
+          "uri": "http://moddevices.com/plugins/mod-devel/Advanced-Compressor",
+          "brand": "MOD",
+          "alias": "Comp ADV",
+          "display": "Comp ADV"
+        }
+      ]
+    },
+    {
+      "key": "Filter",
+      "abbr": "FLT",
+      "plugins": [
+        {
+          "name": "3 Band EQ",
+          "uri": "http://distrho.sf.net/plugins/3BandEQ",
+          "brand": "DISTRHO",
+          "alias": null,
+          "display": "3 Band EQ"
+        },
+        {
+          "name": "BandPassFilter",
+          "uri": "http://moddevices.com/plugins/mod-devel/BandPassFilter",
+          "brand": "MOD",
+          "alias": "BandPass",
+          "display": "BandPass"
+        },
+        {
+          "name": "mud",
+          "uri": "http://remaincalm.org/plugins/mud",
+          "brand": "remaincalm.org",
+          "alias": null,
+          "display": "mud"
+        }
+      ]
+    },
+    {
+      "key": "Pedal",
+      "abbr": "PDL",
+      "plugins": [
+        {
+          "name": "GxColorSoundTonebender",
+          "uri": "http://guitarix.sourceforge.net/plugins/gx_cstb_#_cstb_",
+          "brand": "Guitarix",
+          "alias": "Gx ToneBlender",
+          "display": "Gx ToneBlender"
+        },
+        {
+          "name": "Harmonic Exciter",
+          "uri": "https://github.com/brummer10/HarmonicExciter",
+          "brand": "brummer",
+          "alias": "Harmonic Exc",
+          "display": "Harmonic Exc"
+        },
+        {
+          "name": "ChowCentaur",
+          "uri": "https://github.com/jatinchowdhury18/KlonCentaur",
+          "brand": "chowdsp",
+          "alias": null,
+          "display": "ChowCentaur"
+        },
+        {
+          "name": "bluesbreaker",
+          "uri": "urn:brummer:bluesbreaker",
+          "brand": "brummer",
+          "alias": null,
+          "display": "bluesbreaker"
+        }
+      ]
+    },
+    {
+      "key": "Amp",
+      "abbr": "AMP",
+      "plugins": [
+        {
+          "name": "AIDA-X",
+          "uri": "http://aidadsp.cc/plugins/aidadsp-bundle/rt-neural-generic",
+          "brand": "Aida DSP",
+          "alias": null,
+          "display": "AIDA-X"
+        },
+        {
+          "name": "Neural Amp Modeler",
+          "uri": "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+          "brand": "Mike Oliphant",
+          "alias": "NAM",
+          "display": "NAM"
+        },
+        {
+          "name": "GxAlembic",
+          "uri": "http://guitarix.sourceforge.net/plugins/gx_studiopre#studiopre",
+          "brand": "Guitarix",
+          "alias": null,
+          "display": "GxAlembic"
+        }
+      ]
+    },
+    {
+      "key": "Cab",
+      "abbr": "CAB",
+      "plugins": [
+        {
+          "name": "IR loader cabsim",
+          "uri": "http://moddevices.com/plugins/mod-devel/cabsim-IR-loader",
+          "brand": "MOD",
+          "alias": "IR CABsim",
+          "display": "IR CABsim"
+        },
+        {
+          "name": "Cabinet Loader",
+          "uri": "https://mod.audio/plugins/CabinetLoader",
+          "brand": "MOD",
+          "alias": null,
+          "display": "Cabinet Loader"
+        }
+      ]
+    },
+    {
+      "key": "Mod",
+      "abbr": "MOD",
+      "plugins": [
+        {
+          "name": "GxPhaser",
+          "uri": "http://guitarix.sourceforge.net/plugins/gx_phaser#_phaser",
+          "brand": "Guitarix team",
+          "alias": null,
+          "display": "GxPhaser"
+        },
+        {
+          "name": "GxTremolo",
+          "uri": "http://guitarix.sourceforge.net/plugins/gx_tremolo#_tremolo",
+          "brand": "Guitarix team",
+          "alias": null,
+          "display": "GxTremolo"
+        },
+        {
+          "name": "GxTubeVibrato",
+          "uri": "http://guitarix.sourceforge.net/plugins/gxtubevibrato#tubevibrato",
+          "brand": "Guitarix team",
+          "alias": "GxVibrato",
+          "display": "GxVibrato"
+        },
+        {
+          "name": "C* PhaserII - Mono phaser modulated by a Lorenz fractal",
+          "uri": "http://moddevices.com/plugins/caps/PhaserII",
+          "brand": "CAPS",
+          "alias": "C*Phaser",
+          "display": "C*Phaser"
+        },
+        {
+          "name": "Harmonizer",
+          "uri": "http://moddevices.com/plugins/mod-devel/Harmonizer",
+          "brand": "MOD",
+          "alias": null,
+          "display": "Harmonizer"
+        },
+        {
+          "name": "TAP Rotary Speaker",
+          "uri": "http://moddevices.com/plugins/tap/rotspeak",
+          "brand": "TAP",
+          "alias": "TAP Rotary",
+          "display": "TAP Rotary"
+        },
+        {
+          "name": "TAP Vibrato",
+          "uri": "http://moddevices.com/plugins/tap/vibrato",
+          "brand": "TAP",
+          "alias": null,
+          "display": "TAP Vibrato"
+        }
+      ]
+    },
+    {
+      "key": "Spatial",
+      "abbr": "SPC",
+      "plugins": [
+        {
+          "name": "Aether",
+          "uri": "http://github.com/Dougal-s/Aether",
+          "brand": "Dougal Stewart",
+          "alias": null,
+          "display": "Aether"
+        },
+        {
+          "name": "C* Plate - Versatile plate reverb",
+          "uri": "http://moddevices.com/plugins/caps/Plate",
+          "brand": "CAPS",
+          "alias": "C* Plate",
+          "display": "C* Plate"
+        },
+        {
+          "name": "floaty",
+          "uri": "http://remaincalm.org/plugins/floaty",
+          "brand": "remaincalm.org",
+          "alias": null,
+          "display": "floaty"
+        },
+        {
+          "name": "Bollie Delay",
+          "uri": "https://ca9.eu/lv2/bolliedelay",
+          "brand": "Bollie",
+          "alias": null,
+          "display": "Bollie Delay"
+        },
+        {
+          "name": "Dragonfly Hall Reverb",
+          "uri": "https://github.com/michaelwillis/dragonfly-reverb",
+          "brand": "Dragonfly",
+          "alias": "DF Hall Reverb",
+          "display": "DF Hall Reverb"
+        },
+        {
+          "name": "StarChild",
+          "uri": "https://hannesbraun.net/ns/lv2/airwindows/starchild",
+          "brand": "Airwindows",
+          "alias": null,
+          "display": "StarChild"
+        },
+        {
+          "name": "Convolution Loader",
+          "uri": "https://mod.audio/plugins/ConvolutionLoader",
+          "brand": "MOD",
+          "alias": "Cnv Loader",
+          "display": "Cnv Loader"
+        },
+        {
+          "name": "Dragonfly Early Reflections",
+          "uri": "urn:dragonfly:early",
+          "brand": "Dragonfly",
+          "alias": "DF Eearly Refl",
+          "display": "DF Eearly Refl"
+        },
+        {
+          "name": "Dragonfly Plate Reverb",
+          "uri": "urn:dragonfly:plate",
+          "brand": "Dragonfly",
+          "alias": "DF Plate Reverb",
+          "display": "DF Plate Reverb"
+        }
+      ]
+    },
+    {
+      "key": "Utils",
+      "abbr": "UTL",
+      "plugins": [
+        {
+          "name": "Level Meter",
+          "uri": "http://gareus.org/oss/lv2/modmeter",
+          "brand": "x42",
+          "alias": null,
+          "display": "Level Meter"
+        },
+        {
+          "name": "Audio File",
+          "uri": "http://kxstudio.sf.net/carla/plugins/audiofile",
+          "brand": "falkTX",
+          "alias": null,
+          "display": "Audio File"
+        },
+        {
+          "name": "C* Click - Metronome",
+          "uri": "http://moddevices.com/plugins/caps/Click",
+          "brand": "CAPS",
+          "alias": "C* Metronome",
+          "display": "C* Metronome"
+        },
+        {
+          "name": "C* Noisegate - Attenuate noise resident in silence",
+          "uri": "http://moddevices.com/plugins/caps/Noisegate",
+          "brand": "CAPS",
+          "alias": "NoiseGate",
+          "display": "NoiseGate"
+        },
+        {
+          "name": "C* Wider - Stereo image Synthesis",
+          "uri": "http://moddevices.com/plugins/caps/Wider",
+          "brand": "CAPS",
+          "alias": "C* Wider",
+          "display": "C* Wider"
+        },
+        {
+          "name": "Capo",
+          "uri": "http://moddevices.com/plugins/mod-devel/Capo",
+          "brand": "MOD",
+          "alias": null,
+          "display": "Capo"
+        },
+        {
+          "name": "Gain",
+          "uri": "http://moddevices.com/plugins/mod-devel/Gain",
+          "brand": "MOD",
+          "alias": null,
+          "display": "Gain"
+        },
+        {
+          "name": "Record-Mono",
+          "uri": "https://github.com/brummer10/screcord#mono_record",
+          "brand": "brummer",
+          "alias": null,
+          "display": "Record-Mono"
+        },
+        {
+          "name": "Record-Stereo",
+          "uri": "https://github.com/brummer10/screcord#stereo_record",
+          "brand": "brummer",
+          "alias": "Recordx2",
+          "display": "Recordx2"
+        }
+      ]
+    }
+  ]
+}

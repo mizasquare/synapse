@@ -3,8 +3,9 @@
 시안 2a를 `ganglion/app.py`로 포팅하며 튀어나온 결정들. 진행하며 계속 추가한다.
 `[사용자]`=님 판단 필요 · `[구현]`=내가 옵션 정리해 제안 · `[해결]`=정해짐.
 
-상태(2026-07-04): **스파인 포팅 완료** — depth 0/−1, 슬롯 메뉴(bypass/remove/back),
-SYSTEM, TUNER, COMBO 저장, 노브 focus/lock/adjust. 라이브 노브 모델 + 6개 화면 렌더 검증.
+상태(2026-07-05): **스파인 + 피커 포팅 완료** — depth 0/−1, 슬롯 메뉴(bypass/remove/back),
+SYSTEM, TUNER, COMBO 저장, 노브 focus/lock/adjust, **플러그인 피커(place/replace,
+`geco_whitelist.json` 8버킷)**. 라이브 노브 모델 + 7개 화면 렌더 검증.
 
 ---
 
@@ -15,13 +16,20 @@ synapse `model.py`/`modepctrl.py`/`plugincatalog.py`의 **실 페달보드·LV2 
 → 기본값: 당분간 self-contained 샘플로 스파인 완성, 통합은 별도 단계.
 
 ## B. 플러그인 화이트리스트 `[사용자]`
-시안 `WL`(카테고리×승인 플러그인)이 하드코딩. 실배선 시 `plugincatalog.py`의 실 LV2 URI로 매핑 필요.
-확정본인가, 시작점인가? (피커 화면은 아직 스텁)
+시안 `WL`(카테고리×승인 플러그인) → 이제 `tools/catalog.py`로 큐레이션한
+`geco_whitelist.json`(8버킷)을 `load_whitelist()`로 로드해 피커가 사용. URI도 이미 실 LV2 값.
+남은 것: 실배선 시 이 URI로 `plugincatalog.py`/`modepctrl.py`에 인스턴스화·파라미터 매핑(→ A/E).
+화이트리스트 자체는 언제든 catalog 툴로 재큐레이션 가능(증분 유지).
 
-## C. 스텁된 인터랙션 우선순위 `[구현]`
-시안엔 있으나 아직 포팅 안 함 (토스트로 스텁): **피커(place/replace)** · **move** ·
+## C. 스텁된 인터랙션 우선순위 `[구현/일부 해결]`
+시안엔 있으나 아직 포팅 안 함 (토스트로 스텁): ~~피커(place/replace)~~ · **move** ·
 **보드/스냅샷 관리(rename/save/delete)** · **confirm 오버레이**. 로직은 시안에 다 있음.
-→ 어느 것부터? 제안: 피커 → move → 관리 → confirm 순 (사용 빈도).
+→ 제안 순서: 피커 → move → 관리 → confirm.
+- **[해결] 피커(place/replace)**: `geco_whitelist.json`(큐레이션 8버킷) 로드 →
+  카테고리 리스트(`pick='cat'`) → 플러그인 리스트(`pick='fx'`) → 배치.
+  ENC0 클릭=드릴/배치, ENC1 클릭·홀드=백. 윈도잉 리스트(`_vlist`, 5행+엣지 화살표).
+  배치 노드는 버킷별 **플레이스홀더 노브 템플릿**(`_KNOB_TMPL`) — 실 LV2 파라미터
+  배선은 A/B/E와 함께 (placed node의 name=display, abbr=버킷 약어). 렌더·`--walk` 검증됨.
 
 ## D. 회전 가속(accel)을 값 조절에 반영할지 `[사용자]`
 현재 `feed()`에서 Rotate.delta를 **부호로만** 축약 → 1디텐트=1스텝(노드 이동·값 조절 공통).
