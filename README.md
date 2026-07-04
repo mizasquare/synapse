@@ -13,6 +13,13 @@ controller — no laptop or phone needed to play.
 > `GCaMP6s` identifiers in the MIDI/host wiring). The intended end state is
 > **Synapse = app**, **GCaMP6s = box**; a rename refactor is on the roadmap.
 
+> **Sibling project — ganglion / GECO1.** A second, *headless* control app lives in this repo
+> under [`ganglion/`](ganglion/): a 128×128 I²C OLED + two rotary encoders for a small pisound
+> desk rig (**GECO1**), in place of Synapse's touchscreen. It reuses Synapse's pure logic layers
+> (`model` · `modepctrl` · `plugincatalog` · `monitorfeed`) with **0 edits to the synapse core**.
+> Its code and design docs are self-contained under [`ganglion/`](ganglion/) and
+> [`ganglion/docs/`](ganglion/docs/).
+
 ---
 
 ## What it does
