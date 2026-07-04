@@ -504,6 +504,7 @@ def _menu(st):
             s.T(ic + " " + label, 48, y + 1, 8, fill=0)
         else:
             s.T(ic + " " + label, 48, y + 1, 8)
+    _toast_over(s, st)
     return s.img
 
 
@@ -622,6 +623,7 @@ def _sys(st):
         else:
             s.T(it, 9, y, 12)
     s.T("e0 move.click  HOLD back", 5, 120, 6)
+    _toast_over(s, st)
     return s.img
 
 
@@ -733,48 +735,65 @@ def _snap(st):
                st.menu_open, st.pick or "-", st.moving, st.sys, st.tuner, st.pb, st.snap, st.toast))
 
 
+class _ScriptSource:
+    """Headless input source: replays keyboard chars, one per poll (for tests)."""
+
+    def __init__(self, kb, chars):
+        self.kb = kb
+        self.chars = list(chars)
+
+    def poll(self, now):
+        return self.kb.feed(self.chars.pop(0), now) if self.chars else []
+
+
+class _CaptureSink:
+    def __init__(self):
+        self.frames, self.last = 0, None
+
+    def show(self, frame):
+        self.frames, self.last = self.frames + 1, frame
+
+
+def _looptest():
+    """Drive the Runtime under a fake clock (no TTY) — proves loop + splash (F)."""
+    from ganglion.runtime import Runtime
+    from ganglion.input import KeyboardInput
+    clk = [0.0]
+    c = AppController()
+    src = _ScriptSource(KeyboardInput(), ["t", "x", "t"])   # nav, combo(save), nav
+    rt = Runtime(c, src, _CaptureSink(), render, leds=leds, splash_s=0.5, tick_s=0.03,
+                 clock=lambda: clk[0], sleep=lambda dt: clk.__setitem__(0, clk[0] + dt))
+    rt.step()
+    print("t (nav)   node=%d toast=%r  clk=%.2f" % (c.st.node, c.st.toast, clk[0]))
+    t0 = clk[0]
+    rt.step()                                               # 'x' sets toast -> splash
+    dt = clk[0] - t0
+    ok = c.st.toast == "" and dt >= 0.5
+    print("x (combo) depth=%d toast=%r  splash_dt=%.2f  %s"
+          % (c.st.depth, c.st.toast, dt, "SPLASH-OK" if ok else "SPLASH-FAIL"))
+    rt.step()
+    print("t (nav)   pb=%d  frames=%d" % (c.st.pb, rt.sink.frames))
+
+
 def main(argv):
     if "--walk" in argv:
         _walk()
         return
-    if not sys.stdin.isatty():
-        print("app needs a TTY. Try: python3 ganglion/app.py --walk")
+    if "--looptest" in argv:
+        _looptest()
         return
-    import termios
-    import tty
-    import select
-    import time
-    from ganglion.display import TerminalRenderer
-    from ganglion.input import KeyboardInput
-    r = TerminalRenderer("braille")
-    kb = KeyboardInput()
+    from ganglion.runtime import run_terminal
     c = AppController()
-    fd = sys.stdin.fileno()
-    old = termios.tcgetattr(fd)
-    try:
-        tty.setcbreak(fd)
-        sys.stdout.write("\x1b[?25l\x1b[?1049h\x1b[2J")
-        while True:
-            now = time.monotonic()
-            while select.select([sys.stdin], [], [], 0)[0]:
-                ch = sys.stdin.read(1)
-                if ch in ("Q",):
-                    return
-                for ev in kb.feed(ch, now):
-                    c.feed(ev)
-            rows = r.render(render(c.st))
-            hud = ["r/t e0  f/g e1", "w/s click  e/d hold  x combo", "Q quit",
-                   "", _snap(c.st).replace(" ", "\n ", 0)[:40], "leds " + str(leds(c.st))]
-            out = []
-            for i, row in enumerate(rows):
-                out.append(row + "  " + (hud[i] if i < len(hud) else "") + "\x1b[K")
-            sys.stdout.write("\x1b[H" + "\r\n".join(out) + "\x1b[J")
-            sys.stdout.flush()
-            time.sleep(0.03)
-    finally:
-        sys.stdout.write("\x1b[?1049l\x1b[?25h")
-        sys.stdout.flush()
-        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+    def hud():
+        return ["r/t e0  f/g e1", "w/s click  e/d hold  x combo", "Q quit",
+                "", _snap(c.st)[:40], "leds " + str(leds(c.st))]
+
+    if "--device" in argv:
+        from ganglion.runtime import run_device
+        run_device(c, render, leds)
+        return
+    run_terminal(c, render, leds=leds, hud=hud)
 
 
 if __name__ == "__main__":

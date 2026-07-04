@@ -77,9 +77,16 @@ synapse `model.py`/`modepctrl.py`/`plugincatalog.py`의 **실 페달보드·LV2 
 `leds()`가 색 **이름**("amber","green","red","purple","blue","grey","off") 반환. NeoPixel엔
 실 RGB 튜플 필요. 정확한 색상값·밝기(주간 시인성)·off 처리. → 팔레트 값 확정.
 
-## J. 메인루프 구조 `[구현]`
-헤드리스 루프: 입력 폴/이벤트 · monitorfeed 갱신 · 토스트/애니메이션 틱 · 디스플레이 부분 push.
-`scheduler.Scheduler` seam 맞춰 plain-Python. → 스파인 다음 큰 덩어리.
+## J. 메인루프 구조 `[해결]`
+`ganglion/runtime.py`: `Runtime.step()` = source.poll(now) → controller.feed →
+view 그리기 → (토스트 있으면) F의 0.5s 블로킹 splash → clear → tick sleep.
+모두 주입(source/sink/clock/sleep)이라 **fake clock으로 헤드리스 테스트 가능**(순수
+컨트롤러는 I/O·시간 무지). 심: `source.poll(now)->events`, `sink.show(frame)`,
+`led_out((c0,c1))`. 드라이버 둘: `run_terminal`(키보드+터미널, dev),
+`run_device`(seesaw+luma SH1107, 온메탈 — seesaw처럼 lazy import 스텁, 미검증).
+`app.py --looptest`가 루프+splash를 fake clock으로 검증(SPLASH-OK). monitorfeed
+갱신(H)·LED 팔레트 실값(I)은 배선/하드웨어 때 이 루프에 얹음.
+- 남음: monitorfeed 틱(H), 스크린세이버 무조작 진입(G)을 step에 추가.
 
 ---
 
