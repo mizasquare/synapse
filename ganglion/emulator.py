@@ -10,11 +10,10 @@ Run (from the repo root):
     python3 ganglion/emulator.py --half     # half-block, 128x64 chars (wide term)
     python3 ganglion/emulator.py --selftest # render one frame + quit (no TTY)
 
-Controls:
-    enc0:  q <   w toggle-switch   e >          x / Ctrl-C : quit
-    enc1:  a <   s toggle-switch   d >
-Switch keys TOGGLE (● held / ○ up); release -> click (<0.6s) or LONG (>=0.6s);
-both ● at once = COMBO. Resize the terminal to >= ~106x34 for the full view.
+Controls (each key = one complete gesture):
+    enc0:  r <   t >   w click   e long        q / Ctrl-C : quit
+    enc1:  f <   g >   s click   d long        x : combo
+Resize the terminal to >= ~106x34 for the full view.
 
 ``DemoScreen`` below is a throwaway placeholder that just proves every input
 path and the render pipeline work -- the real screens (design.md #4) replace it.
@@ -117,14 +116,13 @@ class DemoScreen:
 _HUD = [
     "GANGLION emulator — SH1107 128x128 (fake)",
     "",
-    "enc0:  q <    w toggle    e >",
-    "enc1:  a <    s toggle    d >",
+    "enc0:  r <   t >    w click   e long",
+    "enc1:  f <   g >    s click   d long",
     "",
-    "switch keys TOGGLE  (● held / ○ up)",
-    "release → click(<0.6s) / LONG(≥0.6s)",
-    "both ● at once = COMBO",
+    "each key = one full gesture",
+    "combo:  x",
     "",
-    "x / Ctrl-C : quit",
+    "q / Ctrl-C : quit",
 ]
 
 
@@ -137,13 +135,9 @@ def _compose(disp_rows, hud_lines):
     return "\r\n".join(out) + "\x1b[J"
 
 
-def _dynamic_hud(ui, status):
-    (d0, h0), (d1, h1) = status
-    dot = lambda d: "●" if d else "○"
+def _dynamic_hud(ui):
     return _HUD + [
         "",
-        "enc0 sw: %s  held %4.1fs" % (dot(d0), h0),
-        "enc1 sw: %s  held %4.1fs" % (dot(d1), h1),
         "sel: %d %-9s vol: %d" % (ui.sel, "(%s)" % _MENU[ui.sel], ui.value),
         "entered: %s" % (ui.entered or "-"),
         "last: %s" % ui.last_event,
@@ -156,13 +150,13 @@ def _selftest(mode):
     kb = KeyboardInput()
     ui = DemoScreen()
     t = 0.0
-    for ch in "eeed s".replace(" ", ""):  # scroll menu, bump value
+    for ch in "tttgw":  # enc0 CW x3 (scroll), enc1 CW (vol), enc0 click (enter)
         for ev in kb.feed(ch, t):
             ui.handle(ev, t)
         t += 0.2
     for row in renderer.render(ui.render(t)):
         print(row)
-    print("\n".join(_dynamic_hud(ui, kb.switch_status(t))))
+    print("\n".join(_dynamic_hud(ui)))
 
 
 def main(argv):
@@ -192,12 +186,12 @@ def main(argv):
             now = time.monotonic()
             while select.select([sys.stdin], [], [], 0)[0]:
                 ch = sys.stdin.read(1)
-                if ch in ("x", "X"):
+                if ch in ("q", "Q"):
                     return
                 for ev in kb.feed(ch, now):
                     ui.handle(ev, now)
             frame = renderer.render(ui.render(now))
-            hud = _dynamic_hud(ui, kb.switch_status(now))
+            hud = _dynamic_hud(ui)
             sys.stdout.write("\x1b[H" + _compose(frame, hud))
             sys.stdout.flush()
             time.sleep(0.03)
