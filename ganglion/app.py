@@ -11,13 +11,14 @@ Ported so far (the navigation spine + picker):
   picker (place/replace: split screen — chain on top, category|plugin strips
   below; ENC1 turns/selects, ENC0-hold backs — from the curated
   geco_whitelist.json) · move (Move picks the node up at depth 0 — lifted 5px;
-  ENC0 shifts slots, click drops, hold cancels) · SYSTEM (ENC0
-  scroll-left-past-start) · TUNER (ENC1 hold) · COMBO (save).
+  ENC0 shifts slots, click drops, hold cancels) · board/snapshot manage (glance
+  click → submenu: Save/Save As/Rename/Delete; naming reuses synapse's word bank
+  "Term-suffix" via ENC1=term/ENC0=reroll; delete → confirm overlay) · SYSTEM
+  (ENC0 scroll-left-past-start) · TUNER (ENC1 hold) · COMBO (save).
 
-Stubbed with a toast + [DECISION] marker (see docs/decisions.md): board/snapshot
-manage (rename/save/delete), confirm overlay. The picker's placed nodes use
-per-bucket placeholder knobs — wiring to synapse's real
-model/modepctrl/plugincatalog params is still pending.
+The mockup's 2a interactions are all ported now. Still pending: wiring to
+synapse's real model/modepctrl/plugincatalog (placed nodes use per-bucket
+placeholder knobs; board/snap lists + level meters are self-contained samples).
 
 Run (needs a TTY):  python3 ganglion/app.py
 Scripted check:      python3 ganglion/app.py --walk
@@ -25,6 +26,7 @@ Scripted check:      python3 ganglion/app.py --walk
 
 import json
 import os
+import random
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -137,6 +139,50 @@ PBS = ["Lead Joyful", "Clean Verse", "Ambient Cathedral Wash"]
 SNAPS = ["Default", "Lead Boost", "Ambient"]
 SYSITEMS = ["Tuner", "Brightness", "MIDI Ch", "About", "< Back"]
 
+# ---- SAVE AS naming (reuses synapse's word bank; 0 core edits) --------------
+# Mirrors qtview/editor_bridge: a stage term + '-' + a random quirky suffix
+# ("Drive-cupcake"). On 2 encoders this beats char entry: ENC1 cycles the term,
+# ENC0 re-rolls the suffix, click accepts. The ~6k-word suffix pool is the SAME
+# shared resource file synapse reads (resources/snapshot_words.txt).
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TERMS = ["Clean", "Crunch", "Drive", "Lead", "Rhythm", "Solo",
+         "Verse", "Chorus", "Bridge", "Boost", "Ambient", "Heavy"]
+_WORDS_PATH = os.path.join(_REPO, "resources", "snapshot_words.txt")
+_WORDS_FALLBACK = ["chainsaw", "cupcake", "walrus", "thunder", "pickle",
+                   "comet", "goblin", "biscuit", "tornado", "noodle"]
+_words = None
+_rng = random.Random()
+
+
+def _load_words():
+    global _words
+    if _words is None:
+        try:
+            with open(_WORDS_PATH, encoding="utf-8") as f:
+                _words = [w for w in (ln.strip() for ln in f) if w and not w.startswith("#")]
+        except OSError:
+            _words = []
+        if not _words:
+            _words = list(_WORDS_FALLBACK)
+    return _words
+
+
+def suggest_name(term, existing=(), rng=None):
+    """``term`` + '-' + a random suffix not already in ``existing``."""
+    rng = rng or _rng
+    words = _load_words()
+    existing = set(existing)
+    for _ in range(12):
+        name = "%s-%s" % (term, rng.choice(words))
+        if name not in existing:
+            return name
+    return "%s-%s" % (term, rng.choice(words))
+
+
+# Board/snapshot manage submenu (decision C: sub). Same set for both.
+SUB_ACTIONS = [("Save", "save"), ("Save As", "saveas"), ("Rename", "rename"),
+               ("Delete", "delete"), ("Back", "back")]
+
 
 @dataclass
 class AppState:
@@ -158,10 +204,19 @@ class AppState:
     tnote: str = "A"
     pb: int = 0
     snap: int = 1
+    sub: str = ""             # ""=off, "board"/"snap": manage submenu open
+    sub_idx: int = 0
+    naming: str = ""          # ""=off, "<which>:<mode>" e.g. "board:saveas"
+    nterm: int = 0            # index into TERMS
+    nname: str = ""           # the currently suggested "Term-suffix"
+    confirm: str = ""         # ""=off, or pending action e.g. "del:board"
+    cyes: bool = False        # confirm overlay highlight (No/Yes)
     dirty: bool = False
     toast: str = ""
     board: list = field(default_factory=make_board)
     wl: list = field(default_factory=load_whitelist)
+    boards: list = field(default_factory=lambda: list(PBS))
+    snaps: list = field(default_factory=lambda: list(SNAPS))
 
 
 class AppController:
@@ -198,6 +253,20 @@ class AppController:
         st = self.st
         if st.tuner:
             return
+        if st.confirm:                         # ENC0 toggles No/Yes
+            if enc == 0:
+                st.cyes = not st.cyes
+            return
+        if st.naming:
+            if enc == 1:                       # ENC1 cycles the stage term (fresh suffix)
+                st.nterm = (st.nterm + d) % len(TERMS)
+                self._reroll()
+            else:                              # ENC0 re-rolls the suffix
+                self._reroll()
+            return
+        if st.sub:
+            st.sub_idx = (st.sub_idx + d) % len(SUB_ACTIONS)
+            return
         if st.pick:
             if enc == 1:                       # ENC1 turns the active strip
                 if st.pick == "cat":
@@ -213,9 +282,9 @@ class AppController:
             return
         if st.depth == -1:
             if enc == 0:
-                st.pb = (st.pb + d) % len(PBS)
+                st.pb = (st.pb + d) % len(st.boards)
             else:
-                st.snap = (st.snap + d) % len(SNAPS)
+                st.snap = (st.snap + d) % len(st.snaps)
             return
         # depth 0
         if st.moving:                        # picked-up node: ENC0 swaps with neighbour
@@ -259,6 +328,25 @@ class AppController:
         if st.tuner:
             st.tuner = False
             return
+        if st.confirm:                         # ENC0 acts on the highlighted option
+            if enc == 0:
+                if st.cyes:
+                    self._confirm_exec()
+                else:
+                    st.confirm = ""
+            return
+        if st.naming:
+            if enc == 0:                       # ENC0 click = accept the name
+                self._name_accept()
+            else:                              # ENC1 click = re-roll suffix
+                self._reroll()
+            return
+        if st.sub:
+            if enc == 0:
+                self._sub_act(SUB_ACTIONS[st.sub_idx][1])
+            else:
+                st.sub = ""
+            return
         if st.pick:
             if enc == 1:                       # ENC1 click = select / place
                 if st.pick == "cat":
@@ -282,9 +370,8 @@ class AppController:
             else:
                 self._menu_act(self.menu_items()[st.menu][2])
             return
-        if st.depth == -1:
-            # [DECISION] board/snapshot manage submenu not ported yet
-            self._toast("TODO: manage " + ("board" if enc == 0 else "snap"))
+        if st.depth == -1:                     # open board (e0) / snapshot (e1) manage
+            st.sub, st.sub_idx = ("board" if enc == 0 else "snap"), 0
             return
         # depth 0
         if st.moving:                          # ENC0 click = drop here (commit)
@@ -317,6 +404,72 @@ class AppController:
             st.menu_open = False
             self._toast("TODO: " + act)
 
+    # -- board / snapshot manage (decision C: sub / naming / confirm) ------
+    def _lst(self, which):
+        """(list, active-index) for 'board' or 'snap'."""
+        st = self.st
+        return (st.boards, st.pb) if which == "board" else (st.snaps, st.snap)
+
+    def _set_idx(self, which, i):
+        if which == "board":
+            self.st.pb = i
+        else:
+            self.st.snap = i
+
+    def _sub_act(self, act):
+        st = self.st
+        which = st.sub
+        lst, idx = self._lst(which)
+        if act == "back":
+            st.sub = ""
+        elif act == "save":                    # overwrite current (persist)
+            st.sub, st.dirty = "", False
+            self._toast("SAVED")
+        elif act == "saveas":                  # new entry via the name suggester
+            self._name_open(which, "saveas")
+        elif act == "rename":
+            self._name_open(which, "rename")
+        elif act == "delete":
+            if len(lst) <= 1:
+                st.sub = ""
+                self._toast("KEEP 1 MIN")
+            else:
+                st.confirm, st.cyes = "del:" + which, False
+
+    def _name_open(self, which, mode):
+        st = self.st
+        st.sub, st.naming, st.nterm = "", "%s:%s" % (which, mode), 0
+        self._reroll()
+
+    def _reroll(self):
+        st = self.st
+        which = st.naming.split(":")[0]
+        lst, _ = self._lst(which)
+        st.nname = suggest_name(TERMS[st.nterm], existing=lst, rng=_rng)
+
+    def _name_accept(self):
+        st = self.st
+        which, mode = st.naming.split(":")
+        lst, idx = self._lst(which)
+        if mode == "rename":
+            lst[idx] = st.nname
+        else:                                  # saveas -> insert after current, select it
+            lst.insert(idx + 1, st.nname)
+            self._set_idx(which, idx + 1)
+        st.naming, st.dirty = "", (which == "snap")
+        self._toast(("RENAMED " if mode == "rename" else "SAVED ") + st.nname)
+
+    def _confirm_exec(self):
+        st = self.st
+        if st.confirm.startswith("del:"):
+            which = st.confirm.split(":")[1]
+            lst, idx = self._lst(which)
+            if len(lst) > 1:
+                lst.pop(idx)
+                self._set_idx(which, min(idx, len(lst) - 1))
+            self._toast("DELETED")
+        st.confirm, st.sub = "", ""
+
     def _sys_act(self):
         it = SYSITEMS[self.st.sys_idx]
         if it == "Tuner":
@@ -331,6 +484,18 @@ class AppController:
         st = self.st
         if st.tuner:
             st.tuner = False
+            return
+        if st.confirm:                        # ENC0 hold = cancel (= No)
+            if enc == 0:
+                st.confirm = ""
+            return
+        if st.naming:                         # ENC0 hold = cancel naming
+            if enc == 0:
+                st.naming = ""
+            return
+        if st.sub:                            # ENC0 hold = close submenu
+            if enc == 0:
+                st.sub = ""
             return
         if st.pick:                           # ENC0 hold = back (consistent); ENC1 hold = no-op
             if enc == 0:
@@ -355,7 +520,8 @@ class AppController:
             st.tuner = True
 
     def combo(self):
-        if self.st.moving or self.st.pick:
+        st = self.st
+        if st.moving or st.pick or st.sub or st.naming or st.confirm:
             return
         self.st.depth, self.st.dirty = -1, False
         self._toast("SNAPSHOT SAVED")
@@ -368,6 +534,12 @@ class AppController:
 def render(st):
     if st.tuner:
         return _tuner(st)
+    if st.confirm:
+        return _confirm(st)
+    if st.naming:
+        return _naming(st)
+    if st.sub:
+        return _sub(st)
     if st.pick:
         return _pick(st)
     if st.sys:
@@ -466,18 +638,72 @@ def _chain(st):
 def _glance(st):
     s = Screen()
     s.T("PEDALBOARD", 6, 5, 8, ls=1)
-    name = PBS[st.pb]
-    s.T(name if s.Tw(24, name) <= 108 else name, 5, 14, 24)  # marquee later
-    s.dots(len(PBS), st.pb, 6, 47)
+    s.T(_fit(s, st.boards[st.pb], 24, 122), 5, 14, 24)  # marquee later
+    s.dots(len(st.boards), st.pb, 6, 47)
     s.hline(0, 56, 128)
     s.T("SNAPSHOT", 6, 62, 8, ls=1)
-    s.T(SNAPS[st.snap], 5, 71, 24)
-    s.dots(len(SNAPS), st.snap, 6, 99)
+    s.T(_fit(s, st.snaps[st.snap], 24, 122), 5, 71, 24)
+    s.dots(len(st.snaps), st.snap, 6, 99)
     s.T("e0 pb.CLK manage  e1 snap", 5, 118, 6)
     s.T("-1", 116, 5, 8)
     if st.dirty:
         s.d.ellipse([120, 2, 125, 7], fill=1)
     _toast_over(s, st)
+    return s.img
+
+
+def _sub(st):
+    s = Screen()
+    which = st.sub
+    lst, idx = (st.boards, st.pb) if which == "board" else (st.snaps, st.snap)
+    s.T("BOARD" if which == "board" else "SNAPSHOT", 6, 4, 8, ls=1)
+    s.T(_fit(s, lst[idx], 12, 118), 6, 16, 12)
+    s.hline(0, 30, 128)
+    y0, rh = 36, 16
+    for i, (label, _) in enumerate(SUB_ACTIONS):
+        y = y0 + i * rh
+        if i == st.sub_idx:
+            s.box(4, y - 2, 120, rh - 2, fill=True)
+            s.T(label, 9, y, 12, fill=0)
+        else:
+            s.T(label, 9, y, 12)
+    s.T("e0 pick   e0hold back", 5, 120, 6)
+    _toast_over(s, st)
+    return s.img
+
+
+def _naming(st):
+    s = Screen()
+    which, mode = st.naming.split(":")
+    head = ("RENAME " if mode == "rename" else "SAVE AS ") + ("BOARD" if which == "board" else "SNAP")
+    s.T(head, 6, 4, 8, ls=1)
+    s.hline(0, 16, 128)
+    s.T("TERM  (e1)", 6, 22, 6)
+    s.chip(TERMS[st.nterm], 6, 30, 74, 16, 8)
+    s.T("NAME", 6, 52, 6)
+    s.T(_fit(s, st.nname, 12, 122), 6, 62, 12)  # 12px so full Term-suffix fits
+    s.hline(0, 84, 128)
+    s.T("e1 term   e0 reroll", 5, 104, 6)
+    s.T("e0 click OK   hold X", 5, 114, 6)
+    _toast_over(s, st)
+    return s.img
+
+
+def _confirm(st):
+    s = Screen()
+    which = st.confirm.split(":")[1]
+    lst, idx = (st.boards, st.pb) if which == "board" else (st.snaps, st.snap)
+    s.box(6, 22, 116, 84)
+    s.T("DELETE", 38, 30, 16)
+    s.T("BOARD?" if which == "board" else "SNAPSHOT?", 12, 50, 8)
+    s.T(_fit(s, lst[idx], 12, 104), 12, 62, 12)
+    for i, label in enumerate(["No", "Yes"]):
+        x = 22 + i * 54
+        if ((i == 1) == st.cyes):
+            s.chip(label, x, 84, 44, 16, 8)
+        else:
+            s.box(x, 84, 44, 16)
+            s.T(label, x + (44 - int(s.Tw(8, label))) // 2, 88, 8)
     return s.img
 
 
@@ -655,6 +881,12 @@ def leds(st):
     n = st.board[st.node]
     if st.tuner:
         return ("purple", "purple")
+    if st.confirm:                            # delete danger
+        return ("red", OFF)
+    if st.naming:                             # ENC0 reroll/ok, ENC1 term
+        return ("green", "blue")
+    if st.sub:                                # manage submenu
+        return ("blue", OFF)
     if st.pick:                               # ENC0=back(grey), ENC1=operate(cat colour)
         return ("grey", BUCKETCOL.get(st.wl[st.pick_cat]["key"], "amber"))
     if st.moving:                             # ENC0 holds the node; ENC1 idle
@@ -678,6 +910,7 @@ def leds(st):
 def _walk():
     """Scripted walkthrough — drives events and prints state (no TTY)."""
     from ganglion.input import KeyboardInput
+    _rng.seed(1)                     # deterministic suffix suggestions for the walk
     kb = KeyboardInput()
     c = AppController()
     t = [0.0]
@@ -725,14 +958,33 @@ def _walk():
     do("tt", "shift>>")    # enc0 turn x2: swap node 0 -> 2
     print("      order   %s" % [b["abbr"] or "--" for b in c.st.board])
     do("w", "drop")        # enc0 click: commit landing at slot 2
+    # board/snapshot manage: glance -> board submenu -> Save As (name suggester)
+    do("e", "glance")      # enc0 hold: depth 0 -> -1
+    do("w", "board-sub")   # enc0 click: open BOARD manage submenu
+    do("t", "sub>")        # enc0 turn: Save -> Save As
+    do("w", "saveas")      # enc0 click: -> name suggester (Term-suffix)
+    do("gg", "term>>")     # enc1 turn x2: cycle stage term (fresh suffix each)
+    do("t", "reroll")      # enc0 turn: re-roll suffix
+    print("      name    %r  (%d boards)" % (c.st.nname, len(c.st.boards)))
+    do("w", "accept")      # enc0 click: insert new board, select it
+    print("      boards  %s pb=%d" % (c.st.boards, c.st.pb))
+    # delete the new board (confirm overlay)
+    do("w", "board-sub2")  # open submenu on the new board
+    do("ttt", "to-del")    # Save -> SaveAs -> Rename -> Delete
+    do("w", "del?")        # enc0 click: -> confirm overlay (No highlighted)
+    do("t", "yes")         # enc0 turn: highlight Yes
+    do("w", "confirm")     # enc0 click: execute delete
+    print("      boards  %s pb=%d" % (c.st.boards, c.st.pb))
 
 
 def _snap(st):
     n = st.board[st.node]
     kv = fmt(n["knobs"][st.knob]) if not n["empty"] and n["knobs"] else "--"
-    return ("d=%d node=%d(%s) k=%d[%s] lock=%d dirty=%d menu=%d pick=%s mv=%d sys=%d tun=%d pb=%d snap=%d toast=%r"
-            % (st.depth, st.node, n["abbr"] or "--", st.knob, kv, st.locked, st.dirty,
-               st.menu_open, st.pick or "-", st.moving, st.sys, st.tuner, st.pb, st.snap, st.toast))
+    return ("d=%d node=%d(%s) k=%d[%s] dirty=%d menu=%d pick=%s mv=%d sub=%s name=%s conf=%s "
+            "sys=%d tun=%d pb=%d(%s) snap=%d toast=%r"
+            % (st.depth, st.node, n["abbr"] or "--", st.knob, kv, st.dirty,
+               st.menu_open, st.pick or "-", st.moving, st.sub or "-", st.naming or "-",
+               st.confirm or "-", st.sys, st.tuner, st.pb, st.boards[st.pb], st.snap, st.toast))
 
 
 class _ScriptSource:

@@ -23,10 +23,22 @@ synapse `model.py`/`modepctrl.py`/`plugincatalog.py`의 **실 페달보드·LV2 
 남은 것: 실배선 시 이 URI로 `plugincatalog.py`/`modepctrl.py`에 인스턴스화·파라미터 매핑(→ A/E).
 화이트리스트 자체는 언제든 catalog 툴로 재큐레이션 가능(증분 유지).
 
-## C. 스텁된 인터랙션 우선순위 `[구현/일부 해결]`
-시안엔 있으나 아직 포팅 안 함 (토스트로 스텁): ~~피커(place/replace)~~ · ~~move~~ ·
-**보드/스냅샷 관리(rename/save/delete)** · **confirm 오버레이**. 로직은 시안에 다 있음.
-→ 제안 순서: 피커 → move → 관리 → confirm.
+## C. 스텁된 인터랙션 `[해결]` — 시안 2a 인터랙션 전부 포팅됨
+~~피커(place/replace)~~ · ~~move~~ · ~~보드/스냅샷 관리~~ · ~~confirm 오버레이~~.
+- **[해결] 보드/스냅샷 관리 + naming + confirm**: 글랜스(depth −1)에서 ENC0 클릭=보드
+  관리, ENC1 클릭=스냅 관리 → **sub 서브메뉴**(Save/Save As/Rename/Delete/Back).
+  - **naming = synapse 단어장 재사용** [사용자 지시]: qtview/editor_bridge의 SAVE AS
+    모델(스테이지 용어 + '-' + 랜덤 접미사, 예 `Drive-cupcake`)을 그대로. 접미사 풀은
+    **동일 공유 리소스** `resources/snapshot_words.txt`(~6k, 캐시) 직접 로드 — synapse
+    코어 0줄 수정(그 로직은 순수계층 아닌 qtview/editor_bridge에 이미 각자 복제돼 있음).
+    2인코더 매핑: **ENC1=용어 순환(+새 접미사)·ENC0=접미사 리롤·ENC0 클릭=확정·홀드=취소**.
+    문자입력보다 이게 오히려 물리입력에 적합. NAME은 12px로 전체 표시, TERM은 칩.
+  - **confirm**: Delete → 오버레이(No/Yes), ENC0 회전=토글·클릭=선택·홀드=취소(No).
+    마지막 1개는 삭제 불가("KEEP 1 MIN").
+  - 상태: `sub`/`sub_idx`·`naming`("which:mode")·`nterm`/`nname`·`confirm`("del:which")/`cyes`.
+    보드/스냅 이름은 이제 AppState `boards`/`snaps`(모듈 상수 PBS/SNAPS 복제) — 뮤테이션 격리.
+    `--walk`(Save As→삭제 시퀀스)·렌더 검증됨. 랜덤은 `_rng`(walk에서 seed).
+- 남음(실배선 A): naming 확정 시 실제 페달보드/스냅샷 저장(presenter.save_snapshot 등)에 매핑.
 - **[해결] move** [사용자 설계]: 슬롯 메뉴 Move → 레벨0(체인) 복귀, 대상 노드만 5px
   위로 오프셋(들고 있는 듯, 반전 셀). ENC0 회전=인접 슬롯과 swap(전체 체인 재드로),
   ENC0 클릭=그 자리 착지(dirty, "MOVED"), ENC0 홀드=취소(move_from 복원). 하단 패널에
