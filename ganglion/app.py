@@ -34,6 +34,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dataclasses import dataclass, field
 
+from PIL import ImageDraw
+
 from ganglion import WIDTH, HEIGHT
 from ganglion.render import Screen, fs
 from ganglion.input import Rotate, Press, Combo
@@ -212,6 +214,7 @@ class AppState:
     menu_open: bool = False
     menu: int = 0
     sys: bool = False
+    sys_focus: bool = False   # parked at the SYS entry (edge detent); E0 click enters
     sys_idx: int = 0
     pick: str = ""            # ""=off, "cat"=category list, "fx"=plugin list
     pick_cat: int = 0
@@ -314,6 +317,10 @@ class AppController:
                 st.snap = (st.snap + d) % len(st.snaps)
             return
         # depth 0
+        if st.sys_focus:                     # parked at SYS entry: only ENC0-right returns
+            if enc == 0 and d > 0:           # roll back onto the chain (left = wall)
+                st.sys_focus, st.node = False, 0
+            return
         if st.moving:                        # picked-up node: ENC0 swaps with neighbour
             if enc == 0:
                 j = st.node + d
@@ -323,8 +330,8 @@ class AppController:
             return
         if enc == 0:
             nn = st.node + d
-            if nn < 0:                       # scroll left past chain start -> SYSTEM
-                st.sys, st.sys_idx = True, 0
+            if nn < 0:                       # scroll left past start -> PARK at SYS (guard,
+                st.sys_focus = True          # not enter): a fast spin stops here, E0 click enters
                 return
             st.node = min(nn, len(st.board) - 1)
             st.knob = 0
@@ -404,6 +411,10 @@ class AppController:
             st.sub, st.sub_idx = ("board" if enc == 0 else "snap"), 0
             return
         # depth 0
+        if st.sys_focus:                       # ENC0 click = commit: enter SYSTEM (guard)
+            if enc == 0:
+                st.sys_focus, st.sys, st.sys_idx = False, True, 0
+            return
         if st.moving:                          # ENC0 click = drop here (commit)
             if enc == 0:
                 st.moving, st.dirty = False, True
@@ -554,7 +565,9 @@ class AppController:
                 st.node, st.moving = st.move_from, False
             return
         if enc == 0:                          # ENC0 hold = zoom out one level
-            if st.sys:
+            if st.sys_focus:                  # leave the SYS edge, up to glance (chain rule)
+                st.sys_focus, st.depth = False, -1
+            elif st.sys:
                 st.sys = False
             elif st.menu_open:
                 st.menu_open = False
@@ -567,7 +580,7 @@ class AppController:
 
     def combo(self):
         st = self.st
-        if st.moving or st.pick or st.sub or st.naming or st.confirm:
+        if st.moving or st.pick or st.sub or st.naming or st.confirm or st.sys_focus:
             return
         st.dirty = False                       # Q7: keep current depth; splash confirms
         self._toast("SNAPSHOT SAVED")
@@ -578,6 +591,88 @@ class AppController:
 
 # ========================= VIEW (state -> frame) =========================
 def render(st):
+    """Draw the state's frame, then overlay the left-edge encoder rail."""
+    img = _frame(st)
+    _rail(ImageDraw.Draw(img), *rails(st), _rail_split(st))
+    return img
+
+
+# ---- left-edge encoder rail indicator (design: "Encoder Rail Indicator") ----
+# 3px left edge split into ENC0 (top) / ENC1 (bottom), mirroring the physical
+# encoder stack so the rail "points back" at the knob. Static per state (redraw
+# only on change → 0 refresh cost). Mono: colour is the RGB LED's job; the rail
+# carries what colour can't — "which hand is live" + list position.
+RAIL_W = 3
+
+
+def _rail_split(st):
+    """The y of the rail's centre gap = the screen's content divider, so each
+    zone sits beside the content its encoder drives. Chain maps ENC0->node strip
+    (top) / ENC1->knobs (bottom) at ~3:7; glance splits at its own rule; modals
+    don't map encoders to top/bottom regions so they stay ~1:1."""
+    if st.tuner or st.confirm or st.naming or st.sub or st.pick or st.sys \
+            or st.menu_open or st.sys_focus:
+        return 64                            # ~1:1: no top/bottom encoder mapping
+    if st.depth == -1:
+        return 56                            # glance: pedalboard / snapshot divider
+    return 40                                # chain / moving: node strip / knobs (~3:7)
+
+
+def _rail_zone(d, z, zy, zh):
+    if not z or z == "off":                  # dead hand: black
+        return
+    if z == "solid":                         # dedicated (value / single action): full on
+        d.rectangle([0, zy, RAIL_W - 1, zy + zh - 1], fill=1)
+        return
+    for y in range(zy, zy + zh, 3):          # idle/list track: 1:2 horizontal dither
+        d.rectangle([0, y, RAIL_W - 1, y], fill=1)
+    if isinstance(z, tuple):                 # list: bright thumb at scroll position
+        pos, total = z
+        th = min(zh, max(8, zh // max(1, total)))
+        ty = zy + (round((zh - th) * pos / (total - 1)) if total > 1 else 0)
+        d.rectangle([0, ty, RAIL_W - 1, ty + th - 1], fill=1)
+
+
+def _rail(d, z0, z1, split):
+    _rail_zone(d, z0, 2, split - 5)          # top zone: y2 .. split-3
+    _rail_zone(d, z1, split + 3, 123 - split)  # bottom zone: split+3 .. y125
+
+
+def rails(st):
+    """(ENC0, ENC1) rail zones. Each: 'off' | 'idle' | 'solid' | (pos, total).
+    'solid'=dedicated engagement · tuple=scrollable list (thumb) · 'idle'=usable
+    but secondary · 'off'=dead hand. Danger(red) stays the LED's job, not the rail."""
+    if st.tuner:
+        return ("solid", "off")              # E0 live = E0-hold exits (back rule, Q1)
+    if st.confirm:
+        return ("solid", "off") if _op(st.confirm.split(":")[1]) == 0 else ("off", "solid")
+    if st.naming:
+        if st.naming.split(":")[0] == "board":
+            return ((st.ncat, len(TERMS)), "idle")   # E0 dials term, E1 rerolls
+        return ("off", "solid")              # snap: day auto -> E1-only dedicated (Q3)
+    if st.sub:
+        z = (st.sub_idx, len(SUB_ACTIONS))
+        return (z, "idle") if _op(st.sub) == 0 else ("idle", z)
+    if st.pick:
+        z = (st.pick_cat, len(st.wl)) if st.pick == "cat" \
+            else (st.pick_fx, len(st.wl[st.pick_cat]["plugins"]))
+        return ("off", z)                    # E0 dead (hold=back), E1 operates
+    if st.sys:
+        return ((st.sys_idx, len(SYSITEMS)), "idle")
+    if st.menu_open:
+        return ((st.menu, len(AppController(st).menu_items())), "idle")
+    if st.depth == -1:                       # glance: both hands drive a list
+        return ((st.pb, len(st.boards)), (st.snap, len(st.snaps)))
+    if st.sys_focus:                         # parked at SYS entry: E0 live (click to enter)
+        return ("solid", "off")
+    if st.moving:                            # E0 shifts the picked-up node
+        return ("solid", "off")
+    n = st.board[st.node]                    # chain home
+    z1 = "solid" if st.locked else ("off" if n["empty"] else "idle")
+    return ((st.node, len(st.board)), z1)
+
+
+def _frame(st):
     if st.tuner:
         return _tuner(st)
     if st.confirm:
@@ -594,6 +689,8 @@ def render(st):
         return _menu(st)
     if st.depth == -1:
         return _glance(st)
+    if st.sys_focus:
+        return _sys_focus(st)
     return _chain(st)
 
 
@@ -606,8 +703,8 @@ def _toast_over(s, st):
 
 def _chain(st):
     s = Screen()
-    s.T("IN", 2, 1, 8)
-    s.T("-14.2", 16, 1, 8)
+    s.T("IN", 5, 1, 8)                          # +3px: clear the left rail
+    s.T("-14.2", 18, 1, 8)
     s.T("OUT", 54, 1, 8)
     s.T("-4.3", 74, 1, 8)
     s.T("%d/%d" % (st.node + 1, len(st.board)), 101, 1, 6)
@@ -621,7 +718,7 @@ def _chain(st):
         if idx < 0 or idx >= len(st.board):
             continue
         n = st.board[idx]
-        x = 2 + j * step
+        x = 5 + j * step                       # +3px: node strip clears the left rail
         cells.append((idx, x, x + cw - 1))
         sel = idx == st.node
         cy = ty - 5 if (st.moving and sel) else ty   # lift the picked-up node
@@ -646,7 +743,7 @@ def _chain(st):
         if cells[-1][0] < len(st.board) - 1:
             s.d.rectangle([cells[-1][2] + 1, wy, WIDTH - 1, wy], fill=1)
     if st.node == 0 and not st.moving:         # Q2: SYSTEM is one scroll-left past start
-        s.T("<SYS", 2, 15, 8)
+        s.T("<SYS", 5, 15, 8)
     s.hline(0, 40, 128)
     n = st.board[st.node]
     if st.moving:                              # move mode: instructions in place of knobs
@@ -662,9 +759,9 @@ def _chain(st):
         s.T("CLICK e0 -> add FX", 6, 84, 8)
         _toast_over(s, st)
         return s.img
-    s.T(n["name"], 4, 43, 16)
+    s.T(n["name"], 5, 43, 16)
     s.T("BYP" if n["bypass"] else n["abbr"], 100, 45, 8)
-    kx, base, kh, cw2 = [5, 67], 62, 21, 56
+    kx, base, kh, cw2 = [8, 67], 62, 21, 56    # +3px on col0 so its focus ring clears the rail
     for i, kb in enumerate(n["knobs"][:6]):
         col, row = i % 2, i // 2
         if row >= 3:
@@ -683,15 +780,27 @@ def _chain(st):
     return s.img
 
 
+def _sys_focus(st):
+    """Parked at the chain's left edge: SYS entry focused but NOT entered (guard).
+    A fast spin stops here; only E0 click commits into the SYSTEM menu."""
+    s = Screen()
+    s.T("CHAIN EDGE", 6, 4, 8, ls=1)
+    s.hline(0, 16, 128)
+    s.chip("< SYSTEM", 8, 34, 112, 26, 16)     # the pending entry, highlighted
+    s.T("e0 click  = enter", 8, 74, 8)
+    s.T("e0 turn > = chain", 8, 90, 8)
+    s.T("e0 hold   = glance", 8, 106, 8)
+    _toast_over(s, st)
+    return s.img
+
+
 def _glance(st):
     s = Screen()
-    s.T("PEDALBOARD", 6, 5, 8, ls=1)
-    s.T(_fit(s, st.boards[st.pb], 24, 122), 5, 14, 24)  # marquee later
-    s.dots(len(st.boards), st.pb, 6, 47)
-    s.hline(0, 56, 128)
-    s.T("SNAPSHOT", 6, 62, 8, ls=1)
-    s.T(_fit(s, st.snaps[st.snap], 24, 122), 5, 71, 24)
-    s.dots(len(st.snaps), st.snap, 6, 99)
+    s.T("PEDALBOARD", 8, 5, 8, ls=1)
+    s.T(_fit(s, st.boards[st.pb], 24, 120), 8, 14, 24)  # marquee later
+    s.hline(0, 56, 128)                                 # position: left rail thumbs (dots removed)
+    s.T("SNAPSHOT", 8, 62, 8, ls=1)
+    s.T(_fit(s, st.snaps[st.snap], 24, 120), 8, 71, 24)
     s.T("e0 pb.CLK manage  e1 snap", 5, 118, 6)
     s.T("-1", 116, 5, 8)
     if st.dirty:
@@ -767,16 +876,16 @@ def _confirm(st):
 def _menu(st):
     s = Screen()
     n = st.board[st.node]
-    s.box(0, 0, 40, 128)
+    s.box(4, 0, 36, 128)                        # +4px: info panel clears the left rail
     if n["empty"]:
-        s.T("+", 13, 44, 24)
-        s.T("EMPTY", 4, 74, 8)
-        s.T("SLOT %d" % (st.node + 1), 3, 86, 6)
+        s.T("+", 15, 44, 24)
+        s.T("EMPTY", 7, 74, 8)
+        s.T("SLOT %d" % (st.node + 1), 6, 86, 6)
     else:
-        s.T(n["abbr"], 2, 40, 16)
-        s.T(n["name"], 3, 62, 8)
-        s.T("SLOT %d/6" % (st.node + 1), 3, 76, 6)
-        s.T("BYP" if n["bypass"] else "ON", 3, 88, 6)
+        s.T(n["abbr"], 6, 40, 16)
+        s.T(n["name"], 6, 62, 8)
+        s.T("SLOT %d/6" % (st.node + 1), 6, 76, 6)
+        s.T("BYP" if n["bypass"] else "ON", 6, 88, 6)
     s.T("ACTION", 46, 5, 8, ls=1)
     items = AppController(st).menu_items()
     y0, rh = 17, 17
@@ -802,13 +911,6 @@ def _fit(s, txt, size, maxw):
 
 def _window(n, sel, vis):
     return 0 if n <= vis else max(0, min(sel - vis // 2, n - vis))
-
-
-def _caret(s, cx, y, up):
-    """A 5x3 scroll triangle centred on cx (points up if ``up``)."""
-    for k in range(3):
-        half = k if up else 2 - k
-        s.d.rectangle([cx - half, y + k, cx + half, y + k], fill=1)
 
 
 def _striplist(s, items, sel, x, w, y0, active, size=8, vis=5, rh=14):
@@ -873,22 +975,12 @@ def _pick(st):
     on_cat = st.pick == "cat"
     # left strip: category abbrs, big font (matches node-strip abbrs), 4 rows
     cats = [b["abbr"] for b in st.wl]
-    _striplist(s, cats, st.pick_cat, 0, 48, by, active=on_cat, size=16, vis=4, rh=17)
+    _striplist(s, cats, st.pick_cat, 5, 44, by, active=on_cat, size=16, vis=4, rh=17)  # +5px: clear rail
     s.d.rectangle([49, by - 2, 49, 115], fill=1)
     # right strip: plugins of the hovered/locked category (preview until locked)
     plugs = [p["display"] for p in st.wl[st.pick_cat]["plugins"]]
     _striplist(s, plugs, -1 if on_cat else st.pick_fx, 51, 77, by, active=not on_cat, size=8)
-    # scroll carets in the gaps above/below each strip (no per-row text collision)
-    lstart = _window(len(cats), st.pick_cat, 4)
-    rstart = _window(len(plugs), 0 if on_cat else st.pick_fx, 5)
-    if lstart > 0:
-        _caret(s, 24, 40, True)
-    if lstart + 4 < len(cats):
-        _caret(s, 24, 114, False)
-    if rstart > 0:
-        _caret(s, 89, 40, True)
-    if rstart + 5 < len(plugs):
-        _caret(s, 89, 114, False)
+    # scroll position is carried by the left rail thumb now (carets removed)
     s.T("e1 turn/sel   e0hold back", 4, 120, 6)
     _toast_over(s, st)
     return s.img
@@ -948,6 +1040,8 @@ def leds(st):
         return ("grey", BUCKETCOL.get(st.wl[st.pick_cat]["key"], "amber"))
     if st.moving:                             # ENC0 holds the node; ENC1 idle
         return (BUCKETCOL.get(n["bucket"], "amber"), OFF)
+    if st.sys_focus:                          # parked at SYS entry (edge detent)
+        return ("grey", OFF)
     if st.sys:
         return ("grey", OFF)
     if st.depth == -1:
@@ -993,8 +1087,9 @@ def _walk():
     do("x", "combo")       # save snapshot (toast)
     do("e", "hold-down")   # back to depth 0
     do("rrr", "to-node0")  # enc0 CCW: node 3 -> 0
-    do("r", "sys")         # one more left past start -> SYSTEM
-    do("w", "sys-exec")    # SYSTEM item 0 = Tuner -> tuner
+    do("r", "sys-focus")   # one more left past start -> PARK at SYS entry (guard, not enter)
+    do("w", "sys-enter")   # enc0 click: commit -> SYSTEM menu opens
+    do("w", "sys-exec")    # enc0 click: SYSTEM item 0 = Tuner -> tuner
     do("w", "tuner-exit")  # click exits tuner
     # picker (ENC1 operates, ENC0-hold backs): replace node 0
     do("w", "menu")        # enc0 click: slot menu on node 0
@@ -1047,10 +1142,10 @@ def _snap(st):
     n = st.board[st.node]
     kv = fmt(n["knobs"][st.knob]) if not n["empty"] and n["knobs"] else "--"
     return ("d=%d node=%d(%s) k=%d[%s] dirty=%d menu=%d pick=%s mv=%d sub=%s name=%s conf=%s "
-            "sys=%d tun=%d pb=%d(%s) snap=%d toast=%r"
+            "sysf=%d sys=%d tun=%d pb=%d(%s) snap=%d toast=%r"
             % (st.depth, st.node, n["abbr"] or "--", st.knob, kv, st.dirty,
                st.menu_open, st.pick or "-", st.moving, st.sub or "-", st.naming or "-",
-               st.confirm or "-", st.sys, st.tuner, st.pb, st.boards[st.pb], st.snap, st.toast))
+               st.confirm or "-", st.sys_focus, st.sys, st.tuner, st.pb, st.boards[st.pb], st.snap, st.toast))
 
 
 class _ScriptSource:
