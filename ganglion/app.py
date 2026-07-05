@@ -24,6 +24,7 @@ Run (needs a TTY):  python3 ganglion/app.py
 Scripted check:      python3 ganglion/app.py --walk
 """
 
+import datetime
 import json
 import os
 import random
@@ -185,6 +186,12 @@ def name_build(which, ncat, rand):
     return "%s-%s" % (TERMS[ncat], rand) if which == "board" else "%s-%s" % (rand, DAYS[ncat])
 
 
+def _system_day_idx():
+    """Today's weekday as an index into DAYS (0=monday). Snap naming derives its
+    day part from the clock so it needs no encoder (Q3) — injected for tests."""
+    return datetime.date.today().weekday()
+
+
 # Board/snapshot manage submenu (decision C: sub). Same set for both.
 SUB_ACTIONS = [("Save", "save"), ("Save As", "saveas"), ("Rename", "rename"),
                ("Delete", "delete"), ("Back", "back")]
@@ -235,8 +242,11 @@ class AppState:
 class AppController:
     """Ported 2a state machine. ``feed(event)`` mutates ``self.st``."""
 
-    def __init__(self, state=None):
+    def __init__(self, state=None, day_provider=None):
         self.st = state or AppState()
+        # Snap naming's weekday comes from the clock (Q3). Injected so --walk/tests
+        # stay deterministic; defaults to the real system date on device.
+        self._day_provider = day_provider or _system_day_idx
 
     # -- event entry ------------------------------------------------------
     def feed(self, ev):
@@ -270,12 +280,12 @@ class AppController:
             if enc == _op(st.confirm.split(":")[1]):
                 st.cyes = not st.cyes
             return
-        if st.naming:
-            if enc == 0:                       # ENC0 cycles the categorical (term/day)
-                which = st.naming.split(":")[0]
+        if st.naming:                          # Q3: category=ENC0 (board only), reroll=ENC1
+            which = st.naming.split(":")[0]
+            if which == "board" and enc == 0:  # board: ENC0 dials the stage term
                 st.ncat = (st.ncat + d) % len(name_cats(which))
                 self._rebuild_name(reroll=False)
-            else:                              # ENC1 re-rolls the random word
+            elif enc == 1:                     # ENC1 re-rolls (snap day is auto — no ENC0)
                 self._rebuild_name(reroll=True)
             return
         if st.sub:                             # the encoder that opened it operates it
@@ -289,11 +299,13 @@ class AppController:
                 else:
                     st.pick_fx = (st.pick_fx + d) % len(st.wl[st.pick_cat]["plugins"])
             return
-        if st.sys:
-            st.sys_idx = (st.sys_idx + d) % len(SYSITEMS)
+        if st.sys:                             # Q4: ENC0-only (matches other modals)
+            if enc == 0:
+                st.sys_idx = (st.sys_idx + d) % len(SYSITEMS)
             return
-        if st.menu_open:
-            st.menu = (st.menu + d) % len(self.menu_items())
+        if st.menu_open:                       # Q4: ENC0-only (ENC0 also commits)
+            if enc == 0:
+                st.menu = (st.menu + d) % len(self.menu_items())
             return
         if st.depth == -1:
             if enc == 0:
@@ -352,10 +364,11 @@ class AppController:
             else:
                 st.confirm = ""
             return
-        if st.naming:
-            if enc == 0:                       # ENC0 click = accept the name
+        if st.naming:                          # Q3: operating encoder accepts (board=E0, snap=E1)
+            which = st.naming.split(":")[0]
+            if enc == _op(which):
                 self._name_accept()
-            else:                              # ENC1 click = re-roll random word
+            elif enc == 1:                     # ENC1 click = re-roll (board's non-op hand)
                 self._rebuild_name(reroll=True)
             return
         if st.sub:                             # opening encoder picks; the other backs
@@ -455,7 +468,10 @@ class AppController:
 
     def _name_open(self, which, mode):
         st = self.st
-        st.sub, st.naming, st.ncat = "", "%s:%s" % (which, mode), 0
+        # Q3: boards dial a stage term (ENC0); snaps take today's weekday from the
+        # clock so naming rides ENC1 only (no categorical dial).
+        ncat = 0 if which == "board" else self._day_provider() % len(DAYS)
+        st.sub, st.naming, st.ncat = "", "%s:%s" % (which, mode), ncat
         self._rebuild_name(reroll=True)
 
     def _rebuild_name(self, reroll):
@@ -515,12 +531,12 @@ class AppController:
         if st.tuner:
             st.tuner = False
             return
-        if st.confirm:                        # ENC0 hold = cancel (= No)
-            if enc == 0:
+        if st.confirm:                        # Q3: operating encoder hold = cancel (= No)
+            if enc == _op(st.confirm.split(":")[1]):
                 st.confirm = ""
             return
-        if st.naming:                         # ENC0 hold = cancel naming
-            if enc == 0:
+        if st.naming:                         # Q3: operating encoder hold = cancel naming
+            if enc == _op(st.naming.split(":")[0]):
                 st.naming = ""
             return
         if st.sub:                            # ENC0 hold = close submenu
@@ -553,7 +569,7 @@ class AppController:
         st = self.st
         if st.moving or st.pick or st.sub or st.naming or st.confirm:
             return
-        self.st.depth, self.st.dirty = -1, False
+        st.dirty = False                       # Q7: keep current depth; splash confirms
         self._toast("SNAPSHOT SAVED")
 
     def _toast(self, msg):
@@ -629,6 +645,8 @@ def _chain(st):
             s.d.rectangle([0, wy, cells[0][1] - 1, wy], fill=1)
         if cells[-1][0] < len(st.board) - 1:
             s.d.rectangle([cells[-1][2] + 1, wy, WIDTH - 1, wy], fill=1)
+    if st.node == 0 and not st.moving:         # Q2: SYSTEM is one scroll-left past start
+        s.T("<SYS", 2, 15, 8)
     s.hline(0, 40, 128)
     n = st.board[st.node]
     if st.moving:                              # move mode: instructions in place of knobs
@@ -707,16 +725,21 @@ def _naming(st):
     s = Screen()
     which, mode = st.naming.split(":")
     head = ("RENAME " if mode == "rename" else "SAVE AS ") + ("BOARD" if which == "board" else "SNAP")
-    cat_label, cat_val = ("TERM", TERMS[st.ncat]) if which == "board" else ("DAY", DAYS[st.ncat])
     s.T(head, 6, 4, 8, ls=1)
     s.hline(0, 16, 128)
-    s.T("%s  (e0)" % cat_label, 6, 22, 6)
-    s.chip(cat_val, 6, 30, 90, 16, 8)
+    if which == "board":                        # board: ENC0 dials the stage term
+        s.T("TERM  (e0)", 6, 22, 6)
+        s.chip(TERMS[st.ncat], 6, 30, 90, 16, 8)
+        foot1, foot2 = "e0 term   e1 reroll", "e0 click OK   hold X"
+    else:                                       # snap: day is auto (from clock) — E1 only
+        s.T("DAY  (auto)", 6, 22, 6)
+        s.chip(DAYS[st.ncat], 6, 30, 90, 16, 8)
+        foot1, foot2 = "e1 reroll", "e1 click OK   e1 hold X"
     s.T("NAME", 6, 52, 6)
     s.T(_fit(s, st.nname, 12, 122), 6, 62, 12)  # 12px so the full name fits
     s.hline(0, 84, 128)
-    s.T("e0 %s   e1 reroll" % cat_label.lower(), 5, 104, 6)
-    s.T("e0 click OK   hold X", 5, 114, 6)
+    s.T(foot1, 5, 104, 6)
+    s.T(foot2, 5, 114, 6)
     _toast_over(s, st)
     return s.img
 
@@ -736,8 +759,8 @@ def _confirm(st):
         else:
             s.box(x, 84, 44, 16)
             s.T(label, x + (44 - int(s.Tw(8, label))) // 2, 88, 8)
-    opn = "e0" if which == "board" else "e1"
-    s.T("%s turn/click   e0hold No" % opn, 8, 110, 6)
+    opn = "e0" if which == "board" else "e1"   # Q3: operating encoder toggles/commits/cancels
+    s.T("%s turn/click   %shold No" % (opn, opn), 8, 110, 6)
     return s.img
 
 
@@ -890,7 +913,7 @@ def _sys(st):
 def _tuner(st):
     s = Screen()
     s.T("TUNER", 6, 4, 8, ls=1)
-    s.T("e1 hold ret", 84, 4, 6)
+    s.T("press exit", 84, 4, 6)               # Q1: any press exits (rotate ignored)
     s.T(st.tnote, int((128 - s.Tw(46, st.tnote)) / 2), 18, 46)
     s.hline(10, 88, 108)
     for i in range(-2, 3):
@@ -917,8 +940,8 @@ def leds(st):
         return ("purple", "purple")
     if st.confirm:                            # delete danger on the operating encoder
         return ("red", OFF) if _op(st.confirm.split(":")[1]) == 0 else (OFF, "red")
-    if st.naming:                             # ENC0 term/day + accept, ENC1 reroll
-        return ("green", "blue")
+    if st.naming:                             # Q3: board=E0 term/accept+E1 reroll; snap=E1-only
+        return ("green", "blue") if st.naming.split(":")[0] == "board" else (OFF, "green")
     if st.sub:                                # manage submenu on the opening encoder
         return ("blue", OFF) if _op(st.sub) == 0 else (OFF, "blue")
     if st.pick:                               # ENC0=back(grey), ENC1=operate(cat colour)
@@ -933,8 +956,10 @@ def leds(st):
     if not n["empty"]:
         l0 = "red" if n["bypass"] else BUCKETCOL.get(n["bucket"], "grey")
     l1 = OFF
-    if st.menu_open:
-        l1 = "red" if AppController(st).menu_items()[st.menu][2] == "remove" else "amber"
+    if st.menu_open:                          # Q5: danger(red) rides ENC0 (the commit hand)
+        if AppController(st).menu_items()[st.menu][2] == "remove":
+            l0 = "red"
+        l1 = "amber"
     elif st.locked:
         l1 = "green"
     return (l0, l1)
@@ -946,7 +971,7 @@ def _walk():
     from ganglion.input import KeyboardInput
     _rng.seed(1)                     # deterministic suffix suggestions for the walk
     kb = KeyboardInput()
-    c = AppController()
+    c = AppController(day_provider=lambda: 3)   # fixed weekday (thursday) for determinism
     t = [0.0]
 
     def do(chars, note):
@@ -961,9 +986,8 @@ def _walk():
     do("s", "lock")        # enc1 click: focus-lock knob
     do("gg", "adjust")     # enc1 CW x2: adjust locked value
     do("s", "unlock")
-    do("w", "slot-menu")   # enc0 click: open slot menu
-    do("t", "menu>")       # move menu selection
-    do("w", "exec")        # enc0 click: execute (bypass)
+    do("w", "slot-menu")   # enc0 click: open slot menu (menu 0 = Bypass/Enable)
+    do("w", "exec")        # enc0 click: execute bypass/enable (menu closes)
     do("e", "hold-up")     # enc0 hold: depth 0 -> -1 (glance)
     do("g", "snap>")       # enc1 CW: snapshot scroll
     do("x", "combo")       # save snapshot (toast)
@@ -1003,13 +1027,12 @@ def _walk():
     do("w", "accept")      # enc0 click: insert new board, select it
     print("      boards  %s pb=%d" % (c.st.boards, c.st.pb))
     # snapshot manage is operated by ENC1 (the encoder that opened it)
-    do("s", "snap-sub")    # enc1 click: open SNAP manage submenu
+    do("s", "snap-sub")    # enc1 click: open SNAP manage submenu (E1 operates)
     do("g", "sub>")        # enc1 turn: Save -> Save As
-    do("s", "snap-saveas") # enc1 click: -> name suggester (word-day)
-    do("ttt", "day>>>")    # enc0 turn x3: cycle weekday (naming: ENC0 categorical)
+    do("s", "snap-saveas") # enc1 click: -> name suggester (word-day; day auto = thursday)
     do("g", "reroll")      # enc1 turn: re-roll the random word
     print("      snap-name  %r  (%d snaps)" % (c.st.nname, len(c.st.snaps)))
-    do("w", "accept-snap") # enc0 click: accept the name (naming: ENC0 = OK)
+    do("s", "accept-snap") # enc1 click: accept (Q3: snap naming is E1-only)
     print("      snaps   %s snap=%d" % (c.st.snaps, c.st.snap))
     # delete the new board (confirm overlay)
     do("w", "board-sub2")  # open submenu on the new board
