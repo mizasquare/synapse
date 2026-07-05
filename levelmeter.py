@@ -128,7 +128,13 @@ class LevelMeter:
                 self._try_connect(s, dst)
 
     def _try_connect(self, src, dst):
+        # Skip pairs that are already wired: jackd broadcasts a graph notification
+        # even for a *rejected* duplicate connect, which re-arms _retap and turns
+        # the 30 Hz snapshot tick into a permanent reconnect/notify feedback loop.
+        want = src if isinstance(src, str) else src.name
         try:
+            if any(p.name == want for p in dst.connections):
+                return
             self.client.connect(src, dst)
         except jack.JackError:
             pass                         # already connected, or source absent -- fine
