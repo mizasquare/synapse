@@ -52,7 +52,7 @@ echo '{"cmd":"save"}'                     | nc -U ~/.modep/reflex.sock
 ```
 
 `get_status`의 `raw`를 보면서 페달을 왕복하면 배선/납땜 문제도 진단된다
-(정상: 매끈한 단조 변화 — [`docs/expression-pedal-handoff.md`](../../docs/expression-pedal-handoff.md)).
+(정상: 매끈한 단조 변화 — [`docs/expression-pedal-handoff-DONE.md`](../../docs/expression-pedal-handoff-DONE.md)).
 
 ## 설치
 

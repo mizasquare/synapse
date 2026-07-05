@@ -44,9 +44,11 @@
       `deploy/reflex-service/`) + `synapse-volume` 컨트롤 데몬(`deploy/volume-service/volumectl.py`,
       taper·CC7 private 링크 소유) + 앱 슬라이더 양방향 동기화(state echo). 앱 폴링 통합은
       **의도적으로 하지 않기로 결정**(격리 우선 — reflex는 앱 밖의 장치).
-      온디바이스 검증·캘리브레이션은 현장 작업 필요([`expression-pedal-handoff.md`](expression-pedal-handoff.md)).
-- [ ] **볼륨페달 후속(온디바이스)** — **부팅 페달 감지**(게인토글 프로브, ch0) + **config 사용여부 옵션** +
-      **언플러그 시퀀스**(볼륨→127 1초 램프·홀드→송신중단→홀드=풀 패스스루 페일세이프, ★안정성).
+      온디바이스 검증·캘리브레이션·현장 페달 확인까지 완료(2026-07-05,
+      [`expression-pedal-handoff-DONE.md`](expression-pedal-handoff-DONE.md)).
+- [ ] **볼륨페달 후속(온디바이스)** — **부팅 페달 감지**(게인토글 프로브, ch0) + **config 사용여부 옵션**.
+      ~~언플러그 시퀀스~~ → 구현 불필요 판정(2026-07-05): 분리 후 풀업이 캘리 상한을 넘어 CC 127
+      유니티로 자연 고정됨 — 실측 확인, [`expression-pedal-handoff-DONE.md`](expression-pedal-handoff-DONE.md) 노트.
       코드개선(미적용): 단발→연속모드, EMA+히스테리시스 CC 지터제거. 앱 내 캘리브레이션 화면
       (reflex 소켓 클라이언트, 프로토콜은 확정됨). (중)
 - [ ] **모멘터리(홀드) 모드** — [`presenter.py`](../presenter.py) 폴링이 릴리스엣지 전용(`stable==[0,0,0,0]`일 때만
