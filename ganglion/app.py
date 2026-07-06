@@ -273,14 +273,15 @@ class AppController:
 
     # -- event entry ------------------------------------------------------
     def feed(self, ev):
+        m = MODES[mode_of(self.st)]        # the active mode owns rotate/click/hold
         if isinstance(ev, Rotate):
             # [DECISION D] rotation accel magnitude is collapsed to sign here —
             # 1 detent = 1 step for nav AND value. Revisit: fast spin = coarse?
-            self.rot(ev.enc, 1 if ev.delta > 0 else -1)
+            m.on_rotate(self, ev.enc, 1 if ev.delta > 0 else -1)
         elif isinstance(ev, Press):
-            (self.hold if ev.kind == "long" else self.click)(ev.enc)
+            (m.on_hold if ev.kind == "long" else m.on_click)(self, ev.enc)
         elif isinstance(ev, Combo):
-            if ev.kind == "press":
+            if ev.kind == "press":         # global save; guards on its own
                 self.combo()
 
     def _cur(self):
@@ -293,75 +294,6 @@ class AppController:
         return [("O" if not n["bypass"] else "*", "Enable" if n["bypass"] else "Bypass", "bypass"),
                 ("<>", "Move", "move"), ("~", "Replace", "replace"),
                 ("X", "Remove", "remove"), ("<", "Back", "back")]
-
-    # -- rotate -----------------------------------------------------------
-    def rot(self, enc, d):
-        st = self.st
-        m = mode_of(st)
-        if m == "tuner":
-            return
-        if m == "confirm":                     # the opening encoder toggles No/Yes
-            if enc == _op(st.confirm.split(":")[1]):
-                st.cyes = not st.cyes
-            return
-        if m == "naming":                      # Q3: category=ENC0 (board only), reroll=ENC1
-            which = st.naming.split(":")[0]
-            if which == "board" and enc == 0:  # board: ENC0 dials the stage term
-                st.ncat = (st.ncat + d) % len(name_cats(which))
-                self._rebuild_name(reroll=False)
-            elif enc == 1:                     # ENC1 re-rolls (snap day is auto — no ENC0)
-                self._rebuild_name(reroll=True)
-            return
-        if m == "sub":                         # the encoder that opened it operates it
-            if enc == _op(st.sub):
-                st.sub_idx = (st.sub_idx + d) % len(SUB_ACTIONS)
-            return
-        if m == "pick":
-            if enc == 1:                       # ENC1 turns the active strip
-                if st.pick == "cat":
-                    st.pick_cat = (st.pick_cat + d) % len(st.wl)
-                else:
-                    st.pick_fx = (st.pick_fx + d) % len(st.wl[st.pick_cat]["plugins"])
-            return
-        if m == "sys":                         # Q4: ENC0-only (matches other modals)
-            if enc == 0:
-                st.sys_idx = (st.sys_idx + d) % len(SYSITEMS)
-            return
-        if m == "menu":                        # Q4: ENC0-only (ENC0 also commits)
-            if enc == 0:
-                st.menu = (st.menu + d) % len(self.menu_items())
-            return
-        if m == "glance":
-            if enc == 0:
-                st.pb = (st.pb + d) % len(st.boards)
-            else:
-                st.snap = (st.snap + d) % len(st.snaps)
-            return
-        if m == "sysfocus":                  # parked at SYS entry: only ENC0-right returns
-            if enc == 0 and d > 0:           # roll back onto the chain (left = wall)
-                st.sys_focus, st.node = False, 0
-            return
-        if m == "moving":                    # picked-up node: ENC0 swaps with neighbour
-            if enc == 0:
-                j = st.node + d
-                if 0 <= j < len(st.board):
-                    st.board[st.node], st.board[j] = st.board[j], st.board[st.node]
-                    st.node = j
-            return
-        # chain
-        if enc == 0:
-            nn = st.node + d
-            if nn < 0:                       # scroll left past start -> PARK at SYS (guard,
-                st.sys_focus = True          # not enter): a fast spin stops here, E0 click enters
-                return
-            st.node = min(nn, len(st.board) - 1)
-            st.knob = 0
-        else:
-            n = self._cur()
-            if st.locked:
-                self.adjust(d)
-            elif not n["empty"]:
-                st.knob = (st.knob + d) % len(n["knobs"])
 
     def adjust(self, d):
         n = self._cur()
@@ -376,76 +308,6 @@ class AppController:
             step = (kb["mx"] - kb["mn"]) / 40.0
             kb["v"] = max(kb["mn"], min(kb["mx"], kb["v"] + step * d))
         self.st.dirty = True
-
-    # -- click ------------------------------------------------------------
-    def click(self, enc):
-        st = self.st
-        m = mode_of(st)
-        if m == "tuner":
-            st.tuner = False
-            return
-        if m == "confirm":                     # opening encoder acts; the other cancels
-            if enc == _op(st.confirm.split(":")[1]):
-                if st.cyes:
-                    self._confirm_exec()
-                else:
-                    st.confirm = ""
-            else:
-                st.confirm = ""
-            return
-        if m == "naming":                      # Q3: operating encoder accepts (board=E0, snap=E1)
-            which = st.naming.split(":")[0]
-            if enc == _op(which):
-                self._name_accept()
-            elif enc == 1:                     # ENC1 click = re-roll (board's non-op hand)
-                self._rebuild_name(reroll=True)
-            return
-        if m == "sub":                         # opening encoder picks; the other backs
-            if enc == _op(st.sub):
-                self._sub_act(SUB_ACTIONS[st.sub_idx][1])
-            else:
-                st.sub = ""
-            return
-        if m == "pick":
-            if enc == 1:                       # ENC1 click = select / place
-                if st.pick == "cat":
-                    st.pick, st.pick_fx = "fx", 0
-                else:
-                    cat = st.wl[st.pick_cat]
-                    plug = cat["plugins"][st.pick_fx]
-                    st.board[st.node] = make_node(cat, plug)
-                    st.pick, st.knob, st.dirty = "", 0, True
-                    self._toast(plug["display"] + " placed")
-            return                             # ENC0 click = no-op (hold = back)
-        if m == "sys":
-            if enc == 0:
-                self._sys_act()
-            else:
-                st.sys = False
-            return
-        if m == "menu":
-            if enc == 1:
-                st.menu_open = False
-            else:
-                self._menu_act(self.menu_items()[st.menu][2])
-            return
-        if m == "glance":                      # open board (e0) / snapshot (e1) manage
-            st.sub, st.sub_idx = ("board" if enc == 0 else "snap"), 0
-            return
-        if m == "sysfocus":                    # ENC0 click = commit: enter SYSTEM (guard)
-            if enc == 0:
-                st.sys_focus, st.sys, st.sys_idx = False, True, 0
-            return
-        if m == "moving":                      # ENC0 click = drop here (commit)
-            if enc == 0:
-                st.moving, st.dirty = False, True
-                self._toast("MOVED")
-            return
-        # chain
-        if enc == 0:
-            st.menu_open, st.menu = True, 0
-        elif not self._cur()["empty"]:
-            st.locked = not st.locked
 
     def _menu_act(self, act):
         st = self.st
@@ -558,50 +420,6 @@ class AppController:
         else:
             self._toast("TODO: " + it)
 
-    # -- hold (long press) ------------------------------------------------
-    def hold(self, enc):
-        st = self.st
-        m = mode_of(st)
-        if m == "tuner":
-            st.tuner = False
-            return
-        if m == "confirm":                    # Q3: operating encoder hold = cancel (= No)
-            if enc == _op(st.confirm.split(":")[1]):
-                st.confirm = ""
-            return
-        if m == "naming":                     # Q3: operating encoder hold = cancel naming
-            if enc == _op(st.naming.split(":")[0]):
-                st.naming = ""
-            return
-        if m == "sub":                        # ENC0 hold = close submenu
-            if enc == 0:
-                st.sub = ""
-            return
-        if m == "pick":                       # ENC0 hold = back (consistent); ENC1 hold = no-op
-            if enc == 0:
-                st.pick = "cat" if st.pick == "fx" else ""
-            return
-        if m == "moving":                     # ENC0 hold = cancel move, restore position
-            if enc == 0:
-                node = st.board.pop(st.node)
-                st.board.insert(st.move_from, node)
-                st.node, st.moving = st.move_from, False
-            return
-        # sys / menu / glance / sysfocus / chain: ENC0 = zoom out, ENC1 = tuner
-        if enc == 0:                          # ENC0 hold = zoom out one level
-            if st.sys_focus:                  # leave the SYS edge, up to glance (chain rule)
-                st.sys_focus, st.depth = False, -1
-            elif st.sys:
-                st.sys = False
-            elif st.menu_open:
-                st.menu_open = False
-            elif st.depth == 0:
-                st.depth = -1
-            elif st.depth == -1:
-                st.depth = 0
-        else:                                 # ENC1 hold = tuner
-            st.tuner = True
-
     def combo(self):
         st = self.st
         if st.moving or st.pick or st.sub or st.naming or st.confirm or st.sys_focus:
@@ -611,6 +429,244 @@ class AppController:
 
     def _toast(self, msg):
         self.st.toast = msg
+
+
+# ---- input modes (state-major dispatch) -------------------------------------
+# One class per mode ties its rotate/click/hold together; ``feed`` picks the
+# active one via ``MODES[mode_of(st)]``. Two families capture the cross-mode
+# regularities so they live once, not per-mode:
+#   Mode    — a modal overlay. ENC0-hold backs out (``exit``); ENC1-hold idle.
+#             ``op_enc(st)`` = the encoder that operates it (rotate/click).
+#   NavMode — the navigation family (chain/glance/sys/menu/sysfocus): ENC0-hold
+#             zooms out one level, ENC1-hold opens the tuner. Shared by all five.
+# Modes carry no state: AppState stays the single source of truth (so the
+# confirm-over-sub overlay is preserved), a Mode just reads/mutates it via ``c``.
+class Mode:
+    def op_enc(self, st):
+        return 0
+    def on_rotate(self, c, enc, d):
+        pass
+    def on_click(self, c, enc):
+        pass
+    def on_hold(self, c, enc):             # ENC0-hold = back out of this mode
+        if enc == 0:
+            self.exit(c)
+    def exit(self, c):
+        pass
+
+
+class NavMode(Mode):
+    def on_hold(self, c, enc):             # ENC0 = zoom out one level, ENC1 = tuner
+        st = c.st
+        if enc == 0:
+            if st.sys_focus:               # leave the SYS edge, up to glance (chain rule)
+                st.sys_focus, st.depth = False, -1
+            elif st.sys:
+                st.sys = False
+            elif st.menu_open:
+                st.menu_open = False
+            elif st.depth == 0:
+                st.depth = -1
+            elif st.depth == -1:
+                st.depth = 0
+        else:
+            st.tuner = True
+
+
+class TunerMode(Mode):
+    def on_click(self, c, enc):            # Q1: any press exits (rotate ignored)
+        c.st.tuner = False
+    def on_hold(self, c, enc):
+        c.st.tuner = False
+
+
+class ConfirmMode(Mode):
+    def op_enc(self, st):                  # the encoder that opened the dialog
+        return _op(st.confirm.split(":")[1])
+    def on_rotate(self, c, enc, d):        # the opening encoder toggles No/Yes
+        if enc == self.op_enc(c.st):
+            c.st.cyes = not c.st.cyes
+    def on_click(self, c, enc):            # opening encoder acts; the other cancels
+        st = c.st
+        if enc == self.op_enc(st):
+            if st.cyes:
+                c._confirm_exec()
+            else:
+                st.confirm = ""
+        else:
+            st.confirm = ""
+    def on_hold(self, c, enc):             # Q3: operating encoder hold = cancel (= No)
+        if enc == self.op_enc(c.st):
+            self.exit(c)
+    def exit(self, c):
+        c.st.confirm = ""
+
+
+class NamingMode(Mode):
+    def op_enc(self, st):
+        return _op(st.naming.split(":")[0])
+    def on_rotate(self, c, enc, d):        # Q3: category=ENC0 (board only), reroll=ENC1
+        st = c.st
+        which = st.naming.split(":")[0]
+        if which == "board" and enc == 0:  # board: ENC0 dials the stage term
+            st.ncat = (st.ncat + d) % len(name_cats(which))
+            c._rebuild_name(reroll=False)
+        elif enc == 1:                     # ENC1 re-rolls (snap day is auto — no ENC0)
+            c._rebuild_name(reroll=True)
+    def on_click(self, c, enc):            # Q3: operating encoder accepts (board=E0, snap=E1)
+        st = c.st
+        if enc == self.op_enc(st):
+            c._name_accept()
+        elif enc == 1:                     # ENC1 click = re-roll (board's non-op hand)
+            c._rebuild_name(reroll=True)
+    def on_hold(self, c, enc):             # Q3: operating encoder hold = cancel naming
+        if enc == self.op_enc(c.st):
+            self.exit(c)
+    def exit(self, c):
+        c.st.naming = ""
+
+
+class SubMode(Mode):
+    def op_enc(self, st):                  # boards ride ENC0, snaps ENC1 (whoever opened)
+        return _op(st.sub)
+    def on_rotate(self, c, enc, d):
+        st = c.st
+        if enc == self.op_enc(st):
+            st.sub_idx = (st.sub_idx + d) % len(SUB_ACTIONS)
+    def on_click(self, c, enc):            # opening encoder picks; the other backs
+        st = c.st
+        if enc == self.op_enc(st):
+            c._sub_act(SUB_ACTIONS[st.sub_idx][1])
+        else:
+            st.sub = ""
+    def exit(self, c):                     # ENC0-hold closes (base on_hold), regardless of op
+        c.st.sub = ""
+
+
+class PickMode(Mode):
+    def op_enc(self, st):
+        return 1                           # ENC1 operates; ENC0 dead (hold = back)
+    def on_rotate(self, c, enc, d):        # ENC1 turns the active strip
+        st = c.st
+        if enc == 1:
+            if st.pick == "cat":
+                st.pick_cat = (st.pick_cat + d) % len(st.wl)
+            else:
+                st.pick_fx = (st.pick_fx + d) % len(st.wl[st.pick_cat]["plugins"])
+    def on_click(self, c, enc):            # ENC1 click = select / place
+        st = c.st
+        if enc == 1:
+            if st.pick == "cat":
+                st.pick, st.pick_fx = "fx", 0
+            else:
+                cat = st.wl[st.pick_cat]
+                plug = cat["plugins"][st.pick_fx]
+                st.board[st.node] = make_node(cat, plug)
+                st.pick, st.knob, st.dirty = "", 0, True
+                c._toast(plug["display"] + " placed")
+    def exit(self, c):                     # ENC0-hold = back one strip (base on_hold)
+        c.st.pick = "cat" if c.st.pick == "fx" else ""
+
+
+class MovingMode(Mode):
+    def on_rotate(self, c, enc, d):        # ENC0 swaps the picked-up node with a neighbour
+        st = c.st
+        if enc == 0:
+            j = st.node + d
+            if 0 <= j < len(st.board):
+                st.board[st.node], st.board[j] = st.board[j], st.board[st.node]
+                st.node = j
+    def on_click(self, c, enc):            # ENC0 click = drop here (commit)
+        st = c.st
+        if enc == 0:
+            st.moving, st.dirty = False, True
+            c._toast("MOVED")
+    def exit(self, c):                     # ENC0-hold = cancel move, restore position
+        st = c.st
+        node = st.board.pop(st.node)
+        st.board.insert(st.move_from, node)
+        st.node, st.moving = st.move_from, False
+
+
+class SysMode(NavMode):
+    def on_rotate(self, c, enc, d):        # Q4: ENC0-only (matches other modals)
+        st = c.st
+        if enc == 0:
+            st.sys_idx = (st.sys_idx + d) % len(SYSITEMS)
+    def on_click(self, c, enc):
+        st = c.st
+        if enc == 0:
+            c._sys_act()
+        else:
+            st.sys = False
+
+
+class MenuMode(NavMode):
+    def on_rotate(self, c, enc, d):        # Q4: ENC0-only (ENC0 also commits)
+        st = c.st
+        if enc == 0:
+            st.menu = (st.menu + d) % len(c.menu_items())
+    def on_click(self, c, enc):
+        st = c.st
+        if enc == 1:
+            st.menu_open = False
+        else:
+            c._menu_act(c.menu_items()[st.menu][2])
+
+
+class GlanceMode(NavMode):
+    def on_rotate(self, c, enc, d):
+        st = c.st
+        if enc == 0:
+            st.pb = (st.pb + d) % len(st.boards)
+        else:
+            st.snap = (st.snap + d) % len(st.snaps)
+    def on_click(self, c, enc):            # open board (e0) / snapshot (e1) manage
+        st = c.st
+        st.sub, st.sub_idx = ("board" if enc == 0 else "snap"), 0
+
+
+class SysFocusMode(NavMode):
+    def on_rotate(self, c, enc, d):        # parked at SYS entry: only ENC0-right returns
+        st = c.st
+        if enc == 0 and d > 0:             # roll back onto the chain (left = wall)
+            st.sys_focus, st.node = False, 0
+    def on_click(self, c, enc):            # ENC0 click = commit: enter SYSTEM (guard)
+        st = c.st
+        if enc == 0:
+            st.sys_focus, st.sys, st.sys_idx = False, True, 0
+
+
+class ChainMode(NavMode):
+    def on_rotate(self, c, enc, d):
+        st = c.st
+        if enc == 0:
+            nn = st.node + d
+            if nn < 0:                     # scroll left past start -> PARK at SYS (guard,
+                st.sys_focus = True        # not enter): a fast spin stops here, E0 click enters
+                return
+            st.node = min(nn, len(st.board) - 1)
+            st.knob = 0
+        else:
+            n = c._cur()
+            if st.locked:
+                c.adjust(d)
+            elif not n["empty"]:
+                st.knob = (st.knob + d) % len(n["knobs"])
+    def on_click(self, c, enc):
+        st = c.st
+        if enc == 0:
+            st.menu_open, st.menu = True, 0
+        elif not c._cur()["empty"]:
+            st.locked = not st.locked
+
+
+MODES = {
+    "tuner": TunerMode(), "confirm": ConfirmMode(), "naming": NamingMode(),
+    "sub": SubMode(), "pick": PickMode(), "sys": SysMode(), "menu": MenuMode(),
+    "glance": GlanceMode(), "sysfocus": SysFocusMode(), "moving": MovingMode(),
+    "chain": ChainMode(),
+}
 
 
 # ========================= VIEW (state -> frame) =========================
