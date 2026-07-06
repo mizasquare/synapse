@@ -25,7 +25,6 @@ Scripted check:      python3 ganglion/app.py --walk
 """
 
 import datetime
-import json
 import os
 import random
 import sys
@@ -39,12 +38,13 @@ from PIL import ImageDraw
 from ganglion import WIDTH, HEIGHT
 from ganglion.render import Screen, fs
 from ganglion.input import Rotate, Press, Combo
+from ganglion.geco_backend import FakeGeco
 
 BG = 0
 
-# ---- knob + board model (port of the mockup's K/fmt/norm/makeBoard) ----
-BUCKET = {"Drive": "DRV", "Comp": "CMP", "Amp·Cab": "AMP", "Delay": "DLY",
-          "Reverb": "RVB", "EQ": "EQ", "Mod": "MOD", "Filter": "FLT"}
+# ---- knob-value rendering (norm/fmt) + LED colours ----
+# Board/catalog fixtures and their factories (K/make_board/make_node/whitelist)
+# now live in geco_backend.py (the seam); the view keeps only what it renders.
 # ENC0 LED per effect category (design leds()); ENC1/state colours below.
 # Old sample-board bucket names + the live GECO whitelist keys share this map.
 BUCKETCOL = {"Drive": "amber", "Comp": "green", "Amp·Cab": "amber",
@@ -52,10 +52,6 @@ BUCKETCOL = {"Drive": "amber", "Comp": "green", "Amp·Cab": "amber",
              "Filter": "blue", "Utility": "grey",
              "Dynamics": "green", "Pedal": "amber", "Amp": "amber", "Cab": "amber",
              "Spatial": "blue", "Utils": "grey"}
-
-
-def K(n, v, mn, mx, u="", k="dial", scale=None):
-    return {"n": n, "v": v, "mn": mn, "mx": mx, "u": u, "k": k, "scale": scale}
 
 
 def norm(kb):
@@ -73,73 +69,6 @@ def fmt(kb):
     return s + ((" " + kb["u"]) if kb["u"] else "")
 
 
-def _node(name, abbr, bucket, bypass, knobs):
-    return {"name": name, "abbr": abbr, "bucket": bucket, "bypass": bypass,
-            "empty": False, "knobs": knobs}
-
-
-def make_board():
-    return [
-        _node("Comp", "CMP", "Comp", False, [K("Thresh", -24, -60, 0, "dB"), K("Ratio", 4, 1, 20, ":1"),
-                                             K("Attack", 12, 1, 100, "ms"), K("Makeup", 6, 0, 24, "dB")]),
-        _node("Drive", "DRV", "Drive", False, [K("Gain", .62, 0, 1), K("Tone", .5, 0, 1),
-                                               K("Level", .72, 0, 1), K("Bass", .4, 0, 1)]),
-        _node("NAM", "AMP", "Amp·Cab", False, [K("Input", -6, -20, 20, "dB"), K("Output", -3, -20, 20, "dB"),
-              K("Model", 0, 0, 3, "", "file", ["Fender Twin", "Vox AC30", "JCM800", "Mesa Recto"])]),
-        _node("Cab", "CAB", "Amp·Cab", True, [K("Level", .8, 0, 1)]),
-        _node("Delay", "DLY", "Delay", False, [K("Time", 380, 20, 1200, "ms"), K("Fdbk", 42, 0, 100, "%"),
-                                               K("Mix", 28, 0, 100, "%")]),
-        _node("Reverb", "RVB", "Reverb", False, [K("Decay", 2.4, .1, 12, "s"), K("Mix", 22, 0, 100, "%"),
-                                                 K("Size", .6, 0, 1)]),
-    ]
-
-
-def _empty():
-    return {"name": "", "abbr": "", "bucket": "", "bypass": False, "empty": True, "knobs": []}
-
-
-# ---- plugin whitelist + node factory (port of the mockup's WL/makeNode) ----
-# Curated by tools/catalog.py -> geco_whitelist.json (8 GECO buckets). The knob
-# templates below are placeholders keyed by bucket until the synapse model/LV2
-# param wiring lands (decisions.md A/B/E) — a placed node gets its bucket's dials.
-_WL_FALLBACK = [
-    {"key": "Pedal", "abbr": "PDL",
-     "plugins": [{"display": "Overdrive", "name": "Overdrive", "uri": "", "brand": "", "alias": None}]},
-    {"key": "Amp", "abbr": "AMP",
-     "plugins": [{"display": "Amp Sim", "name": "Amp Sim", "uri": "", "brand": "", "alias": None}]},
-]
-
-_KNOB_TMPL = {
-    "Dynamics": lambda: [K("Thresh", -24, -60, 0, "dB"), K("Ratio", 4, 1, 20, ":1"),
-                         K("Attack", 12, 1, 100, "ms"), K("Makeup", 6, 0, 24, "dB")],
-    "Filter": lambda: [K("Freq", 800, 20, 12000, "Hz"), K("Q", 1.0, .1, 10), K("Gain", 0, -24, 24, "dB")],
-    "Pedal": lambda: [K("Gain", .6, 0, 1), K("Tone", .5, 0, 1), K("Level", .7, 0, 1)],
-    "Amp": lambda: [K("Input", -6, -20, 20, "dB"), K("Gain", .5, 0, 1), K("Output", -3, -20, 20, "dB")],
-    "Cab": lambda: [K("Level", .8, 0, 1)],
-    "Mod": lambda: [K("Rate", 1.2, .1, 10, "Hz"), K("Depth", 50, 0, 100, "%"), K("Mix", 40, 0, 100, "%")],
-    "Spatial": lambda: [K("Time", 380, 20, 1200, "ms"), K("Fdbk", 42, 0, 100, "%"), K("Mix", 28, 0, 100, "%")],
-    "Utils": lambda: [K("Level", .7, 0, 1)],
-}
-
-
-def load_whitelist():
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "geco_whitelist.json")
-    try:
-        with open(path) as f:
-            buckets = json.load(f)["buckets"]
-        return buckets if buckets else _WL_FALLBACK
-    except (OSError, ValueError, KeyError):
-        return _WL_FALLBACK
-
-
-def make_node(cat, plug):
-    tmpl = _KNOB_TMPL.get(cat["key"], lambda: [K("Level", .7, 0, 1)])
-    return {"name": plug["display"], "abbr": cat["abbr"], "bucket": cat["key"],
-            "bypass": False, "empty": False, "knobs": tmpl()}
-
-
-PBS = ["Lead Joyful", "Clean Verse", "Ambient Cathedral Wash"]
-SNAPS = ["Default", "Lead Boost", "Ambient"]
 SYSITEMS = ["Tuner", "Brightness", "MIDI Ch", "About", "< Back"]
 
 # ---- SAVE AS naming (reuses synapse's word bank; 0 core edits) --------------
@@ -236,10 +165,13 @@ class AppState:
     cyes: bool = False        # confirm overlay highlight (No/Yes)
     dirty: bool = False
     toast: str = ""
-    board: list = field(default_factory=make_board)
-    wl: list = field(default_factory=load_whitelist)
-    boards: list = field(default_factory=lambda: list(PBS))
-    snaps: list = field(default_factory=lambda: list(SNAPS))
+    # Render caches mirrored from the backend (the source of truth). Seeded by
+    # AppController.__init__ and re-synced after each mutation; the view reads
+    # only these, so it never touches the backend. Bare AppState() starts empty.
+    board: list = field(default_factory=list)
+    wl: list = field(default_factory=list)
+    boards: list = field(default_factory=list)
+    snaps: list = field(default_factory=list)
 
 
 # ---- mode selection (the ONE cascade) -------------------------------------
@@ -276,11 +208,26 @@ def menu_items(st):
 class AppController:
     """Ported 2a state machine. ``feed(event)`` mutates ``self.st``."""
 
-    def __init__(self, state=None, day_provider=None):
+    def __init__(self, state=None, day_provider=None, backend=None):
+        # backend: the GECO seam (board / catalog / persistence). Defaults to the
+        # in-memory FakeGeco; a live entry point injects an adapter over synapse.
+        self.backend = backend or FakeGeco()
         self.st = state or AppState()
+        self._sync_board()                    # seed the render caches from the backend
+        self.st.wl = self.backend.catalog()
+        self._sync_lists()
         # Snap naming's weekday comes from the clock (Q3). Injected so --walk/tests
         # stay deterministic; defaults to the real system date on device.
         self._day_provider = day_provider or _system_day_idx
+
+    def _sync_board(self):
+        """Refresh the board cache from the backend (call after any board mutation)."""
+        self.st.board = self.backend.board()
+
+    def _sync_lists(self):
+        """Refresh the board/snapshot name caches (call after any persist mutation)."""
+        self.st.boards = self.backend.boards()
+        self.st.snaps = self.backend.snapshots()
 
     # -- event entry ------------------------------------------------------
     def feed(self, ev):
@@ -309,14 +256,16 @@ class AppController:
         n = self._cur()
         if n["empty"]:
             return
-        kb = n["knobs"][self.st.knob]
+        kb = n["knobs"][self.st.knob]          # read current value from the cache
         if kb["k"] == "toggle":
-            kb["v"] = 0 if kb["v"] >= .5 else 1
+            v = 0 if kb["v"] >= .5 else 1
         elif kb["k"] in ("enum", "file"):
-            kb["v"] = max(kb["mn"], min(kb["mx"], round(kb["v"]) + d))
+            v = max(kb["mn"], min(kb["mx"], round(kb["v"]) + d))
         else:
             step = (kb["mx"] - kb["mn"]) / 40.0
-            kb["v"] = max(kb["mn"], min(kb["mx"], kb["v"] + step * d))
+            v = max(kb["mn"], min(kb["mx"], kb["v"] + step * d))
+        self.backend.set_param(self.st.node, self.st.knob, v)   # the detent maps to a value; backend stores it
+        self._sync_board()
         self.st.dirty = True
 
     def _menu_act(self, act):
@@ -325,10 +274,12 @@ class AppController:
         if act == "back":
             st.menu_open = False
         elif act == "bypass":
-            n["bypass"] = not n["bypass"]
+            self.backend.set_bypass(st.node, not n["bypass"])
+            self._sync_board()
             st.menu_open, st.dirty = False, True
         elif act == "remove":
-            st.board[st.node] = _empty()
+            self.backend.remove(st.node)
+            self._sync_board()
             st.menu_open, st.knob, st.dirty = False, 0, True
         elif act in ("place", "replace"):
             st.menu_open = False
@@ -359,6 +310,7 @@ class AppController:
         if act == "back":
             st.sub = ""
         elif act == "save":                    # overwrite current (persist)
+            self.backend.save(which)
             st.sub, st.dirty = "", False
             self._toast("SAVED")
         elif act == "saveas":                  # new entry via the name suggester
@@ -394,12 +346,12 @@ class AppController:
     def _name_accept(self):
         st = self.st
         which, mode = st.naming.split(":")
-        lst, idx = self._lst(which)
+        _, idx = self._lst(which)
         if mode == "rename":
-            lst[idx] = st.nname
+            self.backend.rename(which, idx, st.nname)
         else:                                  # saveas -> insert after current, select it
-            lst.insert(idx + 1, st.nname)
-            self._set_idx(which, idx + 1)
+            self._set_idx(which, self.backend.save_as(which, idx, st.nname))
+        self._sync_lists()
         st.naming, st.dirty = "", (which == "snap")
         self._toast(("RENAMED " if mode == "rename" else "SAVED ") + st.nname)
 
@@ -407,10 +359,9 @@ class AppController:
         st = self.st
         if st.confirm.startswith("del:"):
             which = st.confirm.split(":")[1]
-            lst, idx = self._lst(which)
-            if len(lst) > 1:
-                lst.pop(idx)
-                self._set_idx(which, min(idx, len(lst) - 1))
+            _, idx = self._lst(which)
+            self._set_idx(which, self.backend.delete(which, idx))
+            self._sync_lists()
             self._toast("DELETED")
         st.confirm, st.sub = "", ""
 
@@ -580,9 +531,9 @@ class PickMode(Mode):
             if st.pick == "cat":
                 st.pick, st.pick_fx = "fx", 0
             else:
-                cat = st.wl[st.pick_cat]
-                plug = cat["plugins"][st.pick_fx]
-                st.board[st.node] = make_node(cat, plug)
+                plug = st.wl[st.pick_cat]["plugins"][st.pick_fx]   # for the toast
+                c.backend.place(st.node, st.pick_cat, st.pick_fx)
+                c._sync_board()
                 st.pick, st.knob, st.dirty = "", 0, True
                 c._toast(plug["display"] + " placed")
     def exit(self, c):                     # ENC0-hold = back one strip (base on_hold)
@@ -597,7 +548,8 @@ class MovingMode(Mode):
         if enc == 0:
             j = st.node + d
             if 0 <= j < len(st.board):
-                st.board[st.node], st.board[j] = st.board[j], st.board[st.node]
+                c.backend.move(st.node, j)
+                c._sync_board()
                 st.node = j
     def on_click(self, c, enc):            # ENC0 click = drop here (commit)
         st = c.st
@@ -606,8 +558,8 @@ class MovingMode(Mode):
             c._toast("MOVED")
     def exit(self, c):                     # ENC0-hold = cancel move, restore position
         st = c.st
-        node = st.board.pop(st.node)
-        st.board.insert(st.move_from, node)
+        c.backend.move(st.node, st.move_from)
+        c._sync_board()
         st.node, st.moving = st.move_from, False
 
 
