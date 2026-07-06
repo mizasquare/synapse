@@ -242,6 +242,26 @@ class AppState:
     snaps: list = field(default_factory=lambda: list(SNAPS))
 
 
+# ---- mode selection (the ONE cascade) -------------------------------------
+# The active mode is derived from AppState's flags in a single canonical order.
+# Every input handler (rot/click/hold) and every view function (_frame/rails/
+# leds/_rail_split) dispatches off this — so the priority order lives in exactly
+# one place and can't drift between them. Flags stay the source of truth (the
+# confirm-over-sub overlay is preserved for free); this only reads them.
+def mode_of(st):
+    if st.tuner:       return "tuner"
+    if st.confirm:     return "confirm"
+    if st.naming:      return "naming"
+    if st.sub:         return "sub"
+    if st.pick:        return "pick"
+    if st.sys:         return "sys"
+    if st.menu_open:   return "menu"
+    if st.depth == -1: return "glance"
+    if st.sys_focus:   return "sysfocus"
+    if st.moving:      return "moving"
+    return "chain"
+
+
 class AppController:
     """Ported 2a state machine. ``feed(event)`` mutates ``self.st``."""
 
@@ -277,13 +297,14 @@ class AppController:
     # -- rotate -----------------------------------------------------------
     def rot(self, enc, d):
         st = self.st
-        if st.tuner:
+        m = mode_of(st)
+        if m == "tuner":
             return
-        if st.confirm:                         # the opening encoder toggles No/Yes
+        if m == "confirm":                     # the opening encoder toggles No/Yes
             if enc == _op(st.confirm.split(":")[1]):
                 st.cyes = not st.cyes
             return
-        if st.naming:                          # Q3: category=ENC0 (board only), reroll=ENC1
+        if m == "naming":                      # Q3: category=ENC0 (board only), reroll=ENC1
             which = st.naming.split(":")[0]
             if which == "board" and enc == 0:  # board: ENC0 dials the stage term
                 st.ncat = (st.ncat + d) % len(name_cats(which))
@@ -291,43 +312,43 @@ class AppController:
             elif enc == 1:                     # ENC1 re-rolls (snap day is auto — no ENC0)
                 self._rebuild_name(reroll=True)
             return
-        if st.sub:                             # the encoder that opened it operates it
+        if m == "sub":                         # the encoder that opened it operates it
             if enc == _op(st.sub):
                 st.sub_idx = (st.sub_idx + d) % len(SUB_ACTIONS)
             return
-        if st.pick:
+        if m == "pick":
             if enc == 1:                       # ENC1 turns the active strip
                 if st.pick == "cat":
                     st.pick_cat = (st.pick_cat + d) % len(st.wl)
                 else:
                     st.pick_fx = (st.pick_fx + d) % len(st.wl[st.pick_cat]["plugins"])
             return
-        if st.sys:                             # Q4: ENC0-only (matches other modals)
+        if m == "sys":                         # Q4: ENC0-only (matches other modals)
             if enc == 0:
                 st.sys_idx = (st.sys_idx + d) % len(SYSITEMS)
             return
-        if st.menu_open:                       # Q4: ENC0-only (ENC0 also commits)
+        if m == "menu":                        # Q4: ENC0-only (ENC0 also commits)
             if enc == 0:
                 st.menu = (st.menu + d) % len(self.menu_items())
             return
-        if st.depth == -1:
+        if m == "glance":
             if enc == 0:
                 st.pb = (st.pb + d) % len(st.boards)
             else:
                 st.snap = (st.snap + d) % len(st.snaps)
             return
-        # depth 0
-        if st.sys_focus:                     # parked at SYS entry: only ENC0-right returns
+        if m == "sysfocus":                  # parked at SYS entry: only ENC0-right returns
             if enc == 0 and d > 0:           # roll back onto the chain (left = wall)
                 st.sys_focus, st.node = False, 0
             return
-        if st.moving:                        # picked-up node: ENC0 swaps with neighbour
+        if m == "moving":                    # picked-up node: ENC0 swaps with neighbour
             if enc == 0:
                 j = st.node + d
                 if 0 <= j < len(st.board):
                     st.board[st.node], st.board[j] = st.board[j], st.board[st.node]
                     st.node = j
             return
+        # chain
         if enc == 0:
             nn = st.node + d
             if nn < 0:                       # scroll left past start -> PARK at SYS (guard,
@@ -359,10 +380,11 @@ class AppController:
     # -- click ------------------------------------------------------------
     def click(self, enc):
         st = self.st
-        if st.tuner:
+        m = mode_of(st)
+        if m == "tuner":
             st.tuner = False
             return
-        if st.confirm:                         # opening encoder acts; the other cancels
+        if m == "confirm":                     # opening encoder acts; the other cancels
             if enc == _op(st.confirm.split(":")[1]):
                 if st.cyes:
                     self._confirm_exec()
@@ -371,20 +393,20 @@ class AppController:
             else:
                 st.confirm = ""
             return
-        if st.naming:                          # Q3: operating encoder accepts (board=E0, snap=E1)
+        if m == "naming":                      # Q3: operating encoder accepts (board=E0, snap=E1)
             which = st.naming.split(":")[0]
             if enc == _op(which):
                 self._name_accept()
             elif enc == 1:                     # ENC1 click = re-roll (board's non-op hand)
                 self._rebuild_name(reroll=True)
             return
-        if st.sub:                             # opening encoder picks; the other backs
+        if m == "sub":                         # opening encoder picks; the other backs
             if enc == _op(st.sub):
                 self._sub_act(SUB_ACTIONS[st.sub_idx][1])
             else:
                 st.sub = ""
             return
-        if st.pick:
+        if m == "pick":
             if enc == 1:                       # ENC1 click = select / place
                 if st.pick == "cat":
                     st.pick, st.pick_fx = "fx", 0
@@ -395,31 +417,31 @@ class AppController:
                     st.pick, st.knob, st.dirty = "", 0, True
                     self._toast(plug["display"] + " placed")
             return                             # ENC0 click = no-op (hold = back)
-        if st.sys:
+        if m == "sys":
             if enc == 0:
                 self._sys_act()
             else:
                 st.sys = False
             return
-        if st.menu_open:
+        if m == "menu":
             if enc == 1:
                 st.menu_open = False
             else:
                 self._menu_act(self.menu_items()[st.menu][2])
             return
-        if st.depth == -1:                     # open board (e0) / snapshot (e1) manage
+        if m == "glance":                      # open board (e0) / snapshot (e1) manage
             st.sub, st.sub_idx = ("board" if enc == 0 else "snap"), 0
             return
-        # depth 0
-        if st.sys_focus:                       # ENC0 click = commit: enter SYSTEM (guard)
+        if m == "sysfocus":                    # ENC0 click = commit: enter SYSTEM (guard)
             if enc == 0:
                 st.sys_focus, st.sys, st.sys_idx = False, True, 0
             return
-        if st.moving:                          # ENC0 click = drop here (commit)
+        if m == "moving":                      # ENC0 click = drop here (commit)
             if enc == 0:
                 st.moving, st.dirty = False, True
                 self._toast("MOVED")
             return
+        # chain
         if enc == 0:
             st.menu_open, st.menu = True, 0
         elif not self._cur()["empty"]:
@@ -539,31 +561,33 @@ class AppController:
     # -- hold (long press) ------------------------------------------------
     def hold(self, enc):
         st = self.st
-        if st.tuner:
+        m = mode_of(st)
+        if m == "tuner":
             st.tuner = False
             return
-        if st.confirm:                        # Q3: operating encoder hold = cancel (= No)
+        if m == "confirm":                    # Q3: operating encoder hold = cancel (= No)
             if enc == _op(st.confirm.split(":")[1]):
                 st.confirm = ""
             return
-        if st.naming:                         # Q3: operating encoder hold = cancel naming
+        if m == "naming":                     # Q3: operating encoder hold = cancel naming
             if enc == _op(st.naming.split(":")[0]):
                 st.naming = ""
             return
-        if st.sub:                            # ENC0 hold = close submenu
+        if m == "sub":                        # ENC0 hold = close submenu
             if enc == 0:
                 st.sub = ""
             return
-        if st.pick:                           # ENC0 hold = back (consistent); ENC1 hold = no-op
+        if m == "pick":                       # ENC0 hold = back (consistent); ENC1 hold = no-op
             if enc == 0:
                 st.pick = "cat" if st.pick == "fx" else ""
             return
-        if st.moving:                         # ENC0 hold = cancel move, restore position
+        if m == "moving":                     # ENC0 hold = cancel move, restore position
             if enc == 0:
                 node = st.board.pop(st.node)
                 st.board.insert(st.move_from, node)
                 st.node, st.moving = st.move_from, False
             return
+        # sys / menu / glance / sysfocus / chain: ENC0 = zoom out, ENC1 = tuner
         if enc == 0:                          # ENC0 hold = zoom out one level
             if st.sys_focus:                  # leave the SYS edge, up to glance (chain rule)
                 st.sys_focus, st.depth = False, -1
@@ -610,8 +634,8 @@ def _rail_split(st):
     zone sits beside the content its encoder drives. Chain maps ENC0->node strip
     (top) / ENC1->knobs (bottom) at ~3:7; glance splits at its own rule; modals
     don't map encoders to top/bottom regions so they stay ~1:1."""
-    if st.tuner or st.confirm or st.naming or st.sub or st.pick or st.sys \
-            or st.menu_open or st.sys_focus:
+    if mode_of(st) in ("tuner", "confirm", "naming", "sub", "pick", "sys",
+                       "menu", "sysfocus"):
         return 64                            # ~1:1: no top/bottom encoder mapping
     if st.depth == -1:
         return 56                            # glance: pedalboard / snapshot divider
@@ -642,30 +666,31 @@ def rails(st):
     """(ENC0, ENC1) rail zones. Each: 'off' | 'idle' | 'solid' | (pos, total).
     'solid'=dedicated engagement · tuple=scrollable list (thumb) · 'idle'=usable
     but secondary · 'off'=dead hand. Danger(red) stays the LED's job, not the rail."""
-    if st.tuner:
+    m = mode_of(st)
+    if m == "tuner":
         return ("solid", "off")              # E0 live = E0-hold exits (back rule, Q1)
-    if st.confirm:
+    if m == "confirm":
         return ("solid", "off") if _op(st.confirm.split(":")[1]) == 0 else ("off", "solid")
-    if st.naming:
+    if m == "naming":
         if st.naming.split(":")[0] == "board":
             return ((st.ncat, len(TERMS)), "idle")   # E0 dials term, E1 rerolls
         return ("off", "solid")              # snap: day auto -> E1-only dedicated (Q3)
-    if st.sub:
+    if m == "sub":
         z = (st.sub_idx, len(SUB_ACTIONS))
         return (z, "idle") if _op(st.sub) == 0 else ("idle", z)
-    if st.pick:
+    if m == "pick":
         z = (st.pick_cat, len(st.wl)) if st.pick == "cat" \
             else (st.pick_fx, len(st.wl[st.pick_cat]["plugins"]))
         return ("off", z)                    # E0 dead (hold=back), E1 operates
-    if st.sys:
+    if m == "sys":
         return ((st.sys_idx, len(SYSITEMS)), "idle")
-    if st.menu_open:
+    if m == "menu":
         return ((st.menu, len(AppController(st).menu_items())), "idle")
-    if st.depth == -1:                       # glance: both hands drive a list
+    if m == "glance":                        # glance: both hands drive a list
         return ((st.pb, len(st.boards)), (st.snap, len(st.snaps)))
-    if st.sys_focus:                         # parked at SYS entry: E0 live (click to enter)
+    if m == "sysfocus":                      # parked at SYS entry: E0 live (click to enter)
         return ("solid", "off")
-    if st.moving:                            # E0 shifts the picked-up node
+    if m == "moving":                        # E0 shifts the picked-up node
         return ("solid", "off")
     n = st.board[st.node]                    # chain home
     z1 = "solid" if st.locked else ("off" if n["empty"] else "idle")
@@ -673,25 +698,26 @@ def rails(st):
 
 
 def _frame(st):
-    if st.tuner:
+    m = mode_of(st)
+    if m == "tuner":
         return _tuner(st)
-    if st.confirm:
+    if m == "confirm":
         return _confirm(st)
-    if st.naming:
+    if m == "naming":
         return _naming(st)
-    if st.sub:
+    if m == "sub":
         return _sub(st)
-    if st.pick:
+    if m == "pick":
         return _pick(st)
-    if st.sys:
+    if m == "sys":
         return _sys(st)
-    if st.menu_open:
+    if m == "menu":
         return _menu(st)
-    if st.depth == -1:
+    if m == "glance":
         return _glance(st)
-    if st.sys_focus:
+    if m == "sysfocus":
         return _sys_focus(st)
-    return _chain(st)
+    return _chain(st)                         # chain / moving
 
 
 def _toast_over(s, st):
@@ -1027,30 +1053,31 @@ OFF = "off"
 
 
 def leds(st):
+    m = mode_of(st)
     n = st.board[st.node]
-    if st.tuner:
+    if m == "tuner":
         return ("purple", "purple")
-    if st.confirm:                            # delete danger on the operating encoder
+    if m == "confirm":                        # delete danger on the operating encoder
         return ("red", OFF) if _op(st.confirm.split(":")[1]) == 0 else (OFF, "red")
-    if st.naming:                             # Q3: board=E0 term/accept+E1 reroll; snap=E1-only
+    if m == "naming":                         # Q3: board=E0 term/accept+E1 reroll; snap=E1-only
         return ("green", "blue") if st.naming.split(":")[0] == "board" else (OFF, "green")
-    if st.sub:                                # manage submenu on the opening encoder
+    if m == "sub":                            # manage submenu on the opening encoder
         return ("blue", OFF) if _op(st.sub) == 0 else (OFF, "blue")
-    if st.pick:                               # ENC0=back(grey), ENC1=operate(cat colour)
+    if m == "pick":                           # ENC0=back(grey), ENC1=operate(cat colour)
         return ("grey", BUCKETCOL.get(st.wl[st.pick_cat]["key"], "amber"))
-    if st.moving:                             # ENC0 holds the node; ENC1 idle
+    if m == "moving":                         # ENC0 holds the node; ENC1 idle
         return (BUCKETCOL.get(n["bucket"], "amber"), OFF)
-    if st.sys_focus:                          # parked at SYS entry (edge detent)
+    if m == "sysfocus":                       # parked at SYS entry (edge detent)
         return ("grey", OFF)
-    if st.sys:
+    if m == "sys":
         return ("grey", OFF)
-    if st.depth == -1:
+    if m == "glance":
         return ("blue", "green")
-    l0 = OFF
+    l0 = OFF                                   # menu / chain
     if not n["empty"]:
         l0 = "red" if n["bypass"] else BUCKETCOL.get(n["bucket"], "grey")
     l1 = OFF
-    if st.menu_open:                          # Q5: danger(red) rides ENC0 (the commit hand)
+    if m == "menu":                           # Q5: danger(red) rides ENC0 (the commit hand)
         if AppController(st).menu_items()[st.menu][2] == "remove":
             l0 = "red"
         l1 = "amber"
