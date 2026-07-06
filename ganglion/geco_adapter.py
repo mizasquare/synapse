@@ -17,6 +17,7 @@ host call, not a full graph re-fetch).
 """
 
 import os
+import re
 
 from ganglion.geco_backend import GecoBackend, load_whitelist
 from ganglion import geco_conform
@@ -139,7 +140,65 @@ class GecoAdapter(GecoBackend):
             e.bypassed = bool(on)
         return err
 
-    # -- graph mutations + persist (next step) ---------------------------------
-    # place / remove / move go through geco_routing (reconcile); save/save_as map
-    # to save_current_pedalboard / snapshot_save[_as]. Not yet wired — the read
-    # side + params land first so the real board renders before edits are live.
+    # -- graph mutations (via the shared routing core) -------------------------
+    def _reconcile(self):
+        """Re-wire the live host to the canonical serial chain for the current
+        effect order (``self._pb.effects``). Ports the editor's diff engine:
+        connect-first then disconnect. IN = mono L (capture_1) — guitar default;
+        a stereo-input system setting is a future idea (decisions.md O)."""
+        nodes = [{"inst": e.instance, "ain": list(e.audio_inputs or []),
+                  "aout": list(e.audio_outputs or [])} for e in self._pb.effects]
+        desired = geco_routing.desired_wiring(nodes, "mono")
+        tracked = geco_routing.host_wiring(self.be)
+        geco_routing.reconcile(self.be, desired, tracked)
+
+    def _mint(self, display):
+        """A fresh unique bare instance name (mod-host requires uniqueness)."""
+        base = re.sub(r"[^A-Za-z0-9]", "", display) or "fx"
+        existing = {e.instance for e in self._pb.effects}
+        name, i = base, 1
+        while name in existing:
+            name, i = "%s_%d" % (base, i), i + 1
+        return name
+
+    def _fetch_effect(self, inst):
+        import model
+        for e in model.initialize_modep_pedalboard(self.be).effects:
+            if e.instance == inst:
+                return e
+        return None
+
+    def move(self, slot, to):
+        e = self._pb.effects.pop(slot)
+        self._pb.effects.insert(to, e)
+        self._reconcile()                          # live re-wire per step (decision C)
+        return None
+
+    def remove(self, slot):
+        e = self._pb.effects.pop(slot)
+        err = self.be.remove_effect(e.instance)    # host severs the node's cables
+        self._reconcile()                          # bridge the gap: A->[gone]->B => A->B
+        return err
+
+    def place(self, slot, bucket_i, plug_i):
+        """Live has no empty slots, so place = REPLACE the effect at ``slot``
+        (add new -> remove old -> re-wire). Net-new insertion is the deferred
+        empty-slot/append fork (decisions.md)."""
+        plug = self._catalog[bucket_i]["plugins"][plug_i]
+        inst = self._mint(plug["display"])
+        err = self.be.add_effect(inst, plug["uri"], slot * 180.0, 300.0)
+        if err is not None:
+            return err                             # add failed -> old untouched
+        old = self._pb.effects[slot]
+        self.be.remove_effect(old.instance)
+        neweff = self._fetch_effect(inst)
+        if neweff is not None:
+            self._pb.effects[slot] = neweff
+        else:                                      # fallback: full resync (rare)
+            import model
+            self._pb = model.initialize_modep_pedalboard(self.be)
+        self._reconcile()
+        return None
+
+    # -- persist (next step): save/save_as -> save_current_pedalboard /
+    # snapshot_save[_as]; select_board -> set_pedalboard + conform. Still stubbed.

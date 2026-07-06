@@ -204,9 +204,19 @@ N의 seam에 라이브 구현체를 붙임. 이 Pi는 살아있는 MODEP/pisound
   (상태소유권 a), param/bypass는 in-place 갱신(노브 1틱=호스트 1콜, 풀 재빌드 회피). `app.py --live`로 주입.
 - **검증**: 실 보드 렌더 OK, **set_param·set_bypass 라이브 조작 성공(소리 변화 확인)**. FakeGeco 경로 무손상.
 - **남은 것(백로그)**:
-  - 그래프 뮤테이션 `place`/`move`/`remove` (routing 코어 경유) — 현재 stub `NotImplementedError`.
+  - 그래프 뮤테이션 `place`/`move`/`remove` `[해결]`(2026-07-07): routing 코어 경유.
+    `_pb.effects`가 순서 authoritative 리스트(board/set_param이 인덱싱), 뮤테이션이 이걸 바꾸고
+    `_reconcile`(desired_wiring→host diff)로 라이브 재배선. **move**=pop/insert+reconcile
+    (per-detent = C의 "이동 매 스텝 실 그래프 재배선" 실현), **remove**=remove_effect+갭 브릿지,
+    **place**=라이브엔 빈 슬롯 없어 **replace-at-slot**(add→remove old→rewire). 라이브 검증:
+    AIDA-X↔Cab swap 라운드트립 배선 완전복원, Click remove, EQ→BandPass 교체(모노 1→2 팬·탭 정확).
+    - **IN=mono L(capture_1)** 확정[사용자, 기타]. **메모**: 나중에 시스템설정에서 스테레오 입력
+      선택(그때 `_reconcile`의 in_mode 파라미터화).
+    - **empty-slot/append 포크(미해결)**: place=replace뿐 → 순수 신규 삽입(체인 늘리기)의 UX
+      진입점 미정. 라이브는 빈 슬롯이 없으니 "끝에 +추가" 어포던스 등 별도 결정 필요.
+    - 성능 메모: move가 per-detent full reconcile(dump_graph GET/detent). tracked-set 유지로 최적화 여지.
   - persist `save`/`save_as`; `select_board`/`select_snapshot`(+conform 훅); `rename`/`delete`는
-    **호스트 갭**(mod-ui가 Save/SaveAs만 노출) — 처리 결정 필요.
+    **호스트 갭**(mod-ui가 Save/SaveAs만 노출) — 처리 결정 필요. (다음 단계)
   - **patch 위젯** `[해결]`(2026-07-07): NAM/AIDA-X 모델·Cab IR = LV2 patch. 어댑터가 patch를
     **최상단 `k="file"` 노브**로 투영(옵션=디렉토리 리스트, 캐시), 회전=`patch_set`로 그 자리 교체
     (모달 없음). D 가속으로 수백 목록 훑기. 라이브 검증(AIDA-X 323모델 cycle/+12 점프/복원).
