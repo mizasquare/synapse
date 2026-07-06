@@ -72,10 +72,11 @@ seam 뒤 `FakeGeco`로 분리됨. 실제로는 synapse `model.py`/`modepctrl.py`
   노브 템플릿**(`_KNOB_TMPL`) — 실 LV2 파라미터 배선은 A/B/E와 함께
   (placed node의 name=display, abbr=버킷 약어). 렌더·`--walk` 검증됨.
 
-## D. 회전 가속(accel)을 값 조절에 반영할지 `[사용자]`
-현재 `feed()`에서 Rotate.delta를 **부호로만** 축약 → 1디텐트=1스텝(노드 이동·값 조절 공통).
-빠르게 돌리면 큰 스텝(대범위 파라미터 빠른 이동)이 편할 수 있음. 노드 이동엔 1:1이 맞고,
-값 조절엔 accel이 유용. → 값 조절만 accel 반영할지 결정.
+## D. 회전 가속(accel)을 값 조절에 반영 `[해결]` (2026-07-07)
+[사용자] 값 조절/patch에만 accel. `feed()`가 `_rotmag=max(1,abs(delta))` 저장, 내비/포커스엔
+부호(1:1) 전달, `adjust()`가 `mult=d*_rotmag`로 스텝 배율. **노드 이동/노브 포커스=1:1 유지,
+값·patch만 가속.** 키보드는 |delta|=1이라 no-op(골든 무영향); 멀티디텐트는 실 인코더(폴 간 pos
+delta)에서. 동기: patch 리스트가 수백 개(AIDA-X 323)라 빠른 스핀으로 4/8/12개씩 훑어야 실용적(→ O).
 
 ## E. 파라미터 스케일링(선형 vs 로그) `[구현]`
 `adjust()`는 (max−min)/40 **선형**. Hz·ms·주파수류는 로그 스텝이 자연스러움.
@@ -206,10 +207,13 @@ N의 seam에 라이브 구현체를 붙임. 이 Pi는 살아있는 MODEP/pisound
   - 그래프 뮤테이션 `place`/`move`/`remove` (routing 코어 경유) — 현재 stub `NotImplementedError`.
   - persist `save`/`save_as`; `select_board`/`select_snapshot`(+conform 훅); `rename`/`delete`는
     **호스트 갭**(mod-ui가 Save/SaveAs만 노출) — 처리 결정 필요.
-  - **patch 위젯**[사용자]: NAM/AIDA-X 모델·Cab IR 선택 = LV2 patch(파라미터 아님). 2열×1행 큰 위젯
-    최상단 배치. 어댑터에 patch read/set 매핑 + 뷰 위젯 필요(현재 미구현).
-  - 뷰 폴리시[사용자]: 노브 focus 스크롤(7+ 노브 시 화면 밖) · 노브명 `…` 축약+폭 가드 ·
-    미터/메트로놈 탭이 체인 노드로 노출(숨김/배지?) · Utils 약어 뭉침(per-plugin 약어).
+  - **patch 위젯** `[해결]`(2026-07-07): NAM/AIDA-X 모델·Cab IR = LV2 patch. 어댑터가 patch를
+    **최상단 `k="file"` 노브**로 투영(옵션=디렉토리 리스트, 캐시), 회전=`patch_set`로 그 자리 교체
+    (모달 없음). D 가속으로 수백 목록 훑기. 라이브 검증(AIDA-X 323모델 cycle/+12 점프/복원).
+    [사용자] 큰 2열 위젯은 완화(현재 반칸+trunc로 족함, 정밀표시는 marquee로).
+  - 뷰 폴리시[사용자]: **노브명 폭 trunc 착지**(`_fit`); **장기=marquee 스크롤**(긴 patch/param명·
+    페달보드명 공통). 남음: 노브 focus 스크롤(7+ 노브 시 화면 밖) · 미터/메트로놈 탭이 체인 노드로
+    노출(숨김/배지?) · Utils 약어 뭉침(per-plugin 약어) · 키보드 타이밍-accel(하드웨어 전 테스트용, 선택).
   - IN/OUT 헤더 레벨 하드코딩(H, monitorfeed 미배선).
 
 ## 해결됨 `[해결]`

@@ -16,6 +16,8 @@ mutations and updated in place after param/bypass tweaks (so a knob turn is one
 host call, not a full graph re-fetch).
 """
 
+import os
+
 from ganglion.geco_backend import GecoBackend, load_whitelist
 from ganglion import geco_conform
 from ganglion import geco_routing
@@ -43,6 +45,7 @@ class GecoAdapter(GecoBackend):
         self._catalog = load_whitelist()
         self._uri2bucket = {p["uri"]: (b["key"], b["abbr"], p["display"])
                             for b in self._catalog for p in b["plugins"]}
+        self._dircache = {}
         self._pb = None
         self._load_current()
 
@@ -63,11 +66,34 @@ class GecoAdapter(GecoBackend):
         return {"n": p.name, "v": p.value, "mn": mn, "mx": mx, "u": p.units or "",
                 "k": _KIND.get(p.widget_kind, "dial"), "scale": _scale(p.scale_points)}
 
+    def _dirlist(self, d):
+        """Files in a patch dir (cached). PATCH_FILE_DIR_MAP dirs are already
+        type-segregated (configs), so no fileType filter — just skip dotfiles/dirs."""
+        if d not in self._dircache:
+            try:
+                names = sorted(n for n in os.listdir(d)
+                               if not n.startswith(".") and os.path.isfile(os.path.join(d, n)))
+            except OSError:
+                names = []
+            self._dircache[d] = names
+        return self._dircache[d]
+
+    def _patch_knob(self, p):
+        """A patch (NAM model / cab IR / ...) as a ``k='file'`` knob: the value is
+        the current file, rotation walks the directory listing (accel makes long
+        lists usable), set writes via ``patch_set``. Shown at the top of the node."""
+        files = self._dirlist(p.file_path)
+        cur = os.path.basename(p.value) if p.value else ""
+        idx = files.index(cur) if cur in files else 0
+        return {"n": p.label, "v": float(idx), "mn": 0.0, "mx": float(max(0, len(files) - 1)),
+                "u": "", "k": "file", "scale": [os.path.splitext(f)[0] for f in files]}
+
     def _node(self, e):
         key, abbr, disp = self._bucket_of(e.uri)
+        knobs = [self._patch_knob(p) for p in e.patches.values()] + \
+                [self._knob(p) for p in e.ports.values()]
         return {"name": disp or e.name, "abbr": abbr, "bucket": key,
-                "bypass": bool(e.bypassed), "empty": False,
-                "knobs": [self._knob(p) for p in e.ports.values()]}
+                "bypass": bool(e.bypassed), "empty": False, "knobs": knobs}
 
     # -- reads -----------------------------------------------------------------
     def board(self):
@@ -88,7 +114,19 @@ class GecoAdapter(GecoBackend):
     # -- param / bypass (cheap in-place cache update) --------------------------
     def set_param(self, slot, knob, value):
         e = self._pb.effects[slot]
-        p = list(e.ports.values())[knob]
+        patches = list(e.patches.values())           # patch-knobs occupy the low indices
+        if knob < len(patches):
+            p = patches[knob]
+            files = self._dirlist(p.file_path)
+            if not files:
+                return "no files"
+            i = max(0, min(len(files) - 1, int(round(value))))
+            full = os.path.join(p.file_path, files[i])
+            err = self.be.patch_set(e.instance, p.uri, full)
+            if err is None:
+                p.value = full
+            return err
+        p = list(e.ports.values())[knob - len(patches)]
         err = self.be.parameter_set(e.instance, p.symbol, value)
         if err is None:
             p.value = value

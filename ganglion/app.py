@@ -212,6 +212,7 @@ class AppController:
         # backend: the GECO seam (board / catalog / persistence). Defaults to the
         # in-memory FakeGeco; a live entry point injects an adapter over synapse.
         self.backend = backend or FakeGeco()
+        self._rotmag = 1                       # [D] last detent magnitude (value accel)
         self.st = state or AppState()
         self._sync_board()                    # seed the render caches from the backend
         self.st.wl = self.backend.catalog()
@@ -233,8 +234,11 @@ class AppController:
     def feed(self, ev):
         m = MODES[mode_of(self.st)]        # the active mode owns rotate/click/hold
         if isinstance(ev, Rotate):
-            # [DECISION D] rotation accel magnitude is collapsed to sign here —
-            # 1 detent = 1 step for nav AND value. Revisit: fast spin = coarse?
+            # [DECISION D] nav stays 1:1 (sign); value adjust accelerates with the
+            # detent magnitude (fast spin = coarse — traverse long patch/param lists).
+            # Keyboard emits |delta|=1 so this is a no-op there; multi-detent comes
+            # from the real encoder (pos delta between polls).
+            self._rotmag = max(1, abs(ev.delta))
             m.on_rotate(self, ev.enc, 1 if ev.delta > 0 else -1)
         elif isinstance(ev, Press):
             (m.on_hold if ev.kind == "long" else m.on_click)(self, ev.enc)
@@ -257,13 +261,14 @@ class AppController:
         if n["empty"]:
             return
         kb = n["knobs"][self.st.knob]          # read current value from the cache
+        mult = d * self._rotmag                # [D] accel: 1 detent=1 step, fast spin=coarse
         if kb["k"] == "toggle":
             v = 0 if kb["v"] >= .5 else 1
         elif kb["k"] in ("enum", "file"):
-            v = max(kb["mn"], min(kb["mx"], round(kb["v"]) + d))
+            v = max(kb["mn"], min(kb["mx"], round(kb["v"]) + mult))
         else:
             step = (kb["mx"] - kb["mn"]) / 40.0
-            v = max(kb["mn"], min(kb["mx"], kb["v"] + step * d))
+            v = max(kb["mn"], min(kb["mx"], kb["v"] + step * mult))
         self.backend.set_param(self.st.node, self.st.knob, v)   # the detent maps to a value; backend stores it
         self._sync_board()
         self.st.dirty = True
@@ -832,8 +837,8 @@ def _chain(st):
                 s.box(x - 3, yy - 2, cw2, kh - 1)
             else:
                 s.dashed(x - 3, yy - 2, cw2, kh - 1, on=2, off=2)
-        s.T(kb["n"], x, yy, 8)
-        s.T(fmt(kb), x, yy + 8, 8)
+        s.T(_fit(s, kb["n"], 8, cw2 - 4), x, yy, 8)      # trunc now; marquee later
+        s.T(_fit(s, fmt(kb), 8, cw2 - 4), x, yy + 8, 8)
         if kb["k"] == "dial":
             s.gbar(x, yy + 17, cw2 - 8, 3, norm(kb))
     _toast_over(s, st)
