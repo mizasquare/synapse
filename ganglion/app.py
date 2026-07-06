@@ -1257,7 +1257,11 @@ def main(argv):
         _looptest()
         return
     from ganglion.runtime import run_terminal
-    c = AppController()
+    if "--live" in argv:                       # inject the live synapse backend
+        from ganglion.geco_adapter import GecoAdapter
+        c = AppController(backend=GecoAdapter())
+    else:
+        c = AppController()
 
     def hud():
         return ["r/t e0  f/g e1", "w/s click  e/d hold  x combo", "Q quit",
