@@ -284,6 +284,13 @@ class AppController:
             if ev.kind == "press":         # global save; guards on its own
                 self.combo()
 
+    def enter(self, name, **kw):
+        """Deliberately switch into a mode: the target Mode sets its own flag and
+        initial values (each Mode.enter). Kept explicit — NOT auto-fired on a
+        mode_of change — so revealing a mode by popping the overlay above it
+        (cancel confirm -> sub) does NOT re-initialise the revealed mode."""
+        MODES[name].enter(self, **kw)
+
     def _cur(self):
         return self.st.board[self.st.node]
 
@@ -322,9 +329,10 @@ class AppController:
             st.menu_open, st.knob, st.dirty = False, 0, True
         elif act in ("place", "replace"):
             st.menu_open = False
-            st.pick, st.pick_cat, st.pick_fx = "cat", 0, 0
+            self.enter("pick")
         elif act == "move":                    # back to chain, pick up this node
-            st.menu_open, st.moving, st.move_from = False, True, st.node
+            st.menu_open = False
+            self.enter("moving")
         else:
             st.menu_open = False
             self._toast("TODO: " + act)
@@ -351,23 +359,15 @@ class AppController:
             st.sub, st.dirty = "", False
             self._toast("SAVED")
         elif act == "saveas":                  # new entry via the name suggester
-            self._name_open(which, "saveas")
+            self.enter("naming", which=which, mode="saveas")
         elif act == "rename":
-            self._name_open(which, "rename")
+            self.enter("naming", which=which, mode="rename")
         elif act == "delete":
             if len(lst) <= 1:
                 st.sub = ""
                 self._toast("KEEP 1 MIN")
             else:
-                st.confirm, st.cyes = "del:" + which, False
-
-    def _name_open(self, which, mode):
-        st = self.st
-        # Q3: boards dial a stage term (ENC0); snaps take today's weekday from the
-        # clock so naming rides ENC1 only (no categorical dial).
-        ncat = 0 if which == "board" else self._day_provider() % len(DAYS)
-        st.sub, st.naming, st.ncat = "", "%s:%s" % (which, mode), ncat
-        self._rebuild_name(reroll=True)
+                self.enter("confirm", which=which)
 
     def _rebuild_name(self, reroll):
         """Re-assemble nname from ncat + nrand; reroll the random word if asked or
@@ -414,7 +414,8 @@ class AppController:
     def _sys_act(self):
         it = SYSITEMS[self.st.sys_idx]
         if it == "Tuner":
-            self.st.sys, self.st.tuner = False, True
+            self.st.sys = False
+            self.enter("tuner")
         elif it == "< Back":
             self.st.sys = False
         else:
@@ -444,6 +445,8 @@ class AppController:
 class Mode:
     def op_enc(self, st):
         return 0
+    def enter(self, c):                    # deliberate entry: set the flag + init
+        pass
     def on_rotate(self, c, enc, d):
         pass
     def on_click(self, c, enc):
@@ -470,10 +473,12 @@ class NavMode(Mode):
             elif st.depth == -1:
                 st.depth = 0
         else:
-            st.tuner = True
+            c.enter("tuner")
 
 
 class TunerMode(Mode):
+    def enter(self, c):
+        c.st.tuner = True
     def on_click(self, c, enc):            # Q1: any press exits (rotate ignored)
         c.st.tuner = False
     def on_hold(self, c, enc):
@@ -483,6 +488,8 @@ class TunerMode(Mode):
 class ConfirmMode(Mode):
     def op_enc(self, st):                  # the encoder that opened the dialog
         return _op(st.confirm.split(":")[1])
+    def enter(self, c, which):             # delete danger, No highlighted
+        c.st.confirm, c.st.cyes = "del:" + which, False
     def on_rotate(self, c, enc, d):        # the opening encoder toggles No/Yes
         if enc == self.op_enc(c.st):
             c.st.cyes = not c.st.cyes
@@ -505,6 +512,13 @@ class ConfirmMode(Mode):
 class NamingMode(Mode):
     def op_enc(self, st):
         return _op(st.naming.split(":")[0])
+    def enter(self, c, which, mode):       # open the name suggester (was _name_open)
+        st = c.st
+        # Q3: boards dial a stage term (ENC0); snaps take today's weekday from the
+        # clock so naming rides ENC1 only (no categorical dial).
+        ncat = 0 if which == "board" else c._day_provider() % len(DAYS)
+        st.sub, st.naming, st.ncat = "", "%s:%s" % (which, mode), ncat
+        c._rebuild_name(reroll=True)
     def on_rotate(self, c, enc, d):        # Q3: category=ENC0 (board only), reroll=ENC1
         st = c.st
         which = st.naming.split(":")[0]
@@ -529,6 +543,8 @@ class NamingMode(Mode):
 class SubMode(Mode):
     def op_enc(self, st):                  # boards ride ENC0, snaps ENC1 (whoever opened)
         return _op(st.sub)
+    def enter(self, c, which):
+        c.st.sub, c.st.sub_idx = which, 0
     def on_rotate(self, c, enc, d):
         st = c.st
         if enc == self.op_enc(st):
@@ -546,6 +562,8 @@ class SubMode(Mode):
 class PickMode(Mode):
     def op_enc(self, st):
         return 1                           # ENC1 operates; ENC0 dead (hold = back)
+    def enter(self, c):                    # start on the category strip, top of both
+        c.st.pick, c.st.pick_cat, c.st.pick_fx = "cat", 0, 0
     def on_rotate(self, c, enc, d):        # ENC1 turns the active strip
         st = c.st
         if enc == 1:
@@ -569,6 +587,8 @@ class PickMode(Mode):
 
 
 class MovingMode(Mode):
+    def enter(self, c):                    # pick this node up; remember where it was
+        c.st.moving, c.st.move_from = True, c.st.node
     def on_rotate(self, c, enc, d):        # ENC0 swaps the picked-up node with a neighbour
         st = c.st
         if enc == 0:
@@ -589,6 +609,8 @@ class MovingMode(Mode):
 
 
 class SysMode(NavMode):
+    def enter(self, c):
+        c.st.sys, c.st.sys_idx = True, 0
     def on_rotate(self, c, enc, d):        # Q4: ENC0-only (matches other modals)
         st = c.st
         if enc == 0:
@@ -602,6 +624,8 @@ class SysMode(NavMode):
 
 
 class MenuMode(NavMode):
+    def enter(self, c):
+        c.st.menu_open, c.st.menu = True, 0
     def on_rotate(self, c, enc, d):        # Q4: ENC0-only (ENC0 also commits)
         st = c.st
         if enc == 0:
@@ -622,8 +646,7 @@ class GlanceMode(NavMode):
         else:
             st.snap = (st.snap + d) % len(st.snaps)
     def on_click(self, c, enc):            # open board (e0) / snapshot (e1) manage
-        st = c.st
-        st.sub, st.sub_idx = ("board" if enc == 0 else "snap"), 0
+        c.enter("sub", which=("board" if enc == 0 else "snap"))
 
 
 class SysFocusMode(NavMode):
@@ -632,9 +655,9 @@ class SysFocusMode(NavMode):
         if enc == 0 and d > 0:             # roll back onto the chain (left = wall)
             st.sys_focus, st.node = False, 0
     def on_click(self, c, enc):            # ENC0 click = commit: enter SYSTEM (guard)
-        st = c.st
         if enc == 0:
-            st.sys_focus, st.sys, st.sys_idx = False, True, 0
+            c.st.sys_focus = False
+            c.enter("sys")
 
 
 class ChainMode(NavMode):
@@ -656,7 +679,7 @@ class ChainMode(NavMode):
     def on_click(self, c, enc):
         st = c.st
         if enc == 0:
-            st.menu_open, st.menu = True, 0
+            c.enter("menu")
         elif not c._cur()["empty"]:
             st.locked = not st.locked
 
