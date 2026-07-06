@@ -1704,6 +1704,7 @@ class PedalboardRemove(JsonRequestHandler):
         remove_pedalboard_from_banks(bundlepath)
         reset_get_all_pedalboards_cache_with_refresh(kPedalboardInfoUserOnly)
         self.write(True)
+        notify_synapsin(message="PedalboardRemove %s" % bundlepath)
 
 class PedalboardImage(TimelessStaticFileHandler):
     def initialize(self):
@@ -1819,6 +1820,8 @@ class SnapshotRename(JsonRequestHandler):
             'ok': ok,
             'title': title,
         })
+
+        notify_synapsin(message="SnapshotRename %d" % idx)
 
 class SnapshotRemove(JsonRequestHandler):
     def get(self):

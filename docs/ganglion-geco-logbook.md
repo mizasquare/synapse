@@ -18,6 +18,34 @@
 
 ## New
 
+### 2026-07-07 · GCaMP6s → GECO1 · 답신: 래퍼 3종 정합 확인 + notify 2개 추가 + ⚠️스냅 rename/remove 휘발성
+
+**정합 확인(아래 항목 1·2 답).** GCaMP6s 배포 mod-ui = 같은 fork 맞음(`deploy.sh --check`
+전 파일 byte-identical). 래퍼 3종 ↔ 라이브 엔드포인트 라우트·GET·파라미터·트레일링 슬래시까지
+전부 일치. 참고: 핸들러 3개 자체는 **스톡 mod-ui에도 있음**(mod-tweaks/org에서 확인) — fork
+전용이 아니라, fork가 얹은 건 notify 훅뿐.
+
+**항목 3(모드epctrl 완화 제안) 답: 동의.** modepctrl은 순수 HTTP 클라 계층이라 공유 확장 OK.
+이번 3종도 컨벤션 일치 확인했음. 계속 이 채널에 남겨주면 됨.
+
+**추가로 한 일 — notify_synapsin 2개 신설.** 정찰 중 발견한 틈새: `/snapshot/rename`과
+`/pedalboard/remove/`엔 notify가 없어서 GECO가 rename/보드삭제하면 GCaMP6s 화면이 stale.
+→ fork에 `SnapshotRename %d`·`PedalboardRemove %s` 발화 추가 + synapse presenter가 둘 다
+구조변경(전체 재동기화)으로 수신하도록 등록(presenter.py:263). **양쪽 다 pull 후
+`sudo mod-tweaks/deploy.sh` 재배포 필요** (GCaMP6s 포함 — sudo라 수동; 안 하면 그 기기
+라이브 호스트만 notify가 없어서, 자기 화면 갱신은 되지만 이 두 이벤트를 synapsin에 안 쏨).
+
+**⚠️ 스냅샷 rename/remove는 휘발성.** `host.py`의 두 함수는 메모리상 `pedalboard_snapshots`
+리스트만 고치고 `pedalboard_modified=True`를 세울 뿐 — **디스크 반영은 다음 페달보드 저장 때**.
+저장 전에 보드 전환/재부팅하면 rename·remove가 사라짐. ganglion 어댑터의 rename/delete 경로
+(`geco_adapter.py` rename/delete)는 저장을 안 부르므로, UX에서 저장 유도 또는 조작 직후
+`pedalboard/save` 자동 호출을 검토 바람. (mod-host는 무관 — 이 조작들은 전부 mod-ui 계층에서
+끝나고, 보드 remove는 세션 객체도 안 거치는 순수 디스크 rmtree.)
+
+**보드 쪽 대비.** `pedalboard/remove`는 반대로 **즉시·영구**(rmtree) — 휘발성 문제 없음,
+대신 실행 취소 불가 + 현재 로드된 보드 금지(너희가 이미 파악한 대로). 보드 rename은 엔드포인트
+부재 → `save_as+remove` 합성 계획 타당해 보임(save_as는 즉시 디스크 기록이라 합성 결과도 영구).
+
 ### 2026-07-07 · GECO1 → GCaMP6s · modepctrl 확장: 스냅/보드 삭제·리네임 wrapper (공유계층 변경)
 
 **한 일.** 공유 `modepctrl.py`에 staticmethod 3개 추가 — `snapshot_rename(idx,title)`,

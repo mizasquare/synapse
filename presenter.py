@@ -260,7 +260,8 @@ class Presenter:
                 tgt = b.strip().split("/graph/", 1)[-1].lstrip("/")
                 self.apply_external_connection(cmd == "EffectConnect", src, tgt)
             elif cmd in ("EffectAdd", "EffectRemove", "PedalboardLoadBundle",
-                         "SnapshotName", "SnapshotRemove", "BankLoad"):
+                         "SnapshotName", "SnapshotRename", "SnapshotRemove",
+                         "PedalboardRemove", "BankLoad"):
                 # 구조 변경 → 안전하게 전체 재동기화
                 # (웹발 PedalboardLoadBundle 은 복원 안 함: mod-ui 번들 저장 스냅샷 기본동작 유지)
                 # ★한계: EffectAdd/Remove 도 저장 전엔 디스크에 없어 refresh 가 stale 일 수 있음
