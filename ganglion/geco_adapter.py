@@ -200,5 +200,38 @@ class GecoAdapter(GecoBackend):
         self._reconcile()
         return None
 
-    # -- persist (next step): save/save_as -> save_current_pedalboard /
-    # snapshot_save[_as]; select_board -> set_pedalboard + conform. Still stubbed.
+    # -- persist ---------------------------------------------------------------
+    def save(self, which):
+        """Overwrite the current board / snapshot in place."""
+        if which == "board":
+            self.be.save_current_pedalboard()
+        else:
+            self.be.snapshot_save(save_pb_also=True)
+        return None
+
+    def save_as(self, which, after_idx, name):
+        """Create a new board/snapshot named ``name`` (the host mints it and
+        switches current to it); return its index in the refreshed list so the
+        app selects it. Names are pre-deduped by the app's namer, so ``index`` is
+        unambiguous."""
+        if which == "board":
+            self.be.save_pedalboard_as(name)
+            names = self.boards()
+        else:
+            self.be.snapshot_save_as(name)
+            names = self.snapshots()
+        return names.index(name) if name in names else min(after_idx + 1, max(0, len(names) - 1))
+
+    def rename(self, which, idx, name):
+        if which == "snap":
+            self.be.snapshot_rename(idx, name)     # modepctrl wrapper (forked mod-ui)
+        # board rename: no host endpoint -> compose save_as+remove; deferred (select_board)
+        return None
+
+    def delete(self, which, idx):
+        if which == "snap":
+            self.be.snapshot_remove(idx)           # host handles current-snap deletion
+            return max(0, min(idx, len(self.snapshots()) - 1))
+        # board delete: remove_pedalboard is ready, but must switch off the current
+        # board first -> deferred to select_board. No-op keeps the list intact.
+        return idx

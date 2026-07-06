@@ -295,6 +295,29 @@ class ModepController:
 		return
 
 	@staticmethod
+	def snapshot_rename(idx, title):
+		"""Rename snapshot ``idx`` to ``title`` (forked mod-ui /snapshot/rename;
+		modepctrl never wrapped it -- synapse Qt reacts to the web-driven change
+		via notify, whereas ganglion drives it directly). JSON {'ok','title'} or None."""
+		try:
+			r = ModepController._request("get", "snapshot/rename", params={'id': idx, 'title': title})
+			if r is not None:
+				return r.json()
+		except Exception as e:
+			logging.error(f"Error renaming snapshot: {e}")
+
+	@staticmethod
+	def snapshot_remove(idx):
+		"""Delete snapshot ``idx`` (forked mod-ui /snapshot/remove). True/False."""
+		try:
+			r = ModepController._request("get", "snapshot/remove", params={'id': idx})
+			if r is not None:
+				return r.json()
+		except Exception as e:
+			logging.error(f"Error removing snapshot: {e}")
+		return False
+
+	@staticmethod
 	def _symbolify(name):
 		"""Mirror mod-ui's symbolify (mod/__init__.py:188): NFKD ASCII-fold,
 		collapse non-alphanumerics to '_', prefix '_' if it starts with a digit.
@@ -373,6 +396,21 @@ class ModepController:
 		except Exception as e:
 			logging.error("Failed to save pedalboard as %r: %s", title, e)
 			return None
+
+	@staticmethod
+	def remove_pedalboard(bundlepath):
+		"""Delete a pedalboard bundle from disk (forked mod-ui /pedalboard/remove;
+		it rmtrees the dir + drops it from banks, running as the modep user -- so it
+		can remove modep-owned bundles a client process can't). Returns True/False.
+		The host refuses a missing path; callers must NOT pass the currently-loaded
+		bundle (switch away first)."""
+		try:
+			r = ModepController._request("get", "pedalboard/remove/", params={'bundlepath': bundlepath})
+			if r is not None:
+				return r.json()
+		except Exception as e:
+			logging.error(f"Error removing pedalboard: {e}")
+		return False
 
 	@staticmethod
 	def effect_list():
