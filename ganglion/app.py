@@ -262,6 +262,17 @@ def mode_of(st):
     return "chain"
 
 
+def menu_items(st):
+    """The slot menu's (icon, label, action) rows for the focused node — a pure
+    query of state, shared by the menu mode's dispatch and its view."""
+    n = st.board[st.node]
+    if n["empty"]:
+        return [("+", "Place FX", "place"), ("<", "Back", "back")]
+    return [("O" if not n["bypass"] else "*", "Enable" if n["bypass"] else "Bypass", "bypass"),
+            ("<>", "Move", "move"), ("~", "Replace", "replace"),
+            ("X", "Remove", "remove"), ("<", "Back", "back")]
+
+
 class AppController:
     """Ported 2a state machine. ``feed(event)`` mutates ``self.st``."""
 
@@ -293,14 +304,6 @@ class AppController:
 
     def _cur(self):
         return self.st.board[self.st.node]
-
-    def menu_items(self):
-        n = self._cur()
-        if n["empty"]:
-            return [("+", "Place FX", "place"), ("<", "Back", "back")]
-        return [("O" if not n["bypass"] else "*", "Enable" if n["bypass"] else "Bypass", "bypass"),
-                ("<>", "Move", "move"), ("~", "Replace", "replace"),
-                ("X", "Remove", "remove"), ("<", "Back", "back")]
 
     def adjust(self, d):
         n = self._cur()
@@ -629,13 +632,13 @@ class MenuMode(NavMode):
     def on_rotate(self, c, enc, d):        # Q4: ENC0-only (ENC0 also commits)
         st = c.st
         if enc == 0:
-            st.menu = (st.menu + d) % len(c.menu_items())
+            st.menu = (st.menu + d) % len(menu_items(st))
     def on_click(self, c, enc):
         st = c.st
         if enc == 1:
             st.menu_open = False
         else:
-            c._menu_act(c.menu_items()[st.menu][2])
+            c._menu_act(menu_items(st)[st.menu][2])
 
 
 class GlanceMode(NavMode):
@@ -764,7 +767,7 @@ def rails(st):
     if m == "sys":
         return ((st.sys_idx, len(SYSITEMS)), "idle")
     if m == "menu":
-        return ((st.menu, len(AppController(st).menu_items())), "idle")
+        return ((st.menu, len(menu_items(st))), "idle")
     if m == "glance":                        # glance: both hands drive a list
         return ((st.pb, len(st.boards)), (st.snap, len(st.snaps)))
     if m == "sysfocus":                      # parked at SYS entry: E0 live (click to enter)
@@ -992,7 +995,7 @@ def _menu(st):
         s.T("SLOT %d/6" % (st.node + 1), 6, 76, 6)
         s.T("BYP" if n["bypass"] else "ON", 6, 88, 6)
     s.T("ACTION", 46, 5, 8, ls=1)
-    items = AppController(st).menu_items()
+    items = menu_items(st)
     y0, rh = 17, 17
     for i, (ic, label, _) in enumerate(items):
         y = y0 + i * rh
@@ -1157,7 +1160,7 @@ def leds(st):
         l0 = "red" if n["bypass"] else BUCKETCOL.get(n["bucket"], "grey")
     l1 = OFF
     if m == "menu":                           # Q5: danger(red) rides ENC0 (the commit hand)
-        if AppController(st).menu_items()[st.menu][2] == "remove":
+        if menu_items(st)[st.menu][2] == "remove":
             l0 = "red"
         l1 = "amber"
     elif st.locked:
