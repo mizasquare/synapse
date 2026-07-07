@@ -237,6 +237,24 @@ class GecoAdapter(GecoBackend):
         self._reconcile()
         return None
 
+    def insert(self, at, bucket_i, plug_i):
+        """Net-new: add a fresh effect and splice it into the order list at ``at``,
+        then re-wire. Unlike ``place`` (replace-at-slot), this grows the chain — the
+        empty-slot/append fork (decisions.md O). Position elsewhere via ``move``."""
+        plug = self._catalog[bucket_i]["plugins"][plug_i]
+        inst = self._mint(plug["display"])
+        err = self.be.add_effect(inst, plug["uri"], at * 180.0, 300.0)
+        if err is not None:
+            return err                             # add failed -> chain untouched
+        neweff = self._fetch_effect(inst)
+        if neweff is not None:
+            self._pb.effects.insert(at, neweff)
+        else:                                      # fallback: full resync (rare)
+            import model
+            self._pb = model.initialize_modep_pedalboard(self.be)
+        self._reconcile()
+        return None
+
     # -- persist ---------------------------------------------------------------
     def save(self, which):
         """Overwrite the current board / snapshot in place."""

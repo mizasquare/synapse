@@ -150,6 +150,7 @@ class AppState:
     pick_fx: int = 0
     moving: bool = False      # picked-up node: ENC0 shifts slot, click drops
     move_from: int = 0        # original index (ENC0-hold cancel restores it)
+    inserting: bool = False   # picker opened via Insert -> commit splices net-new (vs replace)
     tuner: bool = False
     tcents: int = 6
     tnote: str = "A"
@@ -204,7 +205,7 @@ def menu_items(st):
         return [("+", "Place FX", "place"), ("<", "Back", "back")]
     return [("O" if not n["bypass"] else "*", "Enable" if n["bypass"] else "Bypass", "bypass"),
             ("<>", "Move", "move"), ("~", "Replace", "replace"),
-            ("X", "Remove", "remove"), ("<", "Back", "back")]
+            ("+", "Insert", "insert"), ("X", "Remove", "remove"), ("<", "Back", "back")]
 
 
 class AppController:
@@ -293,7 +294,10 @@ class AppController:
             self._sync_board()
             st.menu_open, st.knob, st.dirty = False, 0, True
         elif act in ("place", "replace"):
-            st.menu_open = False
+            st.menu_open, st.inserting = False, False
+            self.enter("pick")
+        elif act == "insert":                  # net-new: picker commit splices after this node
+            st.menu_open, st.inserting = False, True
             self.enter("pick")
         elif act == "move":                    # back to chain, pick up this node
             st.menu_open = False
@@ -583,12 +587,21 @@ class PickMode(Mode):
                 st.pick, st.pick_fx = "fx", 0
             else:
                 plug = st.wl[st.pick_cat]["plugins"][st.pick_fx]   # for the toast
-                c.backend.place(st.node, st.pick_cat, st.pick_fx)
-                c._sync_board()
-                st.pick, st.knob, st.dirty = "", 0, True
-                c._toast(plug["display"] + " placed")
+                if st.inserting:               # splice a NEW node after the focused one
+                    c.backend.insert(st.node + 1, st.pick_cat, st.pick_fx)
+                    c._sync_board()
+                    st.node = min(st.node + 1, len(st.board) - 1)   # focus the new node
+                    st.pick, st.knob, st.dirty, st.inserting = "", 0, True, False
+                    c._toast(plug["display"] + " inserted")
+                else:                          # replace / fill-empty at the focused slot
+                    c.backend.place(st.node, st.pick_cat, st.pick_fx)
+                    c._sync_board()
+                    st.pick, st.knob, st.dirty = "", 0, True
+                    c._toast(plug["display"] + " placed")
     def exit(self, c):                     # ENC0-hold = back one strip (base on_hold)
         c.st.pick = "cat" if c.st.pick == "fx" else ""
+        if not c.st.pick:                  # fully backed out of the picker -> cancel insert
+            c.st.inserting = False
 
 
 class MovingMode(Mode):
@@ -1238,6 +1251,14 @@ def _walk():
     do("s", "place")       # enc1 click: place node -> board[0] replaced
     do("w", "menu2")       # reopen menu on the freshly placed node
     do("w", "bypass2")     # bypass it (sanity: node model intact)
+    # insert (net-new): grow the chain with a fresh node AFTER the focused one
+    print("      chain   %s (len %d)" % ([b["abbr"] for b in c.st.board], len(c.st.board)))
+    do("w", "menu-ins")    # slot menu on node 0
+    do("ttt", "to-insert") # menu 0 -> 3 (Bypass/Move/Replace/Insert)
+    do("w", "ins-pick")    # exec Insert -> picker (inserting=True)
+    do("s", "ins-fx")      # enc1 click: cat -> plugin strip
+    do("s", "ins-add")     # enc1 click: splice new node after node 0 -> chain grows
+    print("      chain   %s (len %d) focus=%d" % ([b["abbr"] for b in c.st.board], len(c.st.board), c.st.node))
     # move: pick up node 0, shift right two slots, drop
     do("w", "menu3")       # slot menu on node 0
     do("t", "to-move")     # menu 0 -> 1 (Move)

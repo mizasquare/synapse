@@ -212,8 +212,14 @@ N의 seam에 라이브 구현체를 붙임. 이 Pi는 살아있는 MODEP/pisound
     AIDA-X↔Cab swap 라운드트립 배선 완전복원, Click remove, EQ→BandPass 교체(모노 1→2 팬·탭 정확).
     - **IN=mono L(capture_1)** 확정[사용자, 기타]. **메모**: 나중에 시스템설정에서 스테레오 입력
       선택(그때 `_reconcile`의 in_mode 파라미터화).
-    - **empty-slot/append 포크(미해결)**: place=replace뿐 → 순수 신규 삽입(체인 늘리기)의 UX
-      진입점 미정. 라이브는 빈 슬롯이 없으니 "끝에 +추가" 어포던스 등 별도 결정 필요.
+    - **net-new 노드 삽입** `[해결]`(2026-07-07): place=replace뿐이던 갭 해소. UX 결정 —
+      라이브는 가변 길이(remove 시 체인 축소, 빈 슬롯 없음)라 trailing 빈 슬롯을 가짜로 넣으면
+      Move/인덱싱과 충돌 → **슬롯 메뉴 "Insert" 액션**(포커스 노드 **뒤에** 신규 splice)으로 결정.
+      picker+reconcile 재사용, 위치는 기존 Move. `GecoBackend.insert(at,bi,pi)` 신설
+      (Fake=list insert, Adapter=add_effect→`_pb.effects.insert(at)`→`_reconcile`). 앱: `inserting`
+      플래그로 picker 커밋을 insert/place 분기, 커밋 후 신규 노드로 focus 이동. 라이브 검증:
+      Exct-NAM-Widr(7노드)에 3BandEQ를 idx1 삽입→8노드·직렬 in+out 배선 확인→번들 재로드 복구.
+      **메모**: Insert=after-only(맨 앞은 Move로). 빈 체인(0노드) 삽입 진입점은 후순위.
     - 성능 메모: move가 per-detent full reconcile(dump_graph GET/detent). tracked-set 유지로 최적화 여지.
   - persist `[일부 해결]`(2026-07-07):
     - **save/save_as** 착지 — board=`save_current_pedalboard`/`save_pedalboard_as`,
@@ -230,8 +236,8 @@ N의 seam에 라이브 구현체를 붙임. 이 Pi는 살아있는 MODEP/pisound
       **2-단계 제스처** — 하이라이트≠로드 시 클릭=**로드**, 로드된 것 재클릭=관리 서브메뉴(Save/…/Delete).
       상태에 `pb_cur`/`snap_cur`(로드된 인덱스) 추가, glance 뷰에 로드 마커(우측 사각)+LOAD/manage 힌트.
       이 게이트 해소로 **board rename**(save_as+remove 합성; 2-단계가 idx==current 보장)·**board delete**
-      (이웃 보드로 먼저 전환 후 `remove_pedalboard`)도 어댑터 배선 완료. --walk에 board/snap 로드→관리
-      전 구간 추가(회귀+신경로 검증).
+      (이웃 보드로 먼저 전환 후 `remove_pedalboard`)도 어댑터 배선 완료 — **둘 다 실기 육안검증 완료**
+      [사용자, 2026-07-07]. --walk에 board/snap 로드→관리 전 구간 추가(회귀+신경로 검증).
       - **라이브 검증**(2026-07-07, 실기 pisound/MODEP up): `current()` 인덱스 매핑 실 host 일치
         (board=bundle 비교, snap=`get_current_snapshot`가 **이름** 반환→list dict 매핑). board/snap
         select 가역 라운드트립 `select()`↔`current()` 정합. 원상복구.

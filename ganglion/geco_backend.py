@@ -142,6 +142,11 @@ class GecoBackend:
         """Fill/replace ``slot`` with catalog[bucket_i].plugins[plug_i]."""
         raise NotImplementedError
 
+    def insert(self, at, bucket_i, plug_i):
+        """Splice a NEW catalog[bucket_i].plugins[plug_i] into the chain at index
+        ``at`` (net-new — grows the chain; distinct from replace-only ``place``)."""
+        raise NotImplementedError
+
     def remove(self, slot):
         """Empty ``slot``."""
         raise NotImplementedError
@@ -218,6 +223,11 @@ class FakeGeco(GecoBackend):
     def place(self, slot, bucket_i, plug_i):
         cat = self._catalog[bucket_i]
         self._board[slot] = make_node(cat, cat["plugins"][plug_i])
+        return None
+
+    def insert(self, at, bucket_i, plug_i):
+        cat = self._catalog[bucket_i]
+        self._board.insert(at, make_node(cat, cat["plugins"][plug_i]))
         return None
 
     def remove(self, slot):
