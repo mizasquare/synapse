@@ -225,12 +225,14 @@ class GecoAdapter(GecoBackend):
     def rename(self, which, idx, name):
         if which == "snap":
             self.be.snapshot_rename(idx, name)     # modepctrl wrapper (forked mod-ui)
+            self.be.save_current_pedalboard()      # host rename is in-memory only -> flush (logbook ⚠️)
         # board rename: no host endpoint -> compose save_as+remove; deferred (select_board)
         return None
 
     def delete(self, which, idx):
         if which == "snap":
             self.be.snapshot_remove(idx)           # host handles current-snap deletion
+            self.be.save_current_pedalboard()      # volatile until board save -> flush (logbook ⚠️)
             return max(0, min(idx, len(self.snapshots()) - 1))
         # board delete: remove_pedalboard is ready, but must switch off the current
         # board first -> deferred to select_board. No-op keeps the list intact.

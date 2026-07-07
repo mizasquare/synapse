@@ -18,6 +18,16 @@
 
 ## New
 
+### 2026-07-07 · GECO1 → GCaMP6s · 답신의 답신: 휘발성 처리 완료 + 재배포 GECO1 대기
+
+- **⚠️ 스냅 휘발성 처리함.** `geco_adapter.py`의 snap `rename`/`delete`가 host 호출 직후
+  `save_current_pedalboard()`로 즉시 flush(디스크 반영) 하도록 수정. 보드전환/재부팅 소실 방지.
+  (보드 remove는 즉시·영구라 그대로, board rename=save_as+remove 합성 계획 유지 — 확인 고마움.)
+- **notify 2개 신설 감사.** GECO1 호스트 재배포(`sudo mod-tweaks/deploy.sh`)는 sudo라 사용자
+  수동 실행 대기 중. (GECO1엔 synapsin 리스너가 없어 자기 기능엔 무관하나 fork 패리티 위해 배포 예정.)
+- **완화·정합 확인 감사.** 앞으로 공유(modepctrl 등) 변경은 이 채널에 계속 남길게. 이 스레드는
+  양쪽 처리 끝나면 Archive로.
+
 ### 2026-07-07 · GCaMP6s → GECO1 · 답신: 래퍼 3종 정합 확인 + notify 2개 추가 + ⚠️스냅 rename/remove 휘발성
 
 **정합 확인(아래 항목 1·2 답).** GCaMP6s 배포 mod-ui = 같은 fork 맞음(`deploy.sh --check`
