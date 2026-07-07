@@ -153,8 +153,10 @@ class AppState:
     tuner: bool = False
     tcents: int = 6
     tnote: str = "A"
-    pb: int = 0
+    pb: int = 0               # highlighted board (glance cursor)
+    pb_cur: int = 0           # board actually loaded on the host (glance "loaded" marker)
     snap: int = 1
+    snap_cur: int = 1         # snapshot actually loaded on the host
     sub: str = ""             # ""=off, "board"/"snap": manage submenu open
     sub_idx: int = 0
     naming: str = ""          # ""=off, "<which>:<mode>" e.g. "board:saveas"
@@ -217,6 +219,10 @@ class AppController:
         self._sync_board()                    # seed the render caches from the backend
         self.st.wl = self.backend.catalog()
         self._sync_lists()
+        # Start the glance cursor on whatever board/snap the host has loaded, so the
+        # highlight and the "loaded" marker agree until the user scrolls off.
+        self.st.pb = self.st.pb_cur = self.backend.current("board")
+        self.st.snap = self.st.snap_cur = self.backend.current("snap")
         # Snap naming's weekday comes from the clock (Q3). Injected so --walk/tests
         # stay deterministic; defaults to the real system date on device.
         self._day_provider = day_provider or _system_day_idx
@@ -308,6 +314,32 @@ class AppController:
         else:
             self.st.snap = i
 
+    def _set_cur(self, which, i):
+        if which == "board":
+            self.st.pb_cur = i
+        else:
+            self.st.snap_cur = i
+
+    def _rehome_snap(self):
+        """After the loaded board changes, the snapshot list + current snapshot
+        belong to the NEW board (the host resets it on load) -> re-home the snap
+        cursor onto it, else the marker/gesture point at the old board's indices."""
+        j = self.backend.current("snap")
+        self.st.snap = self.st.snap_cur = j
+
+    def _select(self, which):
+        """Load the highlighted board/snapshot onto the host (glance first-click).
+        The chain and the 'loaded' marker follow the newly-current entry."""
+        _, hi = self._lst(which)
+        new = self.backend.select(which, hi)
+        self._set_idx(which, new)
+        self._set_cur(which, new)
+        self._sync_board()                     # chain reflects the loaded board / snap params
+        self._sync_lists()
+        if which == "board":                   # fresh board carries its own current snapshot
+            self._rehome_snap()
+        self._toast(("LOADED " if which == "board" else "SNAP ") + self._lst(which)[0][new])
+
     def _sub_act(self, act):
         st = self.st
         which = st.sub
@@ -354,9 +386,18 @@ class AppController:
         _, idx = self._lst(which)
         if mode == "rename":
             self.backend.rename(which, idx, st.nname)
-        else:                                  # saveas -> insert after current, select it
-            self._set_idx(which, self.backend.save_as(which, idx, st.nname))
-        self._sync_lists()
+            self._sync_lists()
+            j = self.backend.current(which)    # board rename (save_as+remove) may reorder
+            self._set_idx(which, j)
+            self._set_cur(which, j)
+        else:                                  # saveas -> new entry becomes current + selected
+            j = self.backend.save_as(which, idx, st.nname)
+            self._set_idx(which, j)
+            self._set_cur(which, j)
+            self._sync_lists()
+        if which == "board":                   # board switched under us -> re-home snap cursor
+            self._rehome_snap()
+        self._sync_board()                     # loaded board/graph may have changed
         st.naming, st.dirty = "", (which == "snap")
         self._toast(("RENAMED " if mode == "rename" else "SAVED ") + st.nname)
 
@@ -365,8 +406,13 @@ class AppController:
         if st.confirm.startswith("del:"):
             which = st.confirm.split(":")[1]
             _, idx = self._lst(which)
-            self._set_idx(which, self.backend.delete(which, idx))
+            j = self.backend.delete(which, idx)   # board delete lands on a neighbour
+            self._set_idx(which, j)
+            self._set_cur(which, j)
             self._sync_lists()
+            if which == "board":                  # delete switched the loaded board
+                self._rehome_snap()
+            self._sync_board()
             self._toast("DELETED")
         st.confirm, st.sub = "", ""
 
@@ -603,10 +649,18 @@ class GlanceMode(NavMode):
         st = c.st
         if enc == 0:
             st.pb = (st.pb + d) % len(st.boards)
-        else:
+        elif st.pb == st.pb_cur:           # snap list is the loaded board's -> inert when off it
             st.snap = (st.snap + d) % len(st.snaps)
-    def on_click(self, c, enc):            # open board (e0) / snapshot (e1) manage
-        c.enter("sub", which=("board" if enc == 0 else "snap"))
+    def on_click(self, c, enc):            # 2-step: first click loads, re-click manages
+        st = c.st
+        if enc == 1 and st.pb != st.pb_cur:   # snapshot hand is dead until the board is loaded
+            return
+        which = "board" if enc == 0 else "snap"
+        hi, cur = (st.pb, st.pb_cur) if enc == 0 else (st.snap, st.snap_cur)
+        if hi != cur:                      # highlight isn't the loaded one -> load it
+            c._select(which)
+        else:                              # already loaded -> open its manage submenu
+            c.enter("sub", which=which)
 
 
 class SysFocusMode(NavMode):
@@ -725,8 +779,10 @@ def rails(st):
         return ((st.sys_idx, len(SYSITEMS)), "idle")
     if m == "menu":
         return ((st.menu, len(menu_items(st))), "idle")
-    if m == "glance":                        # glance: both hands drive a list
-        return ((st.pb, len(st.boards)), (st.snap, len(st.snaps)))
+    if m == "glance":                        # E0 boards; E1 snapshots — but the snap list
+        # belongs to the LOADED board, so it goes dead while the highlight is off it.
+        z1 = (st.snap, len(st.snaps)) if st.pb == st.pb_cur else "off"
+        return ((st.pb, len(st.boards)), z1)
     if m == "sysfocus":                      # parked at SYS entry: E0 live (click to enter)
         return ("solid", "off")
     if m == "moving":                        # E0 shifts the picked-up node
@@ -861,12 +917,22 @@ def _sys_focus(st):
 
 def _glance(st):
     s = Screen()
+    on_pb = st.pb == st.pb_cur                          # highlight == the loaded board?
+    on_snap = on_pb and st.snap == st.snap_cur
     s.T("PEDALBOARD", 8, 5, 8, ls=1)
-    s.T(_fit(s, st.boards[st.pb], 24, 120), 8, 14, 24)  # marquee later
+    s.T(_fit(s, st.boards[st.pb], 24, 112), 8, 14, 24)  # marquee later
+    if on_pb:
+        s.d.rectangle([121, 26, 125, 30], fill=1)       # this board is loaded on the host
     s.hline(0, 56, 128)                                 # position: left rail thumbs (dots removed)
     s.T("SNAPSHOT", 8, 62, 8, ls=1)
-    s.T(_fit(s, st.snaps[st.snap], 24, 120), 8, 71, 24)
-    s.T("e0 pb.CLK manage  e1 snap", 5, 118, 6)
+    if on_pb:                                           # snap list belongs to the loaded board
+        s.T(_fit(s, st.snaps[st.snap], 24, 112), 8, 71, 24)
+        if on_snap:
+            s.d.rectangle([121, 83, 125, 87], fill=1)
+    else:                                               # highlight is off the loaded board -> stale
+        s.T("— load board first —", 8, 76, 12)
+    s.T("e0 %s  e1 %s" % ("manage" if on_pb else "LOAD",
+                          ("manage" if on_snap else "LOAD") if on_pb else "--"), 5, 118, 6)
     s.T("-1", 116, 5, 8)
     if st.dirty:
         s.d.ellipse([120, 2, 125, 7], fill=1)
@@ -1149,6 +1215,9 @@ def _walk():
     do("w", "slot-menu")   # enc0 click: open slot menu (menu 0 = Bypass/Enable)
     do("w", "exec")        # enc0 click: execute bypass/enable (menu closes)
     do("e", "hold-up")     # enc0 hold: depth 0 -> -1 (glance)
+    do("t", "board>")      # enc0 CW: highlight the next board (now != loaded)
+    do("w", "board-load")  # enc0 click: highlight != loaded -> LOAD it onto the host
+    print("      loaded  pb=%d(%s) pb_cur=%d" % (c.st.pb, c.st.boards[c.st.pb], c.st.pb_cur))
     do("g", "snap>")       # enc1 CW: snapshot scroll
     do("x", "combo")       # save snapshot (toast)
     do("e", "hold-down")   # back to depth 0
@@ -1187,8 +1256,13 @@ def _walk():
     print("      board-name %r  (%d boards)" % (c.st.nname, len(c.st.boards)))
     do("w", "accept")      # enc0 click: insert new board, select it
     print("      boards  %s pb=%d" % (c.st.boards, c.st.pb))
-    # snapshot manage is operated by ENC1 (the encoder that opened it)
-    do("s", "snap-sub")    # enc1 click: open SNAP manage submenu (E1 operates)
+    # snapshot manage is operated by ENC1 (the encoder that opened it). The board
+    # load above re-homed the snap cursor onto the loaded board, so scroll off it
+    # first: then the 2-step shows — first click LOADS, a second click (highlight ==
+    # loaded) opens the manage submenu.
+    do("g", "snap>")       # enc1 CW: highlight the next snapshot (now != loaded)
+    do("s", "snap-load")   # enc1 click: highlight != loaded -> LOAD snapshot
+    do("s", "snap-sub")    # enc1 click: now loaded -> open SNAP manage submenu (E1 operates)
     do("g", "sub>")        # enc1 turn: Save -> Save As
     do("s", "snap-saveas") # enc1 click: -> name suggester (word-day; day auto = thursday)
     do("g", "reroll")      # enc1 turn: re-roll the random word

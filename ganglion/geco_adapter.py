@@ -112,6 +112,43 @@ class GecoAdapter(GecoBackend):
     def catalog(self):
         return self._catalog
 
+    # -- board / snapshot navigation -------------------------------------------
+    def select(self, which, idx):
+        """Board: /reset + load_bundle then conform-on-load (decision: a board is
+        normalised the moment it becomes current). Snap: load_snapshot, then refresh
+        the param/bypass projection. Returns the now-current index."""
+        if which == "board":
+            entries = self.be.get_all_pedalboard_entries()
+            if not (0 <= idx < len(entries)):
+                return self.current("board")
+            if self.be.set_pedalboard(entries[idx]["bundle"]):
+                self._load_current()               # rebuild _pb + conform
+                return idx
+            return self.current("board")           # load failed (host graph wiped)
+        snaps = self.snapshots()
+        idx = max(0, min(idx, len(snaps) - 1))
+        self.be.load_snapshot(idx)
+        import model
+        self._pb = model.initialize_modep_pedalboard(self.be)   # snap changes params/bypass
+        return idx
+
+    def current(self, which):
+        if which == "board":
+            cur = (self.be.get_current_pedalboard() or "").rstrip("/")
+            for i, e in enumerate(self.be.get_all_pedalboard_entries()):
+                if e["bundle"].rstrip("/") == cur:
+                    return i
+            return 0
+        cur = self.be.get_current_snapshot()        # a name or an index string
+        snaps = self.snapshots()
+        if cur in snaps:
+            return snaps.index(cur)
+        try:
+            i = int(cur)
+            return i if 0 <= i < len(snaps) else 0
+        except (TypeError, ValueError):
+            return 0
+
     # -- param / bypass (cheap in-place cache update) --------------------------
     def set_param(self, slot, knob, value):
         e = self._pb.effects[slot]
@@ -226,7 +263,16 @@ class GecoAdapter(GecoBackend):
         if which == "snap":
             self.be.snapshot_rename(idx, name)     # modepctrl wrapper (forked mod-ui)
             self.be.save_current_pedalboard()      # host rename is in-memory only -> flush (logbook ⚠️)
-        # board rename: no host endpoint -> compose save_as+remove; deferred (select_board)
+            return None
+        # board: no host rename endpoint -> save the (loaded) graph under the new name
+        # and drop the old bundle. The 2-step glance gesture guarantees idx == current,
+        # so save_pedalboard_as captures the right board (decisions.md select_board).
+        entries = self.be.get_all_pedalboard_entries()
+        if not (0 <= idx < len(entries)):
+            return None
+        old = entries[idx]["bundle"]
+        self.be.save_pedalboard_as(name)           # mints new bundle from current, switches to it
+        self.be.remove_pedalboard(old)             # safe now: old is no longer current
         return None
 
     def delete(self, which, idx):
@@ -234,6 +280,14 @@ class GecoAdapter(GecoBackend):
             self.be.snapshot_remove(idx)           # host handles current-snap deletion
             self.be.save_current_pedalboard()      # volatile until board save -> flush (logbook ⚠️)
             return max(0, min(idx, len(self.snapshots()) - 1))
-        # board delete: remove_pedalboard is ready, but must switch off the current
-        # board first -> deferred to select_board. No-op keeps the list intact.
-        return idx
+        # board: remove_pedalboard can't drop the loaded board -> switch to a neighbour
+        # first (idx == current, guaranteed by the 2-step manage gesture), then remove.
+        entries = self.be.get_all_pedalboard_entries()
+        if not (0 <= idx < len(entries)) or len(entries) <= 1:
+            return idx
+        target = entries[idx]["bundle"]
+        alt = entries[idx - 1] if idx > 0 else entries[1]
+        self.be.set_pedalboard(alt["bundle"])
+        self._load_current()
+        self.be.remove_pedalboard(target)
+        return self.current("board")               # index of the board now loaded

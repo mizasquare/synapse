@@ -223,8 +223,24 @@ N의 seam에 라이브 구현체를 붙임. 이 Pi는 살아있는 MODEP/pisound
       확장, [[logbook]] 기록): `snapshot_rename`·`snapshot_remove`·`remove_pedalboard`.
       snap rename/delete = 어댑터 배선+라이브 검증. `remove_pedalboard`는 **현재 로드 보드 못 지움** →
       board delete/rename은 `select_board`와 함께(아래).
-    - **미구현**: `select_board`/`select_snapshot`(→`set_pedalboard`+conform 훅 / `load_snapshot`) —
-      보드/스냅 전환. board delete(current 회피 위해 먼저 전환)·board rename(save_as+remove 합성)이 여기 의존.
+    - **select_board/select_snapshot 착지** `[해결]`(2026-07-07): `GecoBackend.select(which,idx)`
+      +`current(which)` 신설. board=`set_pedalboard`(/reset+load_bundle)→성공시 `_load_current`
+      (conform-on-load 훅 발화), snap=`load_snapshot`+투영 재빌드. `current`=host 조회 매핑
+      (`get_current_pedalboard`→entries 인덱스 / `get_current_snapshot`). glance UX[사용자 결정]:
+      **2-단계 제스처** — 하이라이트≠로드 시 클릭=**로드**, 로드된 것 재클릭=관리 서브메뉴(Save/…/Delete).
+      상태에 `pb_cur`/`snap_cur`(로드된 인덱스) 추가, glance 뷰에 로드 마커(우측 사각)+LOAD/manage 힌트.
+      이 게이트 해소로 **board rename**(save_as+remove 합성; 2-단계가 idx==current 보장)·**board delete**
+      (이웃 보드로 먼저 전환 후 `remove_pedalboard`)도 어댑터 배선 완료. --walk에 board/snap 로드→관리
+      전 구간 추가(회귀+신경로 검증).
+      - **라이브 검증**(2026-07-07, 실기 pisound/MODEP up): `current()` 인덱스 매핑 실 host 일치
+        (board=bundle 비교, snap=`get_current_snapshot`가 **이름** 반환→list dict 매핑). board/snap
+        select 가역 라운드트립 `select()`↔`current()` 정합. 원상복구.
+      - **스냅 재홈 버그**(라이브서 포착·수정): 보드 로드(`set_pedalboard`)는 host가 그 보드의 current
+        스냅으로 리셋 → 로드 후 `snap`/`snap_cur`가 옛 인덱스로 stale. 보드 전환 모든 경로
+        (`_select`·board save_as/rename/delete)에서 `_rehome_snap`(=`current("snap")`)으로 재홈.
+        **부수 효과**: 스냅 적은 보드로 전환 시 `st.snaps[st.snap]` IndexError 크래시도 차단.
+      - **stale 스냅 패널**(사용자 지적): 하이라이트≠로드 보드일 때 아래 스냅 목록은 로드된 보드 것 →
+        ENC1 무작동(rail `off`, 회전/클릭 inert), 뷰는 "— load board first —". 로드/복귀 시 재활성.
   - **patch 위젯** `[해결]`(2026-07-07): NAM/AIDA-X 모델·Cab IR = LV2 patch. 어댑터가 patch를
     **최상단 `k="file"` 노브**로 투영(옵션=디렉토리 리스트, 캐시), 회전=`patch_set`로 그 자리 교체
     (모달 없음). D 가속으로 수백 목록 훑기. 라이브 검증(AIDA-X 323모델 cycle/+12 점프/복원).

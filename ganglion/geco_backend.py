@@ -125,6 +125,18 @@ class GecoBackend:
         """The plugin catalog as ``[bucket]`` (place/replace picks from this)."""
         raise NotImplementedError
 
+    # -- board / snapshot navigation -------------------------------------------
+    def select(self, which, idx):
+        """Load ``which``[idx] onto the host and make it current (board ->
+        set_pedalboard + conform, snap -> load_snapshot). Return the now-current
+        index — ``idx`` on success, else the actual current (a load can fail/clamp)."""
+        raise NotImplementedError
+
+    def current(self, which):
+        """Index of the currently-loaded board/snapshot in the list (glance's
+        'loaded' marker; seeds the app's current-index cache)."""
+        raise NotImplementedError
+
     # -- node / graph mutations (editor-level) ---------------------------------
     def place(self, slot, bucket_i, plug_i):
         """Fill/replace ``slot`` with catalog[bucket_i].plugins[plug_i]."""
@@ -175,6 +187,7 @@ class FakeGeco(GecoBackend):
         self._boards = list(PBS)
         self._snaps = list(SNAPS)
         self._catalog = load_whitelist()
+        self._cur = {"board": 0, "snap": 1}    # which entry is "loaded" (glance marker)
 
     def _lst(self, which):
         return self._boards if which == "board" else self._snaps
@@ -191,6 +204,15 @@ class FakeGeco(GecoBackend):
 
     def catalog(self):
         return self._catalog
+
+    # -- board / snapshot navigation --
+    def select(self, which, idx):
+        idx = max(0, min(idx, len(self._lst(which)) - 1))
+        self._cur[which] = idx                 # no per-board graph in RAM: marker only
+        return idx
+
+    def current(self, which):
+        return self._cur[which]
 
     # -- node / graph mutations --
     def place(self, slot, bucket_i, plug_i):
@@ -222,6 +244,7 @@ class FakeGeco(GecoBackend):
     def save_as(self, which, after_idx, name):
         lst = self._lst(which)
         lst.insert(after_idx + 1, name)
+        self._cur[which] = after_idx + 1       # the fresh entry is now loaded
         return after_idx + 1
 
     def rename(self, which, idx, name):
@@ -232,5 +255,6 @@ class FakeGeco(GecoBackend):
         lst = self._lst(which)
         if len(lst) > 1:
             lst.pop(idx)
-            return min(idx, len(lst) - 1)
+            self._cur[which] = min(idx, len(lst) - 1)   # land on the neighbour
+            return self._cur[which]
         return idx
