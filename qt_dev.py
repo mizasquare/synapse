@@ -13,7 +13,7 @@ Run:
 import os
 import sys
 
-from PyQt6.QtCore import QTimer, QUrl
+from PyQt6.QtCore import QObject, QTimer, QUrl
 from PyQt6.QtGui import QGuiApplication, QFontDatabase
 from PyQt6.QtQml import QQmlApplicationEngine
 from PyQt6.QtQuick import QQuickWindow  # registers QQuickWindow so the QML root casts correctly
@@ -100,6 +100,16 @@ def main():
     if not engine.rootObjects():
         print("[qt_dev] QML failed to load")
         return 1
+
+    if "--hub" in argv:
+        # dev: open the MENU hub overlay on a leaf ("menu"/"config"/"system")
+        # for a screenshot -- mirrors --focus/--tap (no touch input off-device).
+        k = argv.index("--hub")
+        leaf = argv[k + 1] if k + 1 < len(argv) else "menu"
+        ov = engine.rootObjects()[0].findChild(QObject, "overviewScreen")
+        if ov is not None:
+            ov.setProperty("hubLeaf", leaf)
+            ov.setProperty("hubOpen", True)
 
     # Stop the footswitch poll thread cleanly on quit. Harmless now (FakeController
     # is a no-op + daemon thread), but a Stage-3 prerequisite: once real/synthetic

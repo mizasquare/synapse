@@ -521,6 +521,28 @@ class ModepController:
 	# self-echo guard) lives one layer up in the editor (M5), not here. Return
 	# ``None`` on success or an error string, like the other write calls.
 	@staticmethod
+	def _graph_mutation_result(r, what):
+		"""Shared success test for the graph add/remove endpoints. mod-ui replies
+		JSON: truthy data (plugin dict / ``true``) on success, ``false`` or a
+		negative error code (e.g. ``-1``) on failure — the latter is truthy, so
+		a bare ``r.json()`` check would misread it as success. Return ``None``
+		on success, else an error string carrying the real reason (status +
+		body) so callers can toast/log it instead of a generic message."""
+		if r is None:
+			return "MODEP host did not respond"
+		if r.status_code == 200:
+			try:
+				body = r.json()
+			except Exception:
+				body = None
+			if body and not (isinstance(body, (int, float)) and body < 0):
+				return None
+		detail = (r.text or "").strip()
+		if len(detail) > 120:
+			detail = detail[:120] + "…"
+		return f"{what} (HTTP {r.status_code}: {detail or 'empty response'})"
+
+	@staticmethod
 	def add_effect(instance, uri, x=0.0, y=0.0):
 		"""Add plugin ``uri`` as new instance ``instance`` (bare name) at (x, y).
 		Mirrors web UI /effect/add (returns the new plugin's data on success)."""
@@ -531,11 +553,7 @@ class ModepController:
 			# instantiate on the host. The editor calls this off the GUI thread,
 			# so waiting here never freezes the UI.
 			r = ModepController._request("get", endpoint, timeout=60)
-			if r is None:
-				return "MODEP host did not respond"
-			if r.status_code == 200 and r.json():
-				return None
-			return "host rejected the add"
+			return ModepController._graph_mutation_result(r, "host rejected the add")
 		except Exception as e:
 			return f"An error occurred: {e}"
 
@@ -544,11 +562,7 @@ class ModepController:
 		"""Remove instance ``instance`` (bare name) and its connections."""
 		try:
 			r = ModepController._request("get", f"effect/remove/graph/{quote(instance, safe='')}")
-			if r is None:
-				return "MODEP host did not respond"
-			if r.status_code == 200 and r.json():
-				return None
-			return r.text or "effect remove failed"
+			return ModepController._graph_mutation_result(r, "effect remove failed")
 		except Exception as e:
 			return f"An error occurred: {e}"
 

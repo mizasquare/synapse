@@ -720,7 +720,7 @@ Window {
                         visible: overviewScreen.hubLeaf === "menu"
                         width: parent.width; spacing: 10
                         Repeater {
-                            model: [ {k:"config", t:"설정 (CONFIG)",   s:"마스터 볼륨 (디지털)"},
+                            model: [ {k:"config", t:"설정 (CONFIG)",   s:"마스터 볼륨 · 박자표"},
                                      {k:"system", t:"시스템 (SYSTEM)",  s:"안전 종료 · 재부팅"} ]
                             Rectangle {
                                 width: parent.width; height: 64; radius: 8
@@ -746,11 +746,13 @@ Window {
                         width: parent.width; spacing: 16
                         property int  masterVol: 100
                         property bool volAvail: true
-                        // seed from the live volume daemon whenever this leaf opens
+                        property int  bpbVal: 4
+                        // seed from the live volume daemon + model whenever this leaf opens
                         onVisibleChanged: if (visible) {
                             var v = view.masterVolume();
                             volAvail = v >= 0;
                             masterVol = v >= 0 ? v : 0;
+                            bpbVal = view.bpb();
                         }
                         // follow the daemon's applied-state echo (the reflex
                         // pedal or any controller may move the volume) — but
@@ -834,6 +836,44 @@ Window {
                         Text { visible: !configLeaf.volAvail
                                text: "게인 스테이지를 찾을 수 없습니다 (synapse-mastervol 서비스 확인)."
                                color: cMuted; font.family: uiFont; font.pixelSize: 16
+                               wrapMode: Text.WordWrap; width: parent.width }
+
+                        // --- time signature (beats per bar) section ---
+                        Text { text: "박자표 BEATS / BAR"
+                               color: cText; font.family: uiFont; font.pixelSize: 20 }
+                        Row {
+                            spacing: 14
+                            Rectangle {   // minus
+                                width: 64; height: 48; radius: 8
+                                color: "#1b2230"; border.width: 1; border.color: cBorder
+                                Text { text: "−"; anchors.centerIn: parent
+                                       color: configLeaf.bpbVal > 2 ? cText : cMuted
+                                       font.family: uiFont; font.pixelSize: 30 }
+                                MouseArea { anchors.fill: parent
+                                            onClicked: if (configLeaf.bpbVal > 2) {
+                                                configLeaf.bpbVal -= 1;
+                                                view.setBpb(configLeaf.bpbVal);
+                                            } }
+                            }
+                            Text { text: configLeaf.bpbVal
+                                   width: 72; horizontalAlignment: Text.AlignHCenter
+                                   anchors.verticalCenter: parent.verticalCenter
+                                   color: cGreen; font.family: uiFont; font.pixelSize: 32 }
+                            Rectangle {   // plus
+                                width: 64; height: 48; radius: 8
+                                color: "#1b2230"; border.width: 1; border.color: cBorder
+                                Text { text: "＋"; anchors.centerIn: parent
+                                       color: configLeaf.bpbVal < 12 ? cText : cMuted
+                                       font.family: uiFont; font.pixelSize: 30 }
+                                MouseArea { anchors.fill: parent
+                                            onClicked: if (configLeaf.bpbVal < 12) {
+                                                configLeaf.bpbVal += 1;
+                                                view.setBpb(configLeaf.bpbVal);
+                                            } }
+                            }
+                        }
+                        Text { text: "탭 템포 메트로놈의 마디당 비트 수입니다 (2–12)."
+                               color: cDim; font.family: uiFont; font.pixelSize: 15
                                wrapMode: Text.WordWrap; width: parent.width }
                     }
                     // ---- system (real: shutdown / reboot, 2-tap confirm) ----
