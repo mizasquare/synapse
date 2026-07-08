@@ -306,4 +306,8 @@ class FakeModepController(Backend):
         return None
 
     def set_bpb(self, value):
+        # Persist into the board's timeInfo so refresh_pedalboard reads it back
+        # (mirrors the host, where transport-bpb sticks to the loaded board).
+        info = self._pb_by_path[self._current_path]["pedalboard_info"]
+        info.setdefault("timeInfo", {})["bpb"] = int(value)
         return None

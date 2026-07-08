@@ -326,6 +326,18 @@ class QtView(QObject):
         """Command the volume daemon to pct (0-100) as a raw linear CC."""
         self._mastervol().set_percent(pct)
 
+    @Slot(result=int)
+    def bpb(self):
+        """Current beats-per-bar from the model (CONFIG leaf seeds from this)."""
+        p = self.presenter
+        return int(p.pedalboard.bpb) if p and p.pedalboard else 4
+
+    @Slot(int)
+    def setBpb(self, value):
+        """CONFIG hub stepper picked a new beats-per-bar."""
+        if self.presenter:
+            self.presenter.set_bpb(value)
+
     @Slot()
     def refreshBoards(self):
         """Populate the overview board-manager list from the live host (call when

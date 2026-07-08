@@ -808,6 +808,15 @@ class Presenter:
     def view_update_bpm(self):
         self.view.update_bpm_display(self.pedalboard.bpm)
 
+    def set_bpb(self, value):
+        """CONFIG hub picked a new beats-per-bar -> tell MODEP, keep the model
+        in sync (write-through discipline mirrors _tap_on_bpm)."""
+        error_msg = self.backend.set_bpb(value)
+        if error_msg is None:
+            self.pedalboard.bpb = int(value)
+        else:
+            self._notify("박자표 설정 실패")
+
     # ── Tap tempo (entered via the C+D footswitch chord) ─────────────────
     def enter_tap_tempo(self):
         """Switch into tap-tempo: every footswitch press becomes a beat tap and
