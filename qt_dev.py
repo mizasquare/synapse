@@ -126,6 +126,14 @@ def main():
         if ov is not None:
             ov.setProperty("snapsOpen", True)
 
+    if "--boards" in argv:
+        # dev: open the overview board-manager overlay for a screenshot —
+        # same open path as the touch button (refreshBoards then boardsOpen).
+        view.refreshBoards()
+        ov = engine.rootObjects()[0].findChild(QObject, "overviewScreen")
+        if ov is not None:
+            ov.setProperty("boardsOpen", True)
+
     # Stop the footswitch poll thread cleanly on quit. Harmless now (FakeController
     # is a no-op + daemon thread), but a Stage-3 prerequisite: once real/synthetic
     # footswitch events exist, a press during shutdown must not marshal work onto a

@@ -427,13 +427,39 @@ class Presenter:
             return None
         return self.pedalboard
 
+    def _ordered_board_entries(self):
+        """Board catalog in the user's saved display order (the app_state
+        board_order overlay — utils.apply_board_order). Single order authority
+        for BOTH the overview board manager and footswitch NAVIGATE, so the
+        list on screen is exactly the sequence the footswitch steps through."""
+        return utils.apply_board_order(self.backend.get_all_pedalboard_entries() or [])
+
     def overview_board_entries(self):
         """Board list for the overview board manager: ``[{bundle,title,current}]``,
-        default.pedalboard excluded (modepctrl filters it). Current board flagged."""
+        default.pedalboard excluded (modepctrl filters it). Current board flagged.
+        Rows follow the user's saved order, not the host's ASCII sort."""
         cur = ((self.pedalboard.current_pb_path if self.pedalboard else "") or "").rstrip("/")
         return [{"bundle": e["bundle"], "title": e.get("title", "") or e["bundle"],
                  "current": e["bundle"].rstrip("/") == cur}
-                for e in (self.backend.get_all_pedalboard_entries() or [])]
+                for e in self._ordered_board_entries()]
+
+    def move_board_order(self, bundle, delta):
+        """Swap ``bundle`` with its display-order neighbour (delta -1 up / +1
+        down) and persist the COMPLETE current display list as the new overlay
+        — boards that never had a saved position get one, and NAVIGATE follows
+        immediately. Mirrors bank_move_board's neighbour-swap. Returns True if
+        the order changed (caller re-renders the list on True)."""
+        bundles = [e["bundle"] for e in self._ordered_board_entries()]
+        try:
+            i = bundles.index(bundle)
+        except ValueError:
+            return False
+        j = i + delta
+        if not (0 <= i < len(bundles) and 0 <= j < len(bundles)):
+            return False
+        bundles[i], bundles[j] = bundles[j], bundles[i]
+        utils.save_board_order(bundles)
+        return True
 
     def overview_switch_board(self, bundle):
         """Switch to ``bundle`` from the overview board manager. No-op if it's
@@ -598,21 +624,40 @@ class Presenter:
                 self.assign_footswitches()
                 self.view.update_mode_display(self.footswitch_mode)
 
+    # NAVIGATE order lives HERE, not in backend.set_next/prev_pedalboard: those
+    # walk the host's ASCII-sorted pedalboard/list and can't see the user's
+    # board_order overlay. Resolving the target bundle presenter-side keeps the
+    # real and fake backends on the identical (user-controlled) sequence while
+    # still reaching every board.
+    def _nav_neighbor_bundle(self, delta):
+        """Resolve the NAVIGATE target ``delta`` (+1 next / -1 prev) steps away
+        in the user-ordered board list. Keeps the legacy modepctrl edge cases:
+        current board unknown -> first board, prev at the top stays at the top
+        (next wraps around). None when there are no boards at all."""
+        bundles = [e["bundle"] for e in self._ordered_board_entries()]
+        if not bundles:
+            print("No banks or pedalboards!")
+            return None
+        cur = (self.backend.get_current_pedalboard() or "").rstrip("/")
+        idx = next((i for i, b in enumerate(bundles) if b.rstrip("/") == cur), None)
+        if idx is None:
+            logging.error("Current pedalboard not in board list, falling back to 0th pedalboard.")
+            return bundles[0]
+        if delta < 0 and idx == 0:
+            return bundles[0]
+        return bundles[(idx + delta) % len(bundles)]
+
     def prev_pedalboard(self):
         self._warn_if_editor_dirty()         # /reset 이 미저장 에디터 편집을 폐기 (비차단 알림)
-        self._remember_current_snapshot()   # /reset 으로 날아가기 전에 떠나는 보드 기록
-        self.backend.set_prev_pedalboard()
-        self.refresh_pedalboard()
-        self._restore_snapshot_for_current_pb()
-        self._return_to_overview()
+        bundle = self._nav_neighbor_bundle(-1)
+        if bundle is not None:
+            self._go_to_pedalboard(bundle)   # remember/restore-snapshot 규율 포함
 
     def next_pedalboard(self):
         self._warn_if_editor_dirty()
-        self._remember_current_snapshot()
-        self.backend.set_next_pedalboard()
-        self.refresh_pedalboard()
-        self._restore_snapshot_for_current_pb()
-        self._return_to_overview()
+        bundle = self._nav_neighbor_bundle(+1)
+        if bundle is not None:
+            self._go_to_pedalboard(bundle)
 
     def prev_snapshot(self):
         if self.pedalboard.current_snapshot_idx > 0:

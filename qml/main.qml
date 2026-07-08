@@ -424,10 +424,25 @@ Window {
                                     Row {
                                         anchors.fill: parent; anchors.margins: 10; spacing: 10
                                         Text {
-                                            width: parent.width - 110; anchors.verticalCenter: parent.verticalCenter
+                                            width: parent.width - 198; anchors.verticalCenter: parent.verticalCenter
                                             text: (modelData.current ? "● " : "") + modelData.title
                                             color: modelData.current ? "#9cc2ff" : cText
                                             font.family: uiFont; font.pixelSize: 19; elide: Text.ElideRight
+                                        }
+                                        // 위/아래: reorder the saved display order (footswitch NAVIGATE
+                                        // steps through the same order) — bank-manager button style
+                                        Row {
+                                            spacing: 4; anchors.verticalCenter: parent.verticalCenter
+                                            Rectangle { width: 34; height: 28; radius: 5; color: "#1b2230"; border.width: 1; border.color: cBorder
+                                                opacity: index === 0 ? 0.35 : 1.0
+                                                Text { anchors.centerIn: parent; text: "위"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 15 }
+                                                MouseArea { anchors.fill: parent; enabled: index > 0
+                                                            onClicked: view.moveBoardOrder(modelData.bundle, -1) } }
+                                            Rectangle { width: 40; height: 28; radius: 5; color: "#1b2230"; border.width: 1; border.color: cBorder
+                                                opacity: index === view.boardList.length - 1 ? 0.35 : 1.0
+                                                Text { anchors.centerIn: parent; text: "아래"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 15 }
+                                                MouseArea { anchors.fill: parent; enabled: index < view.boardList.length - 1
+                                                            onClicked: view.moveBoardOrder(modelData.bundle, 1) } }
                                         }
                                         Rectangle {
                                             width: 84; height: 34; radius: 7; anchors.verticalCenter: parent.verticalCenter

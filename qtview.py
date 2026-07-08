@@ -367,6 +367,15 @@ class QtView(QObject):
         if self.presenter:
             self.presenter.overview_switch_board(bundle)
 
+    @Slot(str, int)
+    def moveBoardOrder(self, bundle, delta):
+        """Board-manager row 위/아래: swap the board with its neighbour in the
+        saved display order (app_state board_order) and re-render — footswitch
+        NAVIGATE follows the same order."""
+        if self.presenter and self.presenter.move_board_order(bundle, delta):
+            self._board_list = self.presenter.overview_board_entries()
+            self.boardsChanged.emit()
+
     @Slot()
     def refreshSnaps(self):
         """Re-announce the snapshot list when the browser opens, so it reflects

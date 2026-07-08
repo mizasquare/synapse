@@ -51,11 +51,15 @@ class Backend:
         raise NotImplementedError
 
     def set_next_pedalboard(self):
-        """Switch to the next pedalboard in the current bank."""
+        """Switch to the next pedalboard in the host's (ASCII) list order.
+        NOTE: footswitch NAVIGATE no longer calls this — the presenter resolves
+        the target bundle itself so the user's board_order overlay (utils)
+        applies; kept as a plain host-order fallback."""
         raise NotImplementedError
 
     def set_prev_pedalboard(self):
-        """Switch to the previous pedalboard in the current bank."""
+        """Switch to the previous pedalboard in the host's (ASCII) list order.
+        Same NOTE as set_next_pedalboard (presenter owns NAVIGATE order)."""
         raise NotImplementedError
 
     def get_bank_pedalboard_entries(self, bank_id):
