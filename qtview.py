@@ -77,6 +77,7 @@ class QtView(QObject):
     tunerUpdated = Signal('QVariant')                # tuner reading (dict payload; {} == listening)
     toastRequested = Signal(str)                     # transient on-screen message
     boardsChanged = Signal()                         # overview board-manager list changed
+    snapsChanged = Signal()                          # overview snapshot-browser list changed
     banksChanged = Signal()                          # bank-manager lists changed
     masterVolumeEchoed = Signal(int)                 # synapse-volume applied-state echo (pct)
 
@@ -186,6 +187,19 @@ class QtView(QObject):
     @Property("QVariantList", notify=boardsChanged)
     def boardList(self):
         return self._board_list
+
+    @Property("QVariantList", notify=snapsChanged)
+    def snapList(self):
+        """The current board's snapshots as [{idx,name,current}] for the overview
+        snapshot browser (same shape as the editor's picker). list_of_snapshots
+        is a {"0":name,...} dict; current_snapshot_idx marks the active one."""
+        pb = getattr(self.presenter, "pedalboard", None) if self.presenter else None
+        if pb is None:
+            return []
+        snaps = pb.list_of_snapshots or {}
+        cur = pb.current_snapshot_idx
+        return [{"idx": int(k), "name": snaps[k], "current": int(k) == cur}
+                for k in sorted(snaps, key=lambda s: int(s))]
 
     @Property("QVariantList", notify=banksChanged)
     def bankList(self):
@@ -352,6 +366,22 @@ class QtView(QObject):
         discipline; no-op if it is already current)."""
         if self.presenter:
             self.presenter.overview_switch_board(bundle)
+
+    @Slot()
+    def refreshSnaps(self):
+        """Re-announce the snapshot list when the browser opens, so it reflects
+        the live model (snapList reads the pedalboard directly; this just kicks
+        the binding — mirrors refreshBoards' open-time freshness discipline)."""
+        self.snapsChanged.emit()
+
+    @Slot(int)
+    def selectSnapshot(self, idx):
+        """Overview snapshot browser picked a snapshot -> load it. go_to_snapshot
+        applies its param/bypass values and refresh_pedalboard updates the header
+        label + graph; out-of-range idx is a no-op (returns None)."""
+        if self.presenter:
+            self.presenter.go_to_snapshot(idx)
+            self.snapsChanged.emit()
 
     # ------------------------------------------ bank manager (QML -> presenter)
     def _push_banks(self):

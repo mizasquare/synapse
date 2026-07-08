@@ -86,6 +86,14 @@ def main():
         presenter.enter_tap_tempo()  # dev: open the TAP TEMPO screen for a screenshot
     if "--tuner" in argv:
         presenter.enter_tuner()      # dev: open the TUNER screen (swept-tone source)
+    if "--snaps" in argv:
+        # dev: the default fake board (Widget Lab) has a single snapshot, so switch
+        # to one with several (GCaMP6s Demo) before opening the snapshot browser —
+        # a 1-row list wouldn't exercise the current-vs-switch row states.
+        target = next((e for e in presenter.overview_board_entries()
+                       if not e["current"] and "GCaMP6s" in (e.get("title") or "")), None)
+        if target:
+            presenter.overview_switch_board(target["bundle"])
 
     editor = EditorBridge()
     editor.set_presenter(presenter)   # EDIT screen seeds from the live/fake board
@@ -110,6 +118,13 @@ def main():
         if ov is not None:
             ov.setProperty("hubLeaf", leaf)
             ov.setProperty("hubOpen", True)
+
+    if "--snaps" in argv:
+        # dev: open the overview snapshot-browser overlay for a screenshot
+        # (board already switched above, before the QML loaded).
+        ov = engine.rootObjects()[0].findChild(QObject, "overviewScreen")
+        if ov is not None:
+            ov.setProperty("snapsOpen", True)
 
     # Stop the footswitch poll thread cleanly on quit. Harmless now (FakeController
     # is a no-op + daemon thread), but a Stage-3 prerequisite: once real/synthetic

@@ -100,6 +100,7 @@ Window {
         anchors.fill: parent
         visible: view.screen === "overview"
         property bool boardsOpen: false   // board-manager overlay
+        property bool snapsOpen: false    // snapshot-browser overlay
         property bool bankMgrOpen: false  // bank-manager overlay (create/edit banks)
         property bool hubOpen: false      // settings / system hub overlay
         property string hubLeaf: "menu"   // hub content: "menu" | "config" | "banks" | "system"
@@ -152,6 +153,13 @@ Window {
                         Text { anchors.centerIn: parent; text: "BOARDS"; color: "#9cc2ff"; font.family: uiFont; font.pixelSize: 19 }
                         MouseArea { anchors.fill: parent
                                     onClicked: { view.refreshBoards(); overviewScreen.boardsOpen = true } }
+                    }
+                    Rectangle {
+                        width: 66; height: 38; radius: 8
+                        color: "#241b2e"; border.width: 1; border.color: "#54407a"
+                        Text { anchors.centerIn: parent; text: "SNAP"; color: "#cdb6f0"; font.family: uiFont; font.pixelSize: 19 }
+                        MouseArea { anchors.fill: parent
+                                    onClicked: { view.refreshSnaps(); overviewScreen.snapsOpen = true } }
                     }
                     Rectangle {
                         width: 70; height: 38; radius: 8
@@ -435,6 +443,69 @@ Window {
                             }
                             Text { visible: view.boardList.length === 0
                                    text: "호스트 보드 목록 없음"; color: cDim
+                                   font.family: uiFont; font.pixelSize: 17; topPadding: 20 }
+                        }
+                    }
+                }
+            }
+        }
+
+        // -------- snapshot browser (overlay) --------
+        // Board-manager clone: same dim + centered panel, rows from view.snapList,
+        // "전환" loads the snapshot via view.selectSnapshot (header ◆ label follows).
+        Item {
+            visible: overviewScreen.snapsOpen; anchors.fill: parent; z: 90
+            MouseArea { anchors.fill: parent; onClicked: overviewScreen.snapsOpen = false }
+            Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.6 }
+            Rectangle {
+                width: 560; height: 420; radius: 12; anchors.centerIn: parent
+                color: cPanel; border.width: 1; border.color: cBorder
+                MouseArea { anchors.fill: parent }   // swallow clicks (don't close on panel tap)
+                Column {
+                    anchors.fill: parent; anchors.margins: 18; spacing: 12
+                    Item {
+                        width: parent.width; height: 30
+                        Text { text: "스냅샷"; color: cText; font.family: uiFont; font.pixelSize: 24
+                               anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
+                        Text { text: "✕"; color: cMuted; font.pixelSize: 24
+                               anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                               MouseArea { anchors.fill: parent; onClicked: overviewScreen.snapsOpen = false } }
+                    }
+                    Text { text: "보드 스냅샷 (" + view.snapList.length + ")"; color: cDim
+                           font.family: uiFont; font.pixelSize: 16 }
+                    Flickable {
+                        width: parent.width; height: 324; contentHeight: scol.height; clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        Column {
+                            id: scol; width: parent.width; spacing: 7
+                            Repeater {
+                                model: view.snapList
+                                Rectangle {
+                                    width: scol.width; height: 50; radius: 7
+                                    color: modelData.current ? cElev : "#161b26"
+                                    border.width: 1; border.color: modelData.current ? "#54407a" : cBorder
+                                    Row {
+                                        anchors.fill: parent; anchors.margins: 10; spacing: 10
+                                        Text {
+                                            width: parent.width - 110; anchors.verticalCenter: parent.verticalCenter
+                                            text: (modelData.current ? "◆ " : "") + modelData.idx + " · " + modelData.name
+                                            color: modelData.current ? cPurple : cText
+                                            font.family: uiFont; font.pixelSize: 19; elide: Text.ElideRight
+                                        }
+                                        Rectangle {
+                                            width: 84; height: 34; radius: 7; anchors.verticalCenter: parent.verticalCenter
+                                            color: modelData.current ? "transparent" : "#241b2e"
+                                            border.width: 1; border.color: modelData.current ? cBorder : "#54407a"
+                                            Text { anchors.centerIn: parent; text: modelData.current ? "현재" : "전환"
+                                                   color: modelData.current ? cMuted : "#cdb6f0"; font.family: uiFont; font.pixelSize: 17 }
+                                            MouseArea { anchors.fill: parent; enabled: !modelData.current
+                                                        onClicked: { view.selectSnapshot(modelData.idx); overviewScreen.snapsOpen = false } }
+                                        }
+                                    }
+                                }
+                            }
+                            Text { visible: view.snapList.length === 0
+                                   text: "스냅샷 없음"; color: cDim
                                    font.family: uiFont; font.pixelSize: 17; topPadding: 20 }
                         }
                     }
