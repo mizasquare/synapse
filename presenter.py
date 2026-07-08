@@ -683,6 +683,20 @@ class Presenter:
         self.refresh_pedalboard()
         return self.pedalboard
 
+    def load_effect_preset(self, instance, preset_uri):
+        """Apply LV2 preset ``preset_uri`` to ``instance`` (the editor's preset
+        chips). A preset rewrites several control ports host-side at once, so
+        refresh the whole model afterwards instead of patching values one by
+        one — same discipline as go_to_snapshot (skipping it desyncs the knobs).
+        Returns the rebuilt Pedalboard for the editor to reseed, or None (with
+        a notify) on host failure."""
+        err = self.backend.preset_load(instance, preset_uri)
+        if err:
+            self._notify('프리셋 적용 실패 — %s' % err)
+            return None
+        self.refresh_pedalboard()
+        return self.pedalboard
+
     # Consecutive identical samples required before a switch state change is
     # accepted (software debounce). At 100 Hz, 3 samples == ~30 ms: longer than
     # mechanical bounce (<10 ms) yet imperceptible to the player.

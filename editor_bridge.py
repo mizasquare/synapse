@@ -1508,6 +1508,29 @@ class EditorBridge(QObject):
         self.snapsChanged.emit()
         self.toast.emit('스냅샷 · %s' % self.currentSnapshotName)
 
+    @Slot(str)
+    def selectPreset(self, uri):
+        """Apply LV2 preset ``uri`` to the selected live node. Like a snapshot,
+        a preset is a multi-parameter change applied host-side, so reload+reseed
+        afterwards (presenter.load_effect_preset refreshes the model) — patching
+        knob values locally would drift. Selection is restored by instance so
+        the inspector stays open on the same node after the reseed."""
+        if not (self._live_flag and self.presenter):
+            return
+        inst = self._inst_of(self.sel)
+        if not inst:
+            return
+        label = next((pr['label'] for pr in self.inspPresets
+                      if pr['uri'] == uri), uri)
+        pb = self.presenter.load_effect_preset(inst, uri)
+        if pb is None:
+            self.toast.emit('프리셋 적용 실패 · %s' % label)
+            return
+        self._seed_from_pedalboard(pb)   # refresh node vals (clears selection too)
+        self.sel = self._gid_by_inst.get(inst, -1)   # reopen the same inspector
+        self._rebuild()
+        self.toast.emit('프리셋 · %s' % label)
+
     @Slot()
     def saveSnapshot(self):
         """Overwrite the current snapshot. NOTE this also persists the pedalboard
@@ -1605,6 +1628,20 @@ class EditorBridge(QObject):
         return [{'label': p.label, 'uri': p.uri,
                  'value': os.path.basename(p.value) if p.value else ''}
                 for p in eff.patches.values()]
+
+    @Property('QVariantList', notify=changed)
+    def inspPresets(self):
+        """LV2 presets of the selected node's plugin ({uri,label} chips for the
+        inspector). Live only — applying needs the host (preset_load), so mock
+        nodes get no dead chips. Sourced from the catalog's presetList."""
+        if not self._live_flag:
+            return []
+        n = self._node(self.sel)
+        if not n:
+            return []
+        p = self.by_uri.get(n['uri']) or {}
+        return [{'uri': pr.get('uri', ''), 'label': pr.get('label', '')}
+                for pr in (p.get('presetList') or [])]
 
     # ============================================================ slots (QML->py)
     @Slot(str)

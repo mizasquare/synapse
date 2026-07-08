@@ -114,6 +114,12 @@ class Backend:
         success, else an error string."""
         raise NotImplementedError
 
+    def preset_load(self, instance, preset_uri):
+        """Apply LV2 preset ``preset_uri`` to ``instance`` (rewrites several of
+        its control ports host-side at once; the caller must re-read values
+        afterwards). Return ``None`` on success, else an error string."""
+        raise NotImplementedError
+
     # -- Live graph ------------------------------------------------------------
     def dump_graph(self):
         """Return the live in-memory graph as a pedalboard/info-compatible dict

@@ -112,6 +112,10 @@
     },
     "http://example.org/synapse/drive": {
       "name": "Overdrive", "brand": "Synapse", "category": ["Distortion"], "parameters": [],
+      "presets": [
+        {"uri": "file:///fake/preset1", "label": "Crunch"},
+        {"uri": "file:///fake/preset2", "label": "Clean"}
+      ],
       "ports": {"control": {
         "input": [
           {"symbol": "gain", "name": "Gain", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.5}, "units": {"symbol": ""}, "properties": []},

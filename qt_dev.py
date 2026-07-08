@@ -126,6 +126,23 @@ def main():
         if ov is not None:
             ov.setProperty("snapsOpen", True)
 
+    if "--editor" in argv:
+        # dev: open the EDIT screen, optionally with a node selected (inspector
+        # open) for a screenshot — mirrors --focus/--hub (no touch off-device).
+        # enterEdit activates the Loader -> editor.enterLive() seeds the graph;
+        # the node lookup runs on a short delay so the seed has landed.
+        k = argv.index("--editor")
+        ed_inst = argv[k + 1] if k + 1 < len(argv) and not argv[k + 1].startswith("--") else None
+        view.enterEdit()
+        if ed_inst:
+            def _select_editor_node():
+                gid = editor._gid_by_inst.get(ed_inst, -1)
+                if gid != -1:
+                    editor.selectNode(gid)
+                else:
+                    print("[qt_dev] --editor: instance %r not on the board" % ed_inst)
+            QTimer.singleShot(300, _select_editor_node)
+
     if "--boards" in argv:
         # dev: open the overview board-manager overlay for a screenshot —
         # same open path as the touch button (refreshBoards then boardsOpen).

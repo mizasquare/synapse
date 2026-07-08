@@ -595,6 +595,21 @@ class ModepController:
 			return f"An error occurred: {e}"
 
 	@staticmethod
+	def preset_load(instance, preset_uri):
+		"""Apply LV2 preset ``preset_uri`` to ``instance`` (bare name). Mirrors
+		web UI /effect/preset/load (rewrites several control ports host-side in
+		one call, like a per-plugin snapshot — the caller must refresh_pedalboard
+		to re-read the values or the cached model desyncs). Replies JSON
+		true/false, so the shared graph-mutation success test applies."""
+		try:
+			endpoint = (f"effect/preset/load/graph/{quote(instance, safe='')}"
+						f"?uri={quote(preset_uri, safe='')}")
+			r = ModepController._request("get", endpoint)
+			return ModepController._graph_mutation_result(r, "host rejected the preset")
+		except Exception as e:
+			return f"An error occurred: {e}"
+
+	@staticmethod
 	def set_bpm(value):
 		formatted_value = "%.1f" % value
 		r = ModepController._request("post", "general/",
