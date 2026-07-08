@@ -21,7 +21,7 @@ import sys
 import threading
 import time
 
-from PyQt6.QtCore import QUrl
+from PyQt6.QtCore import QTimer, QUrl
 from PyQt6.QtGui import QFontDatabase, QGuiApplication
 from PyQt6.QtQml import QQmlApplicationEngine
 from PyQt6.QtQuick import QQuickWindow  # noqa: F401  registers QtQuick types for QML
@@ -100,6 +100,45 @@ def _start_reverse_listener(scheduler, presenter):
 
     threading.Thread(target=loop, daemon=True, name="reverse-sock").start()
     return sock
+
+
+SHOT_TRIGGER = "/tmp/synapse-shot.trigger"
+SHOT_OUT = "/tmp/synapse-shot.png"
+_SHOT_HOOK = []                            # keeps the hook's QTimer wrapper alive (see below)
+
+
+def _start_screenshot_hook(window):
+    """Save a PNG of the live window whenever the trigger file appears.
+
+    Remote eyeballing channel: under labwc this merely duplicates grim, but on
+    the eglfs (no-compositor) boot there is no Wayland to screenshot -- the app
+    itself is the only thing that can see its pixels. Over SSH:
+        touch /tmp/synapse-shot.trigger   ->   /tmp/synapse-shot.png
+    A stat() twice a second is free (cf. the footswitch polling doctrine); an
+    inotify watcher isn't worth the moving parts.
+    """
+    def check():
+        if not os.path.exists(SHOT_TRIGGER):
+            return
+        try:
+            os.unlink(SHOT_TRIGGER)
+        except OSError:
+            pass
+        img = window.grabWindow()          # QTimer fires on the GUI thread
+        if img.save(SHOT_OUT):
+            logging.info("screenshot -> %s", SHOT_OUT)
+        else:
+            logging.error("screenshot save failed: %s", SHOT_OUT)
+
+    timer = QTimer(window)
+    timer.timeout.connect(check)
+    timer.start(500)
+    # Pin the Python wrapper + closure for the process lifetime. Without this
+    # the C++ timer (parented to the window) keeps firing after the GC collects
+    # the sip wrapper -> segfault inside the interpreter on the next timeout
+    # (reproduced twice, gdb: QTimer::timeout -> _PyEval_EvalFrameDefault SEGV).
+    _SHOT_HOOK.append((timer, check))
+    return timer
 
 
 def main():
@@ -202,6 +241,7 @@ def main():
     # True fullscreen: on the Pi a title bar + taskbar otherwise steal ~40px and clip
     # the bottom of the 800x480 layout. Ctrl+Q (QML Shortcut) quits the dev instance.
     engine.rootObjects()[0].showFullScreen()
+    _start_screenshot_hook(engine.rootObjects()[0])
 
     # Splash is up; wait for the host off the GUI thread, then bring up the app.
     threading.Thread(target=_wait_then_bring_up, daemon=True, name="modep-wait").start()

@@ -1,0 +1,21 @@
+[Unit]
+Description=Synapse UI (PyQt6/QML on eglfs, no compositor)
+# No hard dep on mod-ui/jack: the app shows its own splash and polls until the
+# MODEP host answers (_wait_for_modep). Restart=always also covers early-boot
+# races (DRM/udev/I2C not settled yet -- the app fails loud, we retry).
+After=local-fs.target sound.target
+
+[Service]
+# Runs as `miza`: video/render (DRM master), input (libinput touch), i2c
+# (fsledctrl). Executed from the repo checkout; venv provides PyQt6 deps.
+User=miza
+WorkingDirectory=/home/miza/synapse
+# No login session at boot => no /run/user/1000; give Qt/libinput a runtime dir.
+RuntimeDirectory=synapse-ui
+Environment=XDG_RUNTIME_DIR=/run/synapse-ui
+ExecStart=/home/miza/synapse/deploy/ui-service/run_qt.sh
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -89,16 +89,21 @@
 - [ ] **아이캔디 — 오디오 반응형 캐릭터 애니** — 설계 확정, 엔진 미착수. 튜너 오디오버퍼 재사용.
       폴리싱·기능 다 끝난 뒤. → [`eyecandy_idea.md`](eyecandy_idea.md). (대)
 
-## ⏸ 보류 — 무컴포지터 eglfs 부팅 (원격 개발 중 컴포지터 유지)
+## ✅ 완료 — 무컴포지터 eglfs 부팅 (2026-07-08)
 
-> ⏸ 우선순위 내림(2026-06-25). labwc 창모드가 remote desktop 접속에 유리. 스택 검증 끝(FINISHED §4) —
-> 배선만 남음. 기기 확정/무대 단계에서 재개. 개발 중엔 안정성 무관(오히려 창모드가 접속에 유리).
+> `deploy/ui-service/` 참조. 부팅 체인: `multi-user.target → synapse-ui.service → run_qt.sh → qt_main.py`
+> (eglfs 직행, lightdm/labwc/wayvnc 제거 — VNC는 사용자가 불용 확인). 개발용 데스크톱 복귀 = `sudo revert.sh`.
 
-- [ ] **eglfs 풀스크린 부팅 전환** — 현재 labwc 위 창모드 잠정(`~/run_synapsepy.sh`, `dfd42c6`) → lightdm/labwc
-      제거 후 eglfs 직행. 롤백본 `run_synapsepy.sh.kivy-bak`(+ **git 히스토리에서 `app.py` 복원 선행 필요** —
-      백업 스크립트는 `python app.py`를 부르는데 app.py는 워킹트리에서 삭제됨, README §Entry points 참조).
-- [ ] **eglfs 런처 견고화** — DSI 2개 connected 자동선택 모호 → `run_qt.sh`+`eglfs_kms.json`로 card/커넥터/모드 고정
-      + `HIDECURSOR=1` + `QT_QUICK_BACKEND=software`. (부팅전환의 하위작업)
+- [x] **eglfs 풀스크린 부팅 전환** — `synapse-ui.service`(User=miza, Restart=always, `RuntimeDirectory=synapse-ui`)
+      + `install.sh`(lightdm disable + set-default multi-user). labwc autostart의 앱 실행 라인은 제거(이중 실행 방지).
+      kivy 롤백(`run_synapsepy.sh.kivy-bak`/`app.py` 복원)은 **폐기** — Qt 안정화로 무의미.
+- [x] **eglfs 런처 견고화** — `eglfs_kms.json`: 패널을 by-path(`platform-1f00118000.dsi-card`)로 고정
+      (DSI-2는 phantom connected — 자동선택 모호 해소), `hwcursor:false` + `HIDECURSOR=1`.
+      `JACK_PROMISCUOUS_SERVER=jack` 필수(LevelMeter가 modep jackd에 붙는 열쇠).
+      `QT_QUICK_BACKEND=software`는 불필요했음(검증대로 LLVMpipe GL로 충분).
+- [x] **원격 육안확인 대체** — grim(Wayland 전용) 사망 → 앱 내장 스크린샷 훅(`qt_main.py`):
+      `touch /tmp/synapse-shot.trigger` → `/tmp/synapse-shot.png`. ⚠️ PyQt 함정: QTimer 래퍼/클로저를
+      모듈 레벨 `_SHOT_HOOK`에 강참조 고정(안 하면 GC 뒤 세그폴트 — gdb로 확정).
 - [ ] **종료 어포던스 (nice-to-have)** — 깨끗한 종료는 `Ctrl+Q`→`Qt.quit()`([`main.qml:30`])와 **⚙MENU→SYSTEM
       안전종료가 이미 존재**(키보드 없는 기기도 종료 가능). 남은 건 Esc 키/터치 전용 어포던스뿐 — 편의성.
 
