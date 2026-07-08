@@ -86,6 +86,13 @@ class Presenter:
         # sync by assign_footswitches, same lifecycle as bank_boards).
         self.stomp_effects = []
 
+        # Global bypass ("panic button", the A+D chord -> bypass_all): toggle
+        # state + per-effect restore map ({instance: pre-engage bypassed}).
+        # Both reset on refresh_pedalboard so a board/snapshot switch can never
+        # resurrect stale states from a previous board.
+        self._global_bypass = False
+        self._bypass_restore = {}
+
         self.assign_footswitches()
         self.boot_lightshow()
 
@@ -107,6 +114,11 @@ class Presenter:
 
     def refresh_pedalboard(self):
         self.pedalboard = initialize_modep_pedalboard(self.backend)
+        # The rebuilt model may be a different board/snapshot; a stale global-
+        # bypass restore map would then restore wrong states, so drop it here.
+        # (bypass_all itself never calls refresh, so this can't self-trigger.)
+        self._global_bypass = False
+        self._bypass_restore = {}
         self.view_update_effect()
 
     def _audit_desync(self, context):
@@ -719,11 +731,47 @@ class Presenter:
             self.enter_tuner()
         elif status == [0, 0, 1, 1]:      # C+D -> tap tempo
             self.enter_tap_tempo()
+        # Outer-pair chord (the only non-adjacent one): stage panic button.
+        elif status == [1, 0, 0, 1]:      # A+D -> global bypass toggle
+            self.bypass_all()
         elif status == [0, 0, 0, 0]:
             print("How is this possible?")
         else:
             print("Invalid footswitch combination")
 
+    def bypass_all(self):
+        """Stage panic button (A+D chord): toggle a global kill switch.
+
+        ENGAGE: remember each effect's current bypass state, then bypass
+        everything (per-effect backend.bypass_effect, same path as the ':bypass'
+        branch of parameter_changed). DISENGAGE: restore the remembered map —
+        effects added since engage (not in the map) are left untouched. The
+        restore map is board-scoped: refresh_pedalboard resets it (stale-restore
+        guard), so a board/snapshot switch silently drops the engaged state."""
+        if not self._global_bypass:
+            self._bypass_restore = {e.instance: e.bypassed
+                                    for e in self.pedalboard.effects}
+            for effect in self.pedalboard.effects:
+                if self.backend.bypass_effect(effect.instance, True) is None:
+                    effect.bypassed = True
+            self._global_bypass = True
+            self.view_update_effect()
+            self._notify('전역 BYPASS ON')
+            # All four LEDs blink to confirm the kill switch is engaged.
+            for i in range(4):
+                self.hwi.LED.get_led(i).blink(color='red', times=2, interval=0.1)
+        else:
+            for effect in self.pedalboard.effects:
+                if effect.instance not in self._bypass_restore:
+                    continue  # added after engage -> leave as-is
+                prev = self._bypass_restore[effect.instance]
+                if effect.bypassed != prev and \
+                        self.backend.bypass_effect(effect.instance, prev) is None:
+                    effect.bypassed = prev
+            self._global_bypass = False
+            self._bypass_restore = {}
+            self.view_update_effect()
+            self._notify('전역 BYPASS OFF')
 
     def assign_footswitches(self):
         if self.footswitch_mode == 0:
