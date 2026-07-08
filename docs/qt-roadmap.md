@@ -100,7 +100,9 @@
 - [x] **eglfs 런처 견고화** — `eglfs_kms.json`: 패널을 by-path(`platform-1f00118000.dsi-card`)로 고정
       (DSI-2는 phantom connected — 자동선택 모호 해소), `hwcursor:false` + `HIDECURSOR=1`.
       `JACK_PROMISCUOUS_SERVER=jack` 필수(LevelMeter가 modep jackd에 붙는 열쇠).
-      `QT_QUICK_BACKEND=software`는 불필요했음(검증대로 LLVMpipe GL로 충분).
+      `QT_QUICK_BACKEND=software`는 불필요했음. 실기 확인(2026-07-09, fdinfo `drm-driver: v3d` + `renderD128` 오픈):
+      LLVMpipe가 아니라 **V3D 하드웨어 가속**으로 렌더 중 — Mesa kmsro(`drm-rp1-dsi_dri.so`)가 DSI 스캔아웃과
+      V3D 렌더를 자동으로 이어줌(무설정). 유휴 GPU 부하 ~2%.
 - [x] **원격 육안확인 대체** — grim(Wayland 전용) 사망 → 앱 내장 스크린샷 훅(`qt_main.py`):
       `touch /tmp/synapse-shot.trigger` → `/tmp/synapse-shot.png`. ⚠️ PyQt 함정: QTimer 래퍼/클로저를
       모듈 레벨 `_SHOT_HOOK`에 강참조 고정(안 하면 GC 뒤 세그폴트 — gdb로 확정).
