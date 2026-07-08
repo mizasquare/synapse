@@ -793,15 +793,19 @@ class QtView(QObject):
         cell_w = _GW / _PER_ROW
         fx_w, fx_h, io_w, io_h = 170.0, 72.0, 104.0, 72.0
 
-        # (id, label, sub, is_io, on, w, h) in signal order: IN -> effects -> OUT
-        order = [("IN", "IN", "GUITAR", True, True, io_w, io_h)]
+        # (id, label, sub, is_io, on, w, h, kind, model) in signal order:
+        # IN -> effects -> OUT. kind 'model' = file-based effect (NAM/IR); its
+        # 'model' carries the loaded file's basename ('' when nothing loaded).
+        order = [("IN", "IN", "GUITAR", True, True, io_w, io_h, "param", "")]
         for e in effects:
             cat = e.category[0] if isinstance(e.category, (list, tuple)) and e.category else ""
-            order.append((e.instance, e.name, cat, False, not e.bypassed, fx_w, fx_h))
-        order.append(("OUT", "OUT", "STEREO", True, True, io_w, io_h))
+            kind = "model" if e.is_model_effect else "param"
+            model = e.loaded_model_name if e.is_model_effect else ""
+            order.append((e.instance, e.name, cat, False, not e.bypassed, fx_w, fx_h, kind, model))
+        order.append(("OUT", "OUT", "STEREO", True, True, io_w, io_h, "param", ""))
 
         nodes, idmap = [], {}
-        for idx, (nid, label, sub, is_io, on, w, h) in enumerate(order):
+        for idx, (nid, label, sub, is_io, on, w, h, kind, model) in enumerate(order):
             row = idx // _PER_ROW
             col = idx % _PER_ROW
             vcol = col if row % 2 == 0 else (_PER_ROW - 1 - col)  # snake
@@ -809,6 +813,7 @@ class QtView(QObject):
             cy = _ROW_PAD + row * _ROW_H + _ROW_H / 2.0
             box = {"id": nid, "label": label, "sub": sub or "", "isIo": is_io,
                    "on": bool(on), "selected": False, "row": row,
+                   "kind": kind, "model": model,
                    "x": cx - w / 2.0, "y": cy - h / 2.0, "w": w, "h": h}
             nodes.append(box)
             idmap[nid] = box

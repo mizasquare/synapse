@@ -20,6 +20,7 @@ view via the synapsin reverse channel -> refresh_pedalboard(), not per-read poll
 """
 
 import configs
+import os
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
@@ -122,6 +123,21 @@ class Effect:
 	# plugin definition during the build; the catalog carries only ai/ao counts.
 	audio_inputs: List[str] = field(default_factory=list)
 	audio_outputs: List[str] = field(default_factory=list)
+
+	@property
+	def is_model_effect(self) -> bool:
+		"""Model/file-based effect (NAM amp, IR cab, ...): it has at least one
+		patch-file parameter, i.e. its sound comes from a loaded file rather
+		than control ports alone. Category is deliberately ignored."""
+		return bool(self.patches)
+
+	@property
+	def loaded_model_name(self) -> str:
+		"""Basename of the first loaded patch file ('' if nothing is loaded)."""
+		for patch in self.patches.values():
+			if patch.value:
+				return os.path.basename(patch.value)
+		return ""
 
 @dataclass
 class Connection:

@@ -23,8 +23,9 @@
       {"source": "Gate/Out", "target": "Recorder/In"},
       {"source": "Recorder/Out", "target": "Meter/In"},
       {"source": "Meter/Out", "target": "WidgetLab/In"},
-      {"source": "WidgetLab/Out", "target": "playback_1"},
-      {"source": "WidgetLab/Out", "target": "playback_2"}
+      {"source": "WidgetLab/Out", "target": "Cab/In"},
+      {"source": "Cab/Out", "target": "playback_1"},
+      {"source": "Cab/Out", "target": "playback_2"}
     ],
     "plugins": [
       {"instance": "Tuner", "uri": "http://example.org/synapse/tuner", "bypassed": false, "x": 200.0, "y": 250.0,
@@ -40,7 +41,9 @@
       {"instance": "Meter", "uri": "http://example.org/synapse/meter", "bypassed": false, "x": 2200.0, "y": 800.0,
        "ports": [{"symbol": "reset", "value": 1}]},
       {"instance": "WidgetLab", "uri": "http://example.org/synapse/widgetlab", "bypassed": false, "x": 2700.0, "y": 800.0,
-       "ports": [{"symbol": "gain", "value": 6.0}, {"symbol": "freq", "value": 1000.0}, {"symbol": "taps", "value": 3}, {"symbol": "active", "value": 1}, {"symbol": "reset", "value": 1}, {"symbol": "mode", "value": 2}]}
+       "ports": [{"symbol": "gain", "value": 6.0}, {"symbol": "freq", "value": 1000.0}, {"symbol": "taps", "value": 3}, {"symbol": "active", "value": 1}, {"symbol": "reset", "value": 1}, {"symbol": "mode", "value": 2}]},
+      {"instance": "Cab", "uri": "http://moddevices.com/plugins/mod-devel/cabsim", "bypassed": false, "x": 2700.0, "y": 1200.0,
+       "ports": [{"symbol": "gain", "value": 1.0}]}
     ]
   },
   "effects": {
@@ -144,6 +147,25 @@
           {"symbol": "open", "name": "Gate Open", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 1.0}, "units": {"symbol": ""}, "properties": ["integer", "toggled"]}
         ]
       }}
+    },
+    "http://moddevices.com/plugins/mod-devel/cabsim": {
+      "name": "Cabinet Sim", "brand": "MOD", "category": ["Simulator"],
+      "parameters": [
+        {"valid": true, "uri": "http://moddevices.com/plugins/mod-devel/cabsim-IR-loader#ir", "label": "IR File", "fileTypes": ["cabsim", "audio"]}
+      ],
+      "ports": {"control": {
+        "input": [
+          {"symbol": "gain", "name": "Gain", "ranges": {"minimum": 0.0, "maximum": 2.0, "default": 1.0}, "units": {"symbol": ""}, "properties": []}
+        ]
+      }}
+    }
+  },
+  "patches": {
+    "Cab": {
+      "http://moddevices.com/plugins/mod-devel/cabsim-IR-loader#ir": [
+        "/var/modep/user-files/Speaker Cabinets IRs/Marshall 1960.wav",
+        "path"
+      ]
     }
   }
 }

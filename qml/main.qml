@@ -289,20 +289,29 @@ Window {
                             text: modelData.label
                             color: modelData.isIo ? cGreen : cText
                             font.family: uiFont
-                            font.pixelSize: modelData.isIo ? 22 : 20
+                            // model-based effects (NAM/IR) get a bigger name line;
+                            // clamp it to one row so name+file always fit the box.
+                            font.pixelSize: modelData.isIo ? 22
+                                          : (modelData.kind === "model" ? 24 : 20)
                             wrapMode: Text.WrapAtWordBoundaryOrAnywhere
-                            maximumLineCount: 2
+                            maximumLineCount: modelData.kind === "model" ? 1 : 2
                             elide: Text.ElideRight
                         }
                         Text {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            visible: modelData.sub !== ""
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
+                            visible: text !== ""
                             // IN/OUT nodes show their live 5s-peak dB once audio flows,
-                            // else the static role label (GUITAR / STEREO).
-                            text: (modelData.isIo && ioMeter.dbText !== "") ? ioMeter.dbText : modelData.sub
+                            // else the static role label (GUITAR / STEREO). Model-based
+                            // effects show the loaded file name (category fallback).
+                            text: (modelData.isIo && ioMeter.dbText !== "") ? ioMeter.dbText
+                                  : (modelData.kind === "model" && modelData.model !== "") ? modelData.model
+                                  : modelData.sub
                             color: "#6f8a82"
                             font.family: uiFont
                             font.pixelSize: 13
+                            maximumLineCount: 1
+                            elide: Text.ElideRight
                         }
                     }
 
