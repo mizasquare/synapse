@@ -531,6 +531,9 @@ class EditorBridge(QObject):
                            'ain': list(e.audio_inputs or []),
                            'aout': list(e.audio_outputs or [])})
         self.gnodes = gnodes
+        # seeded gids are 1..N but _new_id() counts from _uid — sync it or the
+        # first live add reuses a seeded id and cables jump to the wrong node
+        self._uid = max([self._uid] + [n['id'] for n in gnodes])
         if missing:
             self.toast.emit('카탈로그 누락 %d개 생략: %s' % (len(missing), ', '.join(missing[:3])))
 
@@ -1807,6 +1810,8 @@ class EditorBridge(QObject):
             self._gid_by_inst[e.instance] = gid
             self._inst_by_gid[gid] = e.instance
         self.nodes = nodes
+        # same _uid sync as _seed_from_pedalboard — quick nodes also occupy 1..N
+        self._uid = max([self._uid] + [n['id'] for n in nodes])
         self.gnodes = []
         self.gwires = []
         self.mode = 'quick'
