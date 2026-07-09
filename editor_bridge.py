@@ -531,6 +531,9 @@ class EditorBridge(QObject):
                            'ain': list(e.audio_inputs or []),
                            'aout': list(e.audio_outputs or [])})
         self.gnodes = gnodes
+        # seeded gids are 1..N but _new_id() counts from _uid — sync it or the
+        # first live add reuses a seeded id and cables jump to the wrong node
+        self._uid = max([self._uid] + [n['id'] for n in gnodes])
         if missing:
             self.toast.emit('카탈로그 누락 %d개 생략: %s' % (len(missing), ', '.join(missing[:3])))
 
@@ -1508,6 +1511,47 @@ class EditorBridge(QObject):
         self.snapsChanged.emit()
         self.toast.emit('스냅샷 · %s' % self.currentSnapshotName)
 
+    @Slot(str)
+    def selectPreset(self, uri):
+        """Apply LV2 preset ``uri`` to the selected live node. Like a snapshot,
+        a preset is a multi-parameter change applied host-side — but restoring
+        preset state can take seconds (file-property plugins: NAM models, IRs),
+        so the host call runs in the background (same pattern as addEffect) and
+        the reload+reseed happens in _on_preset_done back on the GUI thread —
+        patching knob values locally would drift."""
+        if not (self._live_flag and self.presenter):
+            return
+        inst = self._inst_of(self.sel)
+        if not inst:
+            return
+        label = next((pr['label'] for pr in self.inspPresets
+                      if pr['uri'] == uri), uri)
+        self._run_bg(lambda: self.presenter.load_effect_preset(inst, uri),
+                     lambda err: self._on_preset_done(inst, label, err))
+
+    def _on_preset_done(self, inst, label, err):
+        """Background preset load returned (GUI thread). On success, refresh the
+        model (the preset rewrote several ports host-side) and reseed; selection
+        is restored by instance so the inspector stays open on the same node.
+        A preset only mutates the RUNTIME graph — it is unsaved state, so
+        _touch() keeps SAVE/dirty-confirm honest (mod-ui itself marks the board
+        modified on preset_load), unlike selectSnapshot where the loaded values
+        ARE the saved state."""
+        if err is not None:
+            self.toast.emit('프리셋 적용 실패 · %s' % label)
+            return
+        if not (self._live_flag and self.presenter):
+            return
+        self.presenter.refresh_pedalboard()
+        pb = self._live_pb()
+        if pb is None:
+            return
+        self._seed_from_pedalboard(pb)   # refresh node vals (clears selection too)
+        self.sel = self._gid_by_inst.get(inst, -1)   # reopen the same inspector
+        self._rebuild()
+        self._touch()                    # preset apply = unsaved edit
+        self.toast.emit('프리셋 · %s' % label)
+
     @Slot()
     def saveSnapshot(self):
         """Overwrite the current snapshot. NOTE this also persists the pedalboard
@@ -1605,6 +1649,20 @@ class EditorBridge(QObject):
         return [{'label': p.label, 'uri': p.uri,
                  'value': os.path.basename(p.value) if p.value else ''}
                 for p in eff.patches.values()]
+
+    @Property('QVariantList', notify=changed)
+    def inspPresets(self):
+        """LV2 presets of the selected node's plugin ({uri,label} chips for the
+        inspector). Live only — applying needs the host (preset_load), so mock
+        nodes get no dead chips. Sourced from the catalog's presetList."""
+        if not self._live_flag:
+            return []
+        n = self._node(self.sel)
+        if not n:
+            return []
+        p = self.by_uri.get(n['uri']) or {}
+        return [{'uri': pr.get('uri', ''), 'label': pr.get('label', '')}
+                for pr in (p.get('presetList') or [])]
 
     # ============================================================ slots (QML->py)
     @Slot(str)
@@ -1770,6 +1828,8 @@ class EditorBridge(QObject):
             self._gid_by_inst[e.instance] = gid
             self._inst_by_gid[gid] = e.instance
         self.nodes = nodes
+        # same _uid sync as _seed_from_pedalboard — quick nodes also occupy 1..N
+        self._uid = max([self._uid] + [n['id'] for n in nodes])
         self.gnodes = []
         self.gwires = []
         self.mode = 'quick'

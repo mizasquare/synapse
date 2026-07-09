@@ -77,6 +77,7 @@ class QtView(QObject):
     tunerUpdated = Signal('QVariant')                # tuner reading (dict payload; {} == listening)
     toastRequested = Signal(str)                     # transient on-screen message
     boardsChanged = Signal()                         # overview board-manager list changed
+    snapsChanged = Signal()                          # overview snapshot-browser list changed
     banksChanged = Signal()                          # bank-manager lists changed
     masterVolumeEchoed = Signal(int)                 # synapse-volume applied-state echo (pct)
 
@@ -186,6 +187,19 @@ class QtView(QObject):
     @Property("QVariantList", notify=boardsChanged)
     def boardList(self):
         return self._board_list
+
+    @Property("QVariantList", notify=snapsChanged)
+    def snapList(self):
+        """The current board's snapshots as [{idx,name,current}] for the overview
+        snapshot browser (same shape as the editor's picker). list_of_snapshots
+        is a {"0":name,...} dict; current_snapshot_idx marks the active one."""
+        pb = getattr(self.presenter, "pedalboard", None) if self.presenter else None
+        if pb is None:
+            return []
+        snaps = pb.list_of_snapshots or {}
+        cur = pb.current_snapshot_idx
+        return [{"idx": int(k), "name": snaps[k], "current": int(k) == cur}
+                for k in sorted(snaps, key=lambda s: int(s))]
 
     @Property("QVariantList", notify=banksChanged)
     def bankList(self):
@@ -353,6 +367,31 @@ class QtView(QObject):
         if self.presenter:
             self.presenter.overview_switch_board(bundle)
 
+    @Slot(str, int)
+    def moveBoardOrder(self, bundle, delta):
+        """Board-manager row 위/아래: swap the board with its neighbour in the
+        saved display order (app_state board_order) and re-render — footswitch
+        NAVIGATE follows the same order."""
+        if self.presenter and self.presenter.move_board_order(bundle, delta):
+            self._board_list = self.presenter.overview_board_entries()
+            self.boardsChanged.emit()
+
+    @Slot()
+    def refreshSnaps(self):
+        """Re-announce the snapshot list when the browser opens, so it reflects
+        the live model (snapList reads the pedalboard directly; this just kicks
+        the binding — mirrors refreshBoards' open-time freshness discipline)."""
+        self.snapsChanged.emit()
+
+    @Slot(int)
+    def selectSnapshot(self, idx):
+        """Overview snapshot browser picked a snapshot -> load it. go_to_snapshot
+        applies its param/bypass values and refresh_pedalboard updates the header
+        label + graph; out-of-range idx is a no-op (returns None)."""
+        if self.presenter:
+            self.presenter.go_to_snapshot(idx)
+            self.snapsChanged.emit()
+
     # ------------------------------------------ bank manager (QML -> presenter)
     def _push_banks(self):
         """Re-read the presenter's draft into the QML-facing lists and notify."""
@@ -516,6 +555,13 @@ class QtView(QObject):
         self._rebuild_graph()
         self._rebuild_footswitches()
         self.dataChanged.emit()
+        # Snapshot state may have changed on ANY refresh path (footswitch
+        # NAVIGATE prev/next_snapshot or a board switch while the SNAP modal is
+        # open never goes through refreshSnaps/selectSnapshot) — without this
+        # the modal keeps stale rows and a '전환' tap applies the row's idx to
+        # the wrong board's snapshot list. snapList reads the live model, so
+        # kicking the binding is all that's needed.
+        self.snapsChanged.emit()
 
     def populate_port_area(self, effectData=None):
         # presenter.view_render_parameters -> here with effectData; build the
@@ -793,15 +839,19 @@ class QtView(QObject):
         cell_w = _GW / _PER_ROW
         fx_w, fx_h, io_w, io_h = 170.0, 72.0, 104.0, 72.0
 
-        # (id, label, sub, is_io, on, w, h) in signal order: IN -> effects -> OUT
-        order = [("IN", "IN", "GUITAR", True, True, io_w, io_h)]
+        # (id, label, sub, is_io, on, w, h, kind, model) in signal order:
+        # IN -> effects -> OUT. kind 'model' = file-based effect (NAM/IR); its
+        # 'model' carries the loaded file's basename ('' when nothing loaded).
+        order = [("IN", "IN", "GUITAR", True, True, io_w, io_h, "param", "")]
         for e in effects:
             cat = e.category[0] if isinstance(e.category, (list, tuple)) and e.category else ""
-            order.append((e.instance, e.name, cat, False, not e.bypassed, fx_w, fx_h))
-        order.append(("OUT", "OUT", "STEREO", True, True, io_w, io_h))
+            kind = "model" if e.is_model_effect else "param"
+            model = e.loaded_model_name if e.is_model_effect else ""
+            order.append((e.instance, e.name, cat, False, not e.bypassed, fx_w, fx_h, kind, model))
+        order.append(("OUT", "OUT", "STEREO", True, True, io_w, io_h, "param", ""))
 
         nodes, idmap = [], {}
-        for idx, (nid, label, sub, is_io, on, w, h) in enumerate(order):
+        for idx, (nid, label, sub, is_io, on, w, h, kind, model) in enumerate(order):
             row = idx // _PER_ROW
             col = idx % _PER_ROW
             vcol = col if row % 2 == 0 else (_PER_ROW - 1 - col)  # snake
@@ -809,6 +859,7 @@ class QtView(QObject):
             cy = _ROW_PAD + row * _ROW_H + _ROW_H / 2.0
             box = {"id": nid, "label": label, "sub": sub or "", "isIo": is_io,
                    "on": bool(on), "selected": False, "row": row,
+                   "kind": kind, "model": model,
                    "x": cx - w / 2.0, "y": cy - h / 2.0, "w": w, "h": h}
             nodes.append(box)
             idmap[nid] = box

@@ -100,6 +100,7 @@ Window {
         anchors.fill: parent
         visible: view.screen === "overview"
         property bool boardsOpen: false   // board-manager overlay
+        property bool snapsOpen: false    // snapshot-browser overlay
         property bool bankMgrOpen: false  // bank-manager overlay (create/edit banks)
         property bool hubOpen: false      // settings / system hub overlay
         property string hubLeaf: "menu"   // hub content: "menu" | "config" | "banks" | "system"
@@ -121,7 +122,9 @@ Window {
                 font.family: uiFont
                 font.pixelSize: 96            // ~80px glyph @133PPI -> glance @1.5m
                 elide: Text.ElideRight
-                width: 500
+                // Stop short of the header button row (drawn later = on top):
+                // a fixed 500 overlapped it from x≈210 once SNAP widened the row.
+                width: parent.width - headerBtnRow.width - 24
             }
             Column {
                 anchors.right: parent.right
@@ -144,6 +147,7 @@ Window {
                 }
                 // snapshot save / pedalboard edit actions
                 Row {
+                    id: headerBtnRow
                     anchors.right: parent.right
                     spacing: 6
                     Rectangle {
@@ -152,6 +156,13 @@ Window {
                         Text { anchors.centerIn: parent; text: "BOARDS"; color: "#9cc2ff"; font.family: uiFont; font.pixelSize: 19 }
                         MouseArea { anchors.fill: parent
                                     onClicked: { view.refreshBoards(); overviewScreen.boardsOpen = true } }
+                    }
+                    Rectangle {
+                        width: 66; height: 38; radius: 8
+                        color: "#241b2e"; border.width: 1; border.color: "#54407a"
+                        Text { anchors.centerIn: parent; text: "SNAP"; color: "#cdb6f0"; font.family: uiFont; font.pixelSize: 19 }
+                        MouseArea { anchors.fill: parent
+                                    onClicked: { view.refreshSnaps(); overviewScreen.snapsOpen = true } }
                     }
                     Rectangle {
                         width: 70; height: 38; radius: 8
@@ -289,20 +300,29 @@ Window {
                             text: modelData.label
                             color: modelData.isIo ? cGreen : cText
                             font.family: uiFont
-                            font.pixelSize: modelData.isIo ? 22 : 20
+                            // model-based effects (NAM/IR) get a bigger name line;
+                            // clamp it to one row so name+file always fit the box.
+                            font.pixelSize: modelData.isIo ? 22
+                                          : (modelData.kind === "model" ? 24 : 20)
                             wrapMode: Text.WrapAtWordBoundaryOrAnywhere
-                            maximumLineCount: 2
+                            maximumLineCount: modelData.kind === "model" ? 1 : 2
                             elide: Text.ElideRight
                         }
                         Text {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            visible: modelData.sub !== ""
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
+                            visible: text !== ""
                             // IN/OUT nodes show their live 5s-peak dB once audio flows,
-                            // else the static role label (GUITAR / STEREO).
-                            text: (modelData.isIo && ioMeter.dbText !== "") ? ioMeter.dbText : modelData.sub
+                            // else the static role label (GUITAR / STEREO). Model-based
+                            // effects show the loaded file name (category fallback).
+                            text: (modelData.isIo && ioMeter.dbText !== "") ? ioMeter.dbText
+                                  : (modelData.kind === "model" && modelData.model !== "") ? modelData.model
+                                  : modelData.sub
                             color: "#6f8a82"
                             font.family: uiFont
                             font.pixelSize: 13
+                            maximumLineCount: 1
+                            elide: Text.ElideRight
                         }
                     }
 
@@ -407,10 +427,28 @@ Window {
                                     Row {
                                         anchors.fill: parent; anchors.margins: 10; spacing: 10
                                         Text {
-                                            width: parent.width - 110; anchors.verticalCenter: parent.verticalCenter
+                                            width: parent.width - 228; anchors.verticalCenter: parent.verticalCenter
                                             text: (modelData.current ? "● " : "") + modelData.title
                                             color: modelData.current ? "#9cc2ff" : cText
                                             font.family: uiFont; font.pixelSize: 19; elide: Text.ElideRight
+                                        }
+                                        // 위/아래: reorder the saved display order (footswitch NAVIGATE
+                                        // steps through the same order). Opposite actions side by side,
+                                        // so touch rules apply: ≥48px-ish targets, ≥12px gap (a mistap
+                                        // here silently rewires the live NAVIGATE order). Hit areas are
+                                        // padded past the visuals to reach the full 50px row height.
+                                        Row {
+                                            spacing: 12; anchors.verticalCenter: parent.verticalCenter
+                                            Rectangle { width: 48; height: 40; radius: 5; color: "#1b2230"; border.width: 1; border.color: cBorder
+                                                opacity: index === 0 ? 0.35 : 1.0
+                                                Text { anchors.centerIn: parent; text: "위"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 15 }
+                                                MouseArea { anchors.fill: parent; anchors.margins: -5; enabled: index > 0
+                                                            onClicked: view.moveBoardOrder(modelData.bundle, -1) } }
+                                            Rectangle { width: 48; height: 40; radius: 5; color: "#1b2230"; border.width: 1; border.color: cBorder
+                                                opacity: index === view.boardList.length - 1 ? 0.35 : 1.0
+                                                Text { anchors.centerIn: parent; text: "아래"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 15 }
+                                                MouseArea { anchors.fill: parent; anchors.margins: -5; enabled: index < view.boardList.length - 1
+                                                            onClicked: view.moveBoardOrder(modelData.bundle, 1) } }
                                         }
                                         Rectangle {
                                             width: 84; height: 34; radius: 7; anchors.verticalCenter: parent.verticalCenter
@@ -426,6 +464,69 @@ Window {
                             }
                             Text { visible: view.boardList.length === 0
                                    text: "호스트 보드 목록 없음"; color: cDim
+                                   font.family: uiFont; font.pixelSize: 17; topPadding: 20 }
+                        }
+                    }
+                }
+            }
+        }
+
+        // -------- snapshot browser (overlay) --------
+        // Board-manager clone: same dim + centered panel, rows from view.snapList,
+        // "전환" loads the snapshot via view.selectSnapshot (header ◆ label follows).
+        Item {
+            visible: overviewScreen.snapsOpen; anchors.fill: parent; z: 90
+            MouseArea { anchors.fill: parent; onClicked: overviewScreen.snapsOpen = false }
+            Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.6 }
+            Rectangle {
+                width: 560; height: 420; radius: 12; anchors.centerIn: parent
+                color: cPanel; border.width: 1; border.color: cBorder
+                MouseArea { anchors.fill: parent }   // swallow clicks (don't close on panel tap)
+                Column {
+                    anchors.fill: parent; anchors.margins: 18; spacing: 12
+                    Item {
+                        width: parent.width; height: 30
+                        Text { text: "스냅샷"; color: cText; font.family: uiFont; font.pixelSize: 24
+                               anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
+                        Text { text: "✕"; color: cMuted; font.pixelSize: 24
+                               anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                               MouseArea { anchors.fill: parent; onClicked: overviewScreen.snapsOpen = false } }
+                    }
+                    Text { text: "보드 스냅샷 (" + view.snapList.length + ")"; color: cDim
+                           font.family: uiFont; font.pixelSize: 16 }
+                    Flickable {
+                        width: parent.width; height: 324; contentHeight: scol.height; clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        Column {
+                            id: scol; width: parent.width; spacing: 7
+                            Repeater {
+                                model: view.snapList
+                                Rectangle {
+                                    width: scol.width; height: 50; radius: 7
+                                    color: modelData.current ? cElev : "#161b26"
+                                    border.width: 1; border.color: modelData.current ? "#54407a" : cBorder
+                                    Row {
+                                        anchors.fill: parent; anchors.margins: 10; spacing: 10
+                                        Text {
+                                            width: parent.width - 110; anchors.verticalCenter: parent.verticalCenter
+                                            text: (modelData.current ? "◆ " : "") + modelData.idx + " · " + modelData.name
+                                            color: modelData.current ? cPurple : cText
+                                            font.family: uiFont; font.pixelSize: 19; elide: Text.ElideRight
+                                        }
+                                        Rectangle {
+                                            width: 84; height: 34; radius: 7; anchors.verticalCenter: parent.verticalCenter
+                                            color: modelData.current ? "transparent" : "#241b2e"
+                                            border.width: 1; border.color: modelData.current ? cBorder : "#54407a"
+                                            Text { anchors.centerIn: parent; text: modelData.current ? "현재" : "전환"
+                                                   color: modelData.current ? cMuted : "#cdb6f0"; font.family: uiFont; font.pixelSize: 17 }
+                                            MouseArea { anchors.fill: parent; enabled: !modelData.current
+                                                        onClicked: { view.selectSnapshot(modelData.idx); overviewScreen.snapsOpen = false } }
+                                        }
+                                    }
+                                }
+                            }
+                            Text { visible: view.snapList.length === 0
+                                   text: "스냅샷 없음"; color: cDim
                                    font.family: uiFont; font.pixelSize: 17; topPadding: 20 }
                         }
                     }
@@ -582,19 +683,22 @@ Window {
                                            color: index < 4 ? cText : cMuted; font.family: uiFont; font.pixelSize: 17
                                            anchors.left: parent.left; anchors.leftMargin: 10
                                            anchors.verticalCenter: parent.verticalCenter
-                                           elide: Text.ElideRight; width: parent.width - 130 }
+                                           elide: Text.ElideRight; width: parent.width - 178 }
+                                    // 위/아래/✕: opposite + destructive actions side by side — widen the
+                                    // targets and gaps toward the 48px/12px touch rule (row is 38px, so
+                                    // hit areas are padded to its full height with negative margins).
                                     Row {
                                         anchors.right: parent.right; anchors.rightMargin: 8
-                                        anchors.verticalCenter: parent.verticalCenter; spacing: 4
-                                        Rectangle { width: 34; height: 28; radius: 5; color: "#1b2230"; border.width: 1; border.color: cBorder
+                                        anchors.verticalCenter: parent.verticalCenter; spacing: 12
+                                        Rectangle { width: 48; height: 34; radius: 5; color: "#1b2230"; border.width: 1; border.color: cBorder
                                             Text { anchors.centerIn: parent; text: "위"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 15 }
-                                            MouseArea { anchors.fill: parent; onClicked: view.bankMoveBoard(bankMgr.sel, index, -1) } }
-                                        Rectangle { width: 40; height: 28; radius: 5; color: "#1b2230"; border.width: 1; border.color: cBorder
+                                            MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: view.bankMoveBoard(bankMgr.sel, index, -1) } }
+                                        Rectangle { width: 48; height: 34; radius: 5; color: "#1b2230"; border.width: 1; border.color: cBorder
                                             Text { anchors.centerIn: parent; text: "아래"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 15 }
-                                            MouseArea { anchors.fill: parent; onClicked: view.bankMoveBoard(bankMgr.sel, index, 1) } }
-                                        Rectangle { width: 30; height: 28; radius: 5; color: "#241b2e"; border.width: 1; border.color: cBorder
+                                            MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: view.bankMoveBoard(bankMgr.sel, index, 1) } }
+                                        Rectangle { width: 40; height: 34; radius: 5; color: "#241b2e"; border.width: 1; border.color: cBorder
                                             Text { anchors.centerIn: parent; text: "✕"; color: "#ffb3b3"; font.pixelSize: 16 }
-                                            MouseArea { anchors.fill: parent; onClicked: view.bankRemoveBoard(bankMgr.sel, index) } }
+                                            MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: view.bankRemoveBoard(bankMgr.sel, index) } }
                                     }
                                 }
                             }

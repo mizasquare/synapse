@@ -193,7 +193,14 @@ class FakeModepController(Backend):
         return self._catalog
 
     def effect_get_information(self, uri):
-        return self._effects_by_uri.get(uri, {})
+        info = self._effects_by_uri.get(uri, {})
+        if info and "uri" not in info:
+            # Fixture effects entries are keyed by uri and omit it inside, but the
+            # real host's effect/get always carries it -- and the editor's catalog
+            # self-heal (normalize_plugin) rejects an info without one, leaving the
+            # fake board's nodes off the editor canvas. Fold the key back in.
+            info = dict(info, uri=uri)
+        return info
 
     def parameter_get(self, instance_id, symbol):
         if symbol == ":bypass":
@@ -213,6 +220,32 @@ class FakeModepController(Backend):
 
     def patch_set(self, instance, uri, value):
         self._patches.setdefault(instance, {})[uri] = [value, "path"]
+        return None
+
+    def preset_load(self, instance, preset_uri):
+        """Apply an LV2 preset: rewrite the instance's control inputs to values
+        deterministically derived from (preset uri, symbol), so different presets
+        give different-but-repeatable knob positions and a subsequent
+        dump_graph()/rebuild reads them back (mirrors the real host, where a
+        preset is a multi-parameter change). Unknown instance/preset -> error
+        string, like the host's ``false`` reply."""
+        import zlib
+        info = self.get_pedalboard_info(self._current_path)
+        plug = next((p for p in info.get("plugins", [])
+                     if p["instance"] == instance), None)
+        if plug is None:
+            return "no such instance: %s" % instance
+        eff = self._effects_by_uri.get(plug["uri"]) or {}
+        presets = eff.get("presets") or []
+        if not any(pr.get("uri") == preset_uri for pr in presets):
+            return "unknown preset: %s" % preset_uri
+        ctrl_in = ((eff.get("ports") or {}).get("control") or {}).get("input") or []
+        for c in ctrl_in:
+            rng = c.get("ranges") or {}
+            lo = float(rng.get("minimum", 0.0))
+            hi = float(rng.get("maximum", 1.0))
+            frac = (zlib.crc32(("%s|%s" % (preset_uri, c["symbol"])).encode()) % 1000) / 999.0
+            self._params[(instance, c["symbol"])] = lo + frac * (hi - lo)
         return None
 
     # -- Live graph ------------------------------------------------------------
@@ -251,9 +284,26 @@ class FakeModepController(Backend):
     def add_effect(self, instance, uri, x=0.0, y=0.0):
         info = self.get_pedalboard_info(self._current_path)
         if not any(p["instance"] == instance for p in info["plugins"]):
+            # Seed ports with the catalog's control-input defaults: the real
+            # host's syn_dump_graph returns EVERY control port's current value
+            # for a live-added instance too (host.add_plugin fills valports into
+            # pluginData['ports']), and dump_graph() above only exports symbols
+            # present in this list — an empty list would make later _params
+            # writes (preset_load, param edits) silently vanish on every reseed.
+            eff = self._effects_by_uri.get(uri) or {}
+            ctrl_in = ((eff.get("ports") or {}).get("control") or {}).get("input") or []
+            ports = []
+            for c in ctrl_in:
+                if not c.get("symbol"):
+                    continue
+                rng = c.get("ranges") or {}
+                val = rng.get("default")
+                if val is None:
+                    val = rng.get("minimum", 0.0)
+                ports.append({"symbol": c["symbol"], "value": val})
             info["plugins"].append({
                 "instance": instance, "uri": uri, "bypassed": False,
-                "x": float(x), "y": float(y), "ports": [],
+                "x": float(x), "y": float(y), "ports": ports,
             })
             self._bypass[instance] = False
         return None

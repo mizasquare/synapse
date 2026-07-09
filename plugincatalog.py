@@ -89,7 +89,10 @@ def _ctl(port):
         'max': r.get('maximum', 1.0),
         'unit': (port.get('units') or {}).get('symbol') or '',
         'render': '',
-        'scale': [sp.get('label') for sp in sps],
+        # both scalePoint shapes: real mod-ui dict ({value,label}) and the
+        # fixtures' [value,label] pairs (same tolerance as qtview._enum_options)
+        'scale': [sp.get('label') if isinstance(sp, dict) else str(sp[1])
+                  for sp in sps],
     }
 
 
@@ -118,6 +121,11 @@ def _plugin(p):
         'cv': len(cv.get('input') or []) + len(cv.get('output') or []),
         'hasBypass': has_bypass,
         'presets': len(p.get('presets') or []),
+        # LV2 presets as {uri,label} for the inspector's preset chips. The int
+        # 'presets' count above predates this (inspSub consumes it) and stays.
+        'presetList': [{'uri': pr.get('uri', ''),
+                        'label': pr.get('label', '') or pr.get('uri', '')}
+                       for pr in (p.get('presets') or []) if isinstance(pr, dict)],
         'ctlTotal': len(ctl),
         'ctl': ctl,
         # M7 additive (not in the frozen dump): real audio port symbols, so the

@@ -90,6 +90,10 @@
       "brand": "Synapse",
       "category": ["Distortion"],
       "parameters": [],
+      "presets": [
+        {"uri": "file:///fake/preset1", "label": "Crunch"},
+        {"uri": "file:///fake/preset2", "label": "Clean"}
+      ],
       "ports": {
         "control": {
           "input": [

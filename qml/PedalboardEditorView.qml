@@ -630,6 +630,7 @@ Item {
             visible: editor.inspOpen
             x: parent.width - 214; y: 34; width: 214; height: parent.height - 34; z: 45
             color: cPanel; border.width: 1; border.color: cBorder
+            clip: true   // defense: panel content must never paint over the canvas/footer
             Column {
                 anchors.fill: parent
                 Item {
@@ -690,9 +691,50 @@ Item {
                         }
                     }
                 }
+                // LV2 presets — tap a chip to apply (live only; a preset rewrites
+                // several params host-side, so the bridge reloads + reseeds after).
+                // Real-host plugins carry 25+ presets (amsynth 27, Dragonfly 25) and
+                // long labels wrap to ~1 chip per row, so the chip Flow is clamped
+                // to ~3 rows and scrolls inside — unbounded it would swallow the
+                // whole panel, push the knob Flickable to negative height and paint
+                // chips over the canvas/footer below.
+                Column {
+                    id: presetSection
+                    width: parent.width; spacing: 4
+                    visible: editor.inspPresets.length > 0
+                    topPadding: visible ? 2 : 0; bottomPadding: visible ? 6 : 0
+                    Flickable {
+                        x: 10; width: presetSection.width - 20
+                        height: Math.min(presetFlow.height, 110)
+                        contentHeight: presetFlow.height
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        Flow {
+                            id: presetFlow
+                            width: presetSection.width - 20; spacing: 6
+                            Repeater {
+                                model: editor.inspPresets
+                                Rectangle {
+                                    height: 30; radius: 5
+                                    width: Math.min(prTxt.implicitWidth + 22, presetSection.width - 20)
+                                    color: "transparent"; border.width: 1; border.color: cBlue
+                                    Text {
+                                        id: prTxt; anchors.centerIn: parent
+                                        width: Math.min(implicitWidth, parent.width - 12)
+                                        text: modelData.label; color: cBlue
+                                        font.family: uiFont; font.pixelSize: 13; elide: Text.ElideRight
+                                    }
+                                    MouseArea { anchors.fill: parent; onClicked: editor.selectPreset(modelData.uri) }
+                                }
+                            }
+                        }
+                    }
+                }
                 Flickable {
                     width: parent.width; clip: true; contentHeight: knobGrid.height
-                    height: parent.height - 96 - (patchSection.visible ? patchSection.height : 0)
+                    height: Math.max(0, parent.height - 96
+                                        - (patchSection.visible ? patchSection.height : 0)
+                                        - (presetSection.visible ? presetSection.height : 0))
                     Grid {
                         id: knobGrid; width: parent.width; columns: 2; rowSpacing: 12; columnSpacing: 8
                         padding: 10

@@ -3,7 +3,13 @@ import os
 #MODEP controls
 
 SERVER_URI         = "http://localhost/"
-LOCAL_STORAGE      = os.path.expanduser("~/.modep/")
+# SYNAPSE_STATE_DIR overrides where app_state.json etc. live. qt_dev sets it to
+# a dev-only dir so a fake-backend run can never overwrite the on-device app's
+# state (board_order is a list of environment-specific bundle paths — one
+# fixture-path write would silently destroy the user's real custom order).
+LOCAL_STORAGE      = os.environ.get("SYNAPSE_STATE_DIR") or os.path.expanduser("~/.modep/")
+if not LOCAL_STORAGE.endswith("/"):
+    LOCAL_STORAGE += "/"
 LAST_PEDALBOARD    = LOCAL_STORAGE + "last_board"
 DEFAULT_PEDALBOARD = "/var/modep/pedalboards/default.pedalboard"
 DEFAULT_BANK       = 0

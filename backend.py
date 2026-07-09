@@ -51,11 +51,15 @@ class Backend:
         raise NotImplementedError
 
     def set_next_pedalboard(self):
-        """Switch to the next pedalboard in the current bank."""
+        """Switch to the next pedalboard in the host's (ASCII) list order.
+        NOTE: footswitch NAVIGATE no longer calls this — the presenter resolves
+        the target bundle itself so the user's board_order overlay (utils)
+        applies; kept as a plain host-order fallback."""
         raise NotImplementedError
 
     def set_prev_pedalboard(self):
-        """Switch to the previous pedalboard in the current bank."""
+        """Switch to the previous pedalboard in the host's (ASCII) list order.
+        Same NOTE as set_next_pedalboard (presenter owns NAVIGATE order)."""
         raise NotImplementedError
 
     def get_bank_pedalboard_entries(self, bank_id):
@@ -108,6 +112,12 @@ class Backend:
     def patch_set(self, instance, uri, value):
         """Load patch ``value`` for ``uri`` on ``instance``. Return ``None`` on
         success, else an error string."""
+        raise NotImplementedError
+
+    def preset_load(self, instance, preset_uri):
+        """Apply LV2 preset ``preset_uri`` to ``instance`` (rewrites several of
+        its control ports host-side at once; the caller must re-read values
+        afterwards). Return ``None`` on success, else an error string."""
         raise NotImplementedError
 
     # -- Live graph ------------------------------------------------------------

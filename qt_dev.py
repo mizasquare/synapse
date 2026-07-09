@@ -13,6 +13,15 @@ Run:
 import os
 import sys
 
+# Keep dev state away from the live app's ~/.modep/: both run as the same user
+# on the Pi, and app_state.json's board_order is a list of environment-specific
+# bundle paths — a single board-manager ▲▼ tap in a fixture-backed qt_dev would
+# otherwise overwrite the user's real custom order with fixture paths (silent
+# ASCII-order fallback on device, unrecoverable). Must run before `configs` is
+# imported (transitively via modepctrl below); setdefault keeps an explicit
+# SYNAPSE_STATE_DIR override working.
+os.environ.setdefault("SYNAPSE_STATE_DIR", os.path.expanduser("~/.modep-dev/"))
+
 from PyQt6.QtCore import QObject, QTimer, QUrl
 from PyQt6.QtGui import QGuiApplication, QFontDatabase
 from PyQt6.QtQml import QQmlApplicationEngine
@@ -86,6 +95,14 @@ def main():
         presenter.enter_tap_tempo()  # dev: open the TAP TEMPO screen for a screenshot
     if "--tuner" in argv:
         presenter.enter_tuner()      # dev: open the TUNER screen (swept-tone source)
+    if "--snaps" in argv:
+        # dev: the default fake board (Widget Lab) has a single snapshot, so switch
+        # to one with several (GCaMP6s Demo) before opening the snapshot browser —
+        # a 1-row list wouldn't exercise the current-vs-switch row states.
+        target = next((e for e in presenter.overview_board_entries()
+                       if not e["current"] and "GCaMP6s" in (e.get("title") or "")), None)
+        if target:
+            presenter.overview_switch_board(target["bundle"])
 
     editor = EditorBridge()
     editor.set_presenter(presenter)   # EDIT screen seeds from the live/fake board
@@ -110,6 +127,38 @@ def main():
         if ov is not None:
             ov.setProperty("hubLeaf", leaf)
             ov.setProperty("hubOpen", True)
+
+    if "--snaps" in argv:
+        # dev: open the overview snapshot-browser overlay for a screenshot
+        # (board already switched above, before the QML loaded).
+        ov = engine.rootObjects()[0].findChild(QObject, "overviewScreen")
+        if ov is not None:
+            ov.setProperty("snapsOpen", True)
+
+    if "--editor" in argv:
+        # dev: open the EDIT screen, optionally with a node selected (inspector
+        # open) for a screenshot — mirrors --focus/--hub (no touch off-device).
+        # enterEdit activates the Loader -> editor.enterLive() seeds the graph;
+        # the node lookup runs on a short delay so the seed has landed.
+        k = argv.index("--editor")
+        ed_inst = argv[k + 1] if k + 1 < len(argv) and not argv[k + 1].startswith("--") else None
+        view.enterEdit()
+        if ed_inst:
+            def _select_editor_node():
+                gid = editor._gid_by_inst.get(ed_inst, -1)
+                if gid != -1:
+                    editor.selectNode(gid)
+                else:
+                    print("[qt_dev] --editor: instance %r not on the board" % ed_inst)
+            QTimer.singleShot(300, _select_editor_node)
+
+    if "--boards" in argv:
+        # dev: open the overview board-manager overlay for a screenshot —
+        # same open path as the touch button (refreshBoards then boardsOpen).
+        view.refreshBoards()
+        ov = engine.rootObjects()[0].findChild(QObject, "overviewScreen")
+        if ov is not None:
+            ov.setProperty("boardsOpen", True)
 
     # Stop the footswitch poll thread cleanly on quit. Harmless now (FakeController
     # is a no-op + daemon thread), but a Stage-3 prerequisite: once real/synthetic

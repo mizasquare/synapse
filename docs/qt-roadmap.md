@@ -3,7 +3,7 @@
 > 🛠 **살아있는 로드맵 (남은 일만).** 완료 항목은 [`qt-roadmap-DONE.md`](qt-roadmap-DONE.md)로 이관,
 > 맥락 필요 시 포인터로 참조. 마일스톤 최심층 상세 = 메모리 `synapse-roadmap`. 이주 스택 결정·검증 =
 > [`qt-migration-FINISHED.md`](qt-migration-FINISHED.md).
-> 마지막 갱신: **2026-07-05 (볼륨페달 Phase 2 완료 반영 — 현재 사실관계 문단 갱신.)**
+> 마지막 갱신: **2026-07-10 (폴리싱 브랜치 9커밋 — ②③ 자가테스트 가능분 일괄 완료 이관, 터치패널 사망 반영.)**
 >
 > **정렬 원칙 — 우선순위 축:** ① 안정성(크래시/데이터손상/무대 리스크) → ② 기능(미구현 본체) →
 > ③ 설계상 미덕(상태를 올바로 드러냄) → ④ 아키텍처 우아함(관심사 분리·유지보수성) → ⑤ 미관.
@@ -11,8 +11,10 @@
 
 **현재 사실관계:** PyQt6+QML 앱이 Pi에서 라이브 동작, autostart 전환됨(`dfd42c6`).
 페달보드 에디터 트랙(M1~M7)·라이브 플러그인 카탈로그·뱅크 매니저·튜너·소프트 마스터볼륨·
-**볼륨페달 Phase 2**(reflex+volumectl, 현장 확인 2026-07-05)까지 완료·master 머지됨.
-"못 뜨는" 하드 블로커 없음. **남은 큰 건 없음** — 작은 기능·실기 검증·정리·보류(부팅) 위주.
+**볼륨페달 Phase 2**·**폴리싱 브랜치 9커밋**(프리셋 적용·스냅샷 모달·bpb·bypass-all·타입구분·보드순서·
+_uid픽스·리뷰픽스 11건, 2026-07-10 머지)까지 완료. ⚠️ **터치패널 사망**(플렉스 컷아웃 찝힘,
+[`hardware.md`](hardware.md) 사후분석) — 부품 수급 중, 기기 분해상태라 **실기 검증 전부 대기**
+(대기 목록: [`qt-roadmap-DONE.md`](qt-roadmap-DONE.md) 상단). 남은 코드 작업은 아래 소항목뿐.
 
 ---
 
@@ -27,19 +29,9 @@
 
 ## ② 기능 (미구현 / 부분구현 본체)
 
-- [ ] **이펙터 프리셋 적용 (LV2 preset)** — M7이 프리셋 `{uri,label}`을 공급하고 카탈로그·이름 노출까지 완료.
-      남은 건 `/effect/preset/load` 래퍼 + presenter/에디터 배선뿐. **지금은 프리셋 이름이 보이는데 탭해도 안 먹음**(UX 갭). (소)
-- [ ] **스냅샷 브라우저 — 오버뷰 모달** — 이름 점프는 **에디터에 이미 구현됨**(`editor.selectSnapshot`→
-      `presenter.go_to_snapshot`, 백엔드 `get_snapshot_list`+`load_snapshot`). 남은 건 **오버뷰 화면 전용 스냅샷 모달**
-      하나(오버뷰 보드매니저 패턴 재사용). (소, 부분구현)
-- [ ] **박자표(bpb) 설정 기능** — `backend.set_bpb`는 3계층 다 구현됨(`backend.py:183`/`modepctrl.py:553`/`fakemodep.py:308`)
-      이나 **라이브 호출자 0**(탭템포는 BPM만 배선). transport/헤더에 bpb 설정 UI·경로만 배선하면 됨. (소)
-- [ ] **Bypass-all / 전역 풋스위치 액션** — presenter에 `bypass_all()` 없음(있는 건 per-instance `bypass_effect`,
-      mode-1 `toggle_bypass`뿐). 전 이펙트 루프 돌리는 단순 액션 + 전용 풋스위치 슬롯. (소)
-- [ ] **라이브러리 보드 순서 (연구 → 편집/정렬)** — 현재 오버뷰 보드 전환 모달·풋스위치 NAVIGATE가 호스트
-      `pedalboard/list` 순서를 **그대로** 씀(정렬·편집 없음, default만 제외). 목표는 **내비게이션 순서를 사용자가
-      직접 제어**하는 것. ①먼저 조사: 보드 순서가 어디에 어떻게 저장·인출되는가(호스트 파일순? `app_state.json`?
-      뱅크 매니저 순서변경과의 관계?) ②그 위에 편집/정렬 UI. (소~중, **먼저 연구 필요**)
+> ✅ 2026-07-10 폴리싱 브랜치로 완료·이관: 프리셋 적용 / 스냅샷 모달 / bpb / Bypass-all / 보드 순서
+> (+③ 타입구분, 에디터 _uid 픽스, add 실패사유 surfacing) → [`qt-roadmap-DONE.md`](qt-roadmap-DONE.md).
+
 - [x] **볼륨페달 Phase 2 (ADS1115→CC)** — 아키텍처 통합 완료: `reflex.py`(독립 MIDI 장치 서비스,
       `deploy/reflex-service/`) + `synapse-volume` 컨트롤 데몬(`deploy/volume-service/volumectl.py`,
       taper·CC7 private 링크 소유) + 앱 슬라이더 양방향 동기화(state echo). 앱 폴링 통합은
@@ -61,8 +53,6 @@
 - [ ] **LED 정상상태 색 + 블링크 후 복원 (한 쌍)** — HW가 red/blue/purple 지원([`fsledctrl.py`](../hardwares/fsledctrl.py))
       인데 지금은 누를 때 blink만·끝나면 OFF(이전색 기억 없음). ★두 항목은 강결합: **먼저 '정상상태 색' 개념**
       (할당/포커스/활성-바이패스 상태별 색 유지)을 도입해야 '블링크 후 그 색으로 복원'이 성립. 함께 설계할 것. (중)
-- [ ] **이펙터 타입 구분 (model vs param)** — 앰프/NAM(모델 줄 크게) vs 컴프/게이트(노브만). 파생 소스(`patches`/
-      카테고리)는 이미 모델에 있음 → 노드 dict에 플래그 하나 + QML 렌더 분기. (소)
 
 ## ④ 아키텍처 우아함 (관심사 분리 · 유지보수성)
 
