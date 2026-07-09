@@ -271,9 +271,13 @@ class Presenter:
                 src = a.strip().split("/graph/", 1)[-1].lstrip("/")
                 tgt = b.strip().split("/graph/", 1)[-1].lstrip("/")
                 self.apply_external_connection(cmd == "EffectConnect", src, tgt)
-            elif cmd in ("EffectAdd", "EffectRemove", "PedalboardLoadBundle",
+            elif cmd in ("EffectAdd", "EffectRemove", "EffectPresetLoad",
+                         "PedalboardLoadBundle",
                          "SnapshotName", "SnapshotRename", "SnapshotRemove",
                          "PedalboardRemove", "BankLoad"):
+                # (EffectPresetLoad: 프리셋은 여러 포트를 한꺼번에 바꾸고 그 에코는
+                #  websocket으로만 나감 → 개별 델타 불가, 전체 재동기화로 수렴.
+                #  파라미터 현재값은 syn_dump_graph(라이브)에서 오므로 저장 전에도 정확.)
                 # 구조 변경 → 안전하게 전체 재동기화
                 # (웹발 PedalboardLoadBundle 은 복원 안 함: mod-ui 번들 저장 스냅샷 기본동작 유지)
                 # ★한계: EffectAdd/Remove 도 저장 전엔 디스크에 없어 refresh 가 stale 일 수 있음
@@ -685,17 +689,15 @@ class Presenter:
 
     def load_effect_preset(self, instance, preset_uri):
         """Apply LV2 preset ``preset_uri`` to ``instance`` (the editor's preset
-        chips). A preset rewrites several control ports host-side at once, so
-        refresh the whole model afterwards instead of patching values one by
-        one — same discipline as go_to_snapshot (skipping it desyncs the knobs).
-        Returns the rebuilt Pedalboard for the editor to reseed, or None (with
-        a notify) on host failure."""
-        err = self.backend.preset_load(instance, preset_uri)
-        if err:
-            self._notify('프리셋 적용 실패 — %s' % err)
-            return None
-        self.refresh_pedalboard()
-        return self.pedalboard
+        chips). Blocking host call — preset state restore can take seconds for
+        file-property plugins (NAM/IR), so the backend allows a long timeout
+        and the editor runs this off the GUI thread (_run_bg), calling
+        refresh_pedalboard itself on completion back on the GUI thread. A
+        preset rewrites several control ports host-side at once, so skipping
+        that refresh desyncs the knobs (same discipline as go_to_snapshot).
+        Returns None on success or an error string; user-facing toasts are the
+        editor's alone (like go_to_snapshot/save_snapshot — no _notify here)."""
+        return self.backend.preset_load(instance, preset_uri)
 
     # Consecutive identical samples required before a switch state change is
     # accepted (software debounce). At 100 Hz, 3 samples == ~30 ms: longer than

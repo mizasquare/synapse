@@ -555,6 +555,13 @@ class QtView(QObject):
         self._rebuild_graph()
         self._rebuild_footswitches()
         self.dataChanged.emit()
+        # Snapshot state may have changed on ANY refresh path (footswitch
+        # NAVIGATE prev/next_snapshot or a board switch while the SNAP modal is
+        # open never goes through refreshSnaps/selectSnapshot) — without this
+        # the modal keeps stale rows and a '전환' tap applies the row's idx to
+        # the wrong board's snapshot list. snapList reads the live model, so
+        # kicking the binding is all that's needed.
+        self.snapsChanged.emit()
 
     def populate_port_area(self, effectData=None):
         # presenter.view_render_parameters -> here with effectData; build the

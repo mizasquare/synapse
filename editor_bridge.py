@@ -1514,10 +1514,11 @@ class EditorBridge(QObject):
     @Slot(str)
     def selectPreset(self, uri):
         """Apply LV2 preset ``uri`` to the selected live node. Like a snapshot,
-        a preset is a multi-parameter change applied host-side, so reload+reseed
-        afterwards (presenter.load_effect_preset refreshes the model) — patching
-        knob values locally would drift. Selection is restored by instance so
-        the inspector stays open on the same node after the reseed."""
+        a preset is a multi-parameter change applied host-side — but restoring
+        preset state can take seconds (file-property plugins: NAM models, IRs),
+        so the host call runs in the background (same pattern as addEffect) and
+        the reload+reseed happens in _on_preset_done back on the GUI thread —
+        patching knob values locally would drift."""
         if not (self._live_flag and self.presenter):
             return
         inst = self._inst_of(self.sel)
@@ -1525,13 +1526,30 @@ class EditorBridge(QObject):
             return
         label = next((pr['label'] for pr in self.inspPresets
                       if pr['uri'] == uri), uri)
-        pb = self.presenter.load_effect_preset(inst, uri)
-        if pb is None:
+        self._run_bg(lambda: self.presenter.load_effect_preset(inst, uri),
+                     lambda err: self._on_preset_done(inst, label, err))
+
+    def _on_preset_done(self, inst, label, err):
+        """Background preset load returned (GUI thread). On success, refresh the
+        model (the preset rewrote several ports host-side) and reseed; selection
+        is restored by instance so the inspector stays open on the same node.
+        A preset only mutates the RUNTIME graph — it is unsaved state, so
+        _touch() keeps SAVE/dirty-confirm honest (mod-ui itself marks the board
+        modified on preset_load), unlike selectSnapshot where the loaded values
+        ARE the saved state."""
+        if err is not None:
             self.toast.emit('프리셋 적용 실패 · %s' % label)
+            return
+        if not (self._live_flag and self.presenter):
+            return
+        self.presenter.refresh_pedalboard()
+        pb = self._live_pb()
+        if pb is None:
             return
         self._seed_from_pedalboard(pb)   # refresh node vals (clears selection too)
         self.sel = self._gid_by_inst.get(inst, -1)   # reopen the same inspector
         self._rebuild()
+        self._touch()                    # preset apply = unsaved edit
         self.toast.emit('프리셋 · %s' % label)
 
     @Slot()

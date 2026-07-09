@@ -1181,6 +1181,12 @@ class EffectPresetLoad(JsonRequestHandler):
         if not ok:
             self.write(False)
             return
+        # SYN: a preset rewrites several ports inside host.preset_load and those
+        # param_set echoes only go to the websocket msg_callback (never through
+        # /tmp/synapsin.sock), so without this hook a phone-web-UI preset apply
+        # leaves the app's cached knob/bypass values stale (desync). The preset
+        # IS applied at this point even if the HMI leg below times out.
+        notify_synapsin(message=f"EffectPresetLoad {instance}")
         if not SESSION.hmi.initialized:
             self.write(True)
             return

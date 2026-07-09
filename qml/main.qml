@@ -122,7 +122,9 @@ Window {
                 font.family: uiFont
                 font.pixelSize: 96            // ~80px glyph @133PPI -> glance @1.5m
                 elide: Text.ElideRight
-                width: 500
+                // Stop short of the header button row (drawn later = on top):
+                // a fixed 500 overlapped it from x≈210 once SNAP widened the row.
+                width: parent.width - headerBtnRow.width - 24
             }
             Column {
                 anchors.right: parent.right
@@ -145,6 +147,7 @@ Window {
                 }
                 // snapshot save / pedalboard edit actions
                 Row {
+                    id: headerBtnRow
                     anchors.right: parent.right
                     spacing: 6
                     Rectangle {
@@ -424,24 +427,27 @@ Window {
                                     Row {
                                         anchors.fill: parent; anchors.margins: 10; spacing: 10
                                         Text {
-                                            width: parent.width - 198; anchors.verticalCenter: parent.verticalCenter
+                                            width: parent.width - 228; anchors.verticalCenter: parent.verticalCenter
                                             text: (modelData.current ? "● " : "") + modelData.title
                                             color: modelData.current ? "#9cc2ff" : cText
                                             font.family: uiFont; font.pixelSize: 19; elide: Text.ElideRight
                                         }
                                         // 위/아래: reorder the saved display order (footswitch NAVIGATE
-                                        // steps through the same order) — bank-manager button style
+                                        // steps through the same order). Opposite actions side by side,
+                                        // so touch rules apply: ≥48px-ish targets, ≥12px gap (a mistap
+                                        // here silently rewires the live NAVIGATE order). Hit areas are
+                                        // padded past the visuals to reach the full 50px row height.
                                         Row {
-                                            spacing: 4; anchors.verticalCenter: parent.verticalCenter
-                                            Rectangle { width: 34; height: 28; radius: 5; color: "#1b2230"; border.width: 1; border.color: cBorder
+                                            spacing: 12; anchors.verticalCenter: parent.verticalCenter
+                                            Rectangle { width: 48; height: 40; radius: 5; color: "#1b2230"; border.width: 1; border.color: cBorder
                                                 opacity: index === 0 ? 0.35 : 1.0
                                                 Text { anchors.centerIn: parent; text: "위"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 15 }
-                                                MouseArea { anchors.fill: parent; enabled: index > 0
+                                                MouseArea { anchors.fill: parent; anchors.margins: -5; enabled: index > 0
                                                             onClicked: view.moveBoardOrder(modelData.bundle, -1) } }
-                                            Rectangle { width: 40; height: 28; radius: 5; color: "#1b2230"; border.width: 1; border.color: cBorder
+                                            Rectangle { width: 48; height: 40; radius: 5; color: "#1b2230"; border.width: 1; border.color: cBorder
                                                 opacity: index === view.boardList.length - 1 ? 0.35 : 1.0
                                                 Text { anchors.centerIn: parent; text: "아래"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 15 }
-                                                MouseArea { anchors.fill: parent; enabled: index < view.boardList.length - 1
+                                                MouseArea { anchors.fill: parent; anchors.margins: -5; enabled: index < view.boardList.length - 1
                                                             onClicked: view.moveBoardOrder(modelData.bundle, 1) } }
                                         }
                                         Rectangle {
@@ -677,19 +683,22 @@ Window {
                                            color: index < 4 ? cText : cMuted; font.family: uiFont; font.pixelSize: 17
                                            anchors.left: parent.left; anchors.leftMargin: 10
                                            anchors.verticalCenter: parent.verticalCenter
-                                           elide: Text.ElideRight; width: parent.width - 130 }
+                                           elide: Text.ElideRight; width: parent.width - 178 }
+                                    // 위/아래/✕: opposite + destructive actions side by side — widen the
+                                    // targets and gaps toward the 48px/12px touch rule (row is 38px, so
+                                    // hit areas are padded to its full height with negative margins).
                                     Row {
                                         anchors.right: parent.right; anchors.rightMargin: 8
-                                        anchors.verticalCenter: parent.verticalCenter; spacing: 4
-                                        Rectangle { width: 34; height: 28; radius: 5; color: "#1b2230"; border.width: 1; border.color: cBorder
+                                        anchors.verticalCenter: parent.verticalCenter; spacing: 12
+                                        Rectangle { width: 48; height: 34; radius: 5; color: "#1b2230"; border.width: 1; border.color: cBorder
                                             Text { anchors.centerIn: parent; text: "위"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 15 }
-                                            MouseArea { anchors.fill: parent; onClicked: view.bankMoveBoard(bankMgr.sel, index, -1) } }
-                                        Rectangle { width: 40; height: 28; radius: 5; color: "#1b2230"; border.width: 1; border.color: cBorder
+                                            MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: view.bankMoveBoard(bankMgr.sel, index, -1) } }
+                                        Rectangle { width: 48; height: 34; radius: 5; color: "#1b2230"; border.width: 1; border.color: cBorder
                                             Text { anchors.centerIn: parent; text: "아래"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 15 }
-                                            MouseArea { anchors.fill: parent; onClicked: view.bankMoveBoard(bankMgr.sel, index, 1) } }
-                                        Rectangle { width: 30; height: 28; radius: 5; color: "#241b2e"; border.width: 1; border.color: cBorder
+                                            MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: view.bankMoveBoard(bankMgr.sel, index, 1) } }
+                                        Rectangle { width: 40; height: 34; radius: 5; color: "#241b2e"; border.width: 1; border.color: cBorder
                                             Text { anchors.centerIn: parent; text: "✕"; color: "#ffb3b3"; font.pixelSize: 16 }
-                                            MouseArea { anchors.fill: parent; onClicked: view.bankRemoveBoard(bankMgr.sel, index) } }
+                                            MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: view.bankRemoveBoard(bankMgr.sel, index) } }
                                     }
                                 }
                             }

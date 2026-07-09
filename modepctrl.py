@@ -600,11 +600,17 @@ class ModepController:
 		web UI /effect/preset/load (rewrites several control ports host-side in
 		one call, like a per-plugin snapshot — the caller must refresh_pedalboard
 		to re-read the values or the cached model desyncs). Replies JSON
-		true/false, so the shared graph-mutation success test applies."""
+		true/false, so the shared graph-mutation success test applies.
+
+		Long timeout for the same reason add_effect has one: preset load is two
+		mod-host round-trips PLUS a full state restore (file properties included
+		— NAM/IR/Fluid-class plugins load model/IR files), so the default 2 s
+		would misreport a slow-but-successful load as failure and desync the
+		cached model. Callers must therefore run this off the GUI thread."""
 		try:
 			endpoint = (f"effect/preset/load/graph/{quote(instance, safe='')}"
 						f"?uri={quote(preset_uri, safe='')}")
-			r = ModepController._request("get", endpoint)
+			r = ModepController._request("get", endpoint, timeout=60)
 			return ModepController._graph_mutation_result(r, "host rejected the preset")
 		except Exception as e:
 			return f"An error occurred: {e}"

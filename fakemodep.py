@@ -284,9 +284,26 @@ class FakeModepController(Backend):
     def add_effect(self, instance, uri, x=0.0, y=0.0):
         info = self.get_pedalboard_info(self._current_path)
         if not any(p["instance"] == instance for p in info["plugins"]):
+            # Seed ports with the catalog's control-input defaults: the real
+            # host's syn_dump_graph returns EVERY control port's current value
+            # for a live-added instance too (host.add_plugin fills valports into
+            # pluginData['ports']), and dump_graph() above only exports symbols
+            # present in this list — an empty list would make later _params
+            # writes (preset_load, param edits) silently vanish on every reseed.
+            eff = self._effects_by_uri.get(uri) or {}
+            ctrl_in = ((eff.get("ports") or {}).get("control") or {}).get("input") or []
+            ports = []
+            for c in ctrl_in:
+                if not c.get("symbol"):
+                    continue
+                rng = c.get("ranges") or {}
+                val = rng.get("default")
+                if val is None:
+                    val = rng.get("minimum", 0.0)
+                ports.append({"symbol": c["symbol"], "value": val})
             info["plugins"].append({
                 "instance": instance, "uri": uri, "bypassed": False,
-                "x": float(x), "y": float(y), "ports": [],
+                "x": float(x), "y": float(y), "ports": ports,
             })
             self._bypass[instance] = False
         return None

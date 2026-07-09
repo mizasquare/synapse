@@ -13,6 +13,15 @@ Run:
 import os
 import sys
 
+# Keep dev state away from the live app's ~/.modep/: both run as the same user
+# on the Pi, and app_state.json's board_order is a list of environment-specific
+# bundle paths — a single board-manager ▲▼ tap in a fixture-backed qt_dev would
+# otherwise overwrite the user's real custom order with fixture paths (silent
+# ASCII-order fallback on device, unrecoverable). Must run before `configs` is
+# imported (transitively via modepctrl below); setdefault keeps an explicit
+# SYNAPSE_STATE_DIR override working.
+os.environ.setdefault("SYNAPSE_STATE_DIR", os.path.expanduser("~/.modep-dev/"))
+
 from PyQt6.QtCore import QObject, QTimer, QUrl
 from PyQt6.QtGui import QGuiApplication, QFontDatabase
 from PyQt6.QtQml import QQmlApplicationEngine
