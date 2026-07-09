@@ -10,6 +10,28 @@
 
 ---
 
+## 마일스톤 일괄 폴리싱 ✅ (2026-07-09~10, 브랜치 `polish/remaining-milestones` 9커밋)
+
+> 울트라코드 워크플로우(정찰 8 → 순차구현 7+통합검증 → 7관점 리뷰+3-스켑틱 검증 44에이전트)로
+> 로드맵 ②③의 자가테스트 가능 항목을 일괄 완료. 전 항목 fake+offscreen 자가검증 통과,
+> 리뷰 확정 결함 11건 후속 수정(`d6256f4`). **실기 육안확인은 터치패널 교체 후** (아래 대기 목록).
+
+- [x] **add_effect/remove 실패사유 surfacing** (`357ca65`) — `_graph_mutation_result` 헬퍼: HTTP status+body를 토스트로 노출, 음수코드를 성공으로 오판하던 것 방지. Fluid* 진단의 앱측 개선분.
+- [x] **박자표(bpb) 설정** (`4456482`) — ⚙MENU CONFIG 리프 스텝퍼(2..12), presenter.set_bpb/qtview 슬롯, fakemodep 영속화, qt_dev `--hub` 훅.
+- [x] **Bypass-all 패닉 토글** (`73a5cd3`) — A+D 코드([1,0,0,1]), 복원맵(엔게이지 시점 상태로 원상복구), refresh/보드전환 시 리셋, 4 LED red blink.
+- [x] **이펙터 타입 구분 model/param** (`9d6d104`) — `Effect.is_model_effect(=bool(patches))`+`loaded_model_name`, 오버뷰 노드 큰 이름+모델 파일명 부제. `--real` 렌더로 실보드(AIDA-X/IR) 확인됨.
+- [x] **오버뷰 스냅샷 브라우저 모달** (`80ec447`) — qtview snapList/selectSnapshot, 헤더 SNAP 버튼(보라), 보드매니저 패턴 복제, qt_dev `--snaps`.
+- [x] **보드 내비게이션 순서 사용자 제어** (`159bc16`) — `~/.modep/app_state.json` `board_order` 오버레이(연구: mod-ui는 ASCII 정렬 고정, 뱅크는 NAVIGATE 정답 아님), presenter 층 중앙화(_ordered_board_entries), 보드매니저 위/아래.
+- [x] **LV2 이펙터 프리셋 적용** (`eb9e655`) — 5계층(preset_load 래퍼/계약/fake/카탈로그 presetList/인스펙터 칩). 로드맵의 "이름 노출까지 완료" 기술은 오류였음 — 카탈로그가 리스트를 버리고 있어 노출부터 신설.
+- [x] **에디터 _uid 미동기화 픽스** (`3dbc2b9`) — 시드 후 첫 라이브 add가 시드 노드 id 재사용 → 케이블 오라우팅(QUICK에선 실호스트 오배선 push 위험). 사용자 제보 "중복 게이트 라우팅 버그"의 진범.
+- [x] **리뷰 확정 결함 11건 수정** (`d6256f4`) — 프리셋 칩 스크롤 클램프(실기 25프리셋 오버플로)·프리셋 dirty 표시·60s 타임아웃+bg 로드·단일 토스트·EffectPresetLoad notify_synapsin 훅(mod-tweaks)·SNAP 모달 snapsChanged·헤더 타이틀 침범·보드/뱅크매니저 터치룰(48px)·SYNAPSE_STATE_DIR dev 격리·app_state 비-dict 가드·fake add_effect 포트 시드.
+
+### 실기 검증 대기 (터치패널 교체·재조립 후)
+- [ ] mod-tweaks 재배포 (EffectPresetLoad notify_synapsin 훅 — 시스템 mod-ui에 복사+재시작)
+- [ ] 신기능 육안확인: 스냅샷 모달·보드 위/아래·프리셋 칩(실 mod-ui 왕복)·bpb·bypass-all(풋스위치 A+D 발감각)·모델형 노드 부제
+- [ ] C* Click add 재시도 — 원인은 터치 데드밴드였음(hardware.md 사후분석). 새 패널에서 정상 예상, 실패 시 이제 토스트에 실사유 뜸
+- [ ] 탭템포 실검증(기존 항목)
+
 ## 데드코드 재수색 2R + 라이브 버그 + 스테일 문서 스윕 ✅ (2026-07-03)
 
 > 대멸종(`07a8115`) **이후** 6렌즈 재수색 + 적대적 검증(60에이전트 워크플로우)으로 스윕이 놓친 잔재를
