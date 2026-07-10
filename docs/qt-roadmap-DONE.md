@@ -47,7 +47,8 @@
 
 ### 실기 검증 대기 (터치패널 교체·재조립 후)
 - [x] **터치패널 복구 확인** (2026-07-10) — 플렉스 재라우팅 후 `touchtest.py`+`rawtouch.py` 재검증 통과, 구 데드밴드 소멸. 상세 hardware.md.
-- [ ] mod-tweaks 재배포 (EffectPresetLoad notify_synapsin 훅 — 시스템 mod-ui에 복사+재시작)
+- [x] **eglfs 메뉴 종료권한 리그레션 해결** (2026-07-10) — 세션리스 시스템서비스라 `systemctl poweroff`가 polkit에 막힘. `deploy/ui-service/49-synapse-power.rules`(miza에게 power-off/reboot 4액션 허용)로 해결, pkcheck 4/4 검증. 상세 qt-migration-FINISHED §5.
+- [x] **mod-tweaks 재배포** (2026-07-10) — `sudo mod-tweaks/deploy.sh`로 `EffectPresetLoad notify_synapsin` 훅 라이브 반영(webserver.py, notify 15→16), `--check` 전부 `[동일]`, modep-mod-ui 재시작, 앱 graceful 재접속 확인. ※앱 자체 프리셋칩은 이 훅 없이도 self-refresh로 동작 — 훅은 웹UI발 프리셋 로드 desync 방지용(포크↔라이브 패리티 유지).
 - [ ] 신기능 육안확인: 스냅샷 모달·보드 위/아래·프리셋 칩(실 mod-ui 왕복)·bpb·bypass-all(풋스위치 A+D 발감각)·모델형 노드 부제
 - [ ] C* Click add 재시도 — 원인은 터치 데드밴드였음(복구 확인). 새 패널에서 정상 예상, 실패 시 이제 토스트에 실사유 뜸
 - [ ] 탭템포 실검증(기존 항목)
