@@ -1205,23 +1205,76 @@ Window {
             }
         }
 
-        // -- monitors (output ports, read-only) --
+        // -- monitors (left, read-only) | FS assign (right) --
+        // The monitor readout is unused by most plugins and the few that use it
+        // aren't real-estate hungry, so the right half hosts the STOMP footswitch
+        // assignment for the focused effect (tap A/B/C/D to pin/unpin).
         Rectangle {
             id: monpanel
             x: 12; y: ctrlpanel.y + ctrlpanel.height + 8
             width: parent.width - 24; height: 104
             radius: 10; color: cPanel
-            Text {
-                visible: monrow.children.length <= 1
-                anchors.centerIn: parent; text: "모니터 없음"
-                color: cDim; font.family: uiFont; font.pixelSize: 16
+
+            // left half: monitors
+            Item {
+                id: monLeft
+                anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
+                width: parent.width / 2
+                Text {
+                    visible: monrow.children.length <= 1
+                    anchors.centerIn: parent; text: "모니터 없음"
+                    color: cDim; font.family: uiFont; font.pixelSize: 16
+                }
+                Row {
+                    id: monrow
+                    anchors.centerIn: parent; spacing: 18
+                    Repeater {
+                        model: focusScreen.f ? focusScreen.f.monitors : []
+                        MonitorWidget { m: modelData }
+                    }
+                }
             }
-            Row {
-                id: monrow
-                anchors.centerIn: parent; spacing: 18
-                Repeater {
-                    model: focusScreen.f ? focusScreen.f.monitors : []
-                    MonitorWidget { m: modelData }
+
+            // divider
+            Rectangle {
+                width: 1; color: cBorder
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top; anchors.bottom: parent.bottom
+                anchors.topMargin: 12; anchors.bottomMargin: 12
+            }
+
+            // right half: STOMP footswitch assignment
+            Column {
+                anchors.left: parent.horizontalCenter; anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 8
+                Text {
+                    text: "STOMP FS 배정"; color: cDim
+                    font.family: uiFont; font.pixelSize: 14
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+                Row {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 8
+                    Repeater {
+                        model: 4
+                        Rectangle {
+                            width: 46; height: 40; radius: 8
+                            property bool sel: !!(focusScreen.f && focusScreen.f.fsSlot === index)
+                            color: sel ? cGreen : cElev
+                            border.width: 1; border.color: sel ? cGreen : cBorder
+                            Text {
+                                anchors.centerIn: parent
+                                text: ["A", "B", "C", "D"][index]
+                                color: sel ? cGraph : cText
+                                font.family: uiFont; font.pixelSize: 20
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: if (focusScreen.f) view.assignFs(focusScreen.f.instance, index)
+                            }
+                        }
+                    }
                 }
             }
         }

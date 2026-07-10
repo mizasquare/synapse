@@ -21,10 +21,16 @@ class _FakeLED:
     def __init__(self, index):
         self._index = index
         self._state = 0
+        self._resting_state = 0
 
     def set_state(self, state):
         self._state = state
         print("[fakehw] LED[%d] set_state %d" % (self._index, state))
+
+    def set_resting(self, state):
+        self._resting_state = state
+        self._state = state
+        print("[fakehw] LED[%d] rest %d" % (self._index, state))
 
     def blink(self, color="red", times=3, interval=0.2):
         print("[fakehw] LED[%d] blink %s x%d (interval=%s)"

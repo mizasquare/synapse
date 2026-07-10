@@ -36,6 +36,11 @@ class LED:
         self.mcp.pinMode(self.blue_pin, self.mcp.OUTPUT)
         self.turnOff()
         self._blink_event = None
+        # Resting colour the LED settles to when no blink is running. A blink is
+        # a transient OVERLAY: its off-phases and its final frame return here
+        # (not to dark), so "flash then restore" holds without the caller
+        # re-painting. Owned per-LED so the blink code needs no callback.
+        self._resting_state = 0
 
     def turnOnRed(self):
         self.mcp.output(self.red_pin, 0)  # Active-low LED
@@ -64,52 +69,41 @@ class LED:
         else:
             self.turnOffRed()
 
+    # Colour name -> (red<<1 | blue) bit pattern for set_state.
+    _COLOR_BITS = {'red': 0b10, 'blue': 0b01, 'purple': 0b11}
+
+    def set_resting(self, state):
+        """Set the colour this LED holds at rest (0=off 1=blue 2=red 3=purple).
+
+        Applied to the pins immediately UNLESS a blink is in progress -- then the
+        blink's final frame lands the LED here on its own. The blink code reads
+        _resting_state live, so a mid-blink change is honoured on settle."""
+        self._resting_state = state
+        if self._blink_event is None:
+            self.set_state(state)
+
     def stop_blink(self):
-        """Cancel an in-progress blink, if any."""
+        """Cancel an in-progress blink, if any, settling back to the resting colour."""
         if self._blink_event:
             self.scheduler.unschedule(self._blink_event)
             self._blink_event = None
+            self.set_state(self._resting_state)
 
     def blink(self, color='red', times=3, interval=0.2):
-        """
-        Blink the LED in the specified color a given number of times.
-        Supports 'red', 'blue', and 'purple' (both red and blue).
-        """
-        # Cancel any existing blink event for this LED
+        """Flash ``color`` ``times`` times as a transient overlay on the resting
+        colour. Supports 'red', 'blue', 'purple'. On-phases show the blink
+        colour; off-phases and the final frame return to _resting_state (read
+        live, so a set_resting mid-blink is honoured). Cancels any prior blink."""
         self.stop_blink()
 
-        blink_state = [0]  # Mutable counter
+        on_state = self._COLOR_BITS.get(color, 0b10)
+        blink_state = [0]  # Mutable phase counter
 
         def toggle(dt):
-            if blink_state[0] % 2 == 0:
-                # Turn LED(s) on based on the selected color
-                if color == 'red':
-                    self.turnOnRed()
-                elif color == 'blue':
-                    self.turnOnBlue()
-                elif color == 'purple':
-                    self.turnOnRed()
-                    self.turnOnBlue()
-            else:
-                # Turn LED(s) off
-                if color == 'red':
-                    self.turnOffRed()
-                elif color == 'blue':
-                    self.turnOffBlue()
-                elif color == 'purple':
-                    self.turnOffRed()
-                    self.turnOffBlue()
+            self.set_state(on_state if blink_state[0] % 2 == 0 else self._resting_state)
             blink_state[0] += 1
-
-            # When done, ensure the LED is off and unschedule
             if blink_state[0] >= times * 2:
-                if color == 'red':
-                    self.turnOffRed()
-                elif color == 'blue':
-                    self.turnOffBlue()
-                elif color == 'purple':
-                    self.turnOffRed()
-                    self.turnOffBlue()
+                self.set_state(self._resting_state)   # settle to rest, not dark
                 self.scheduler.unschedule(self._blink_event)
                 self._blink_event = None
 

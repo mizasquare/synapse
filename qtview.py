@@ -489,6 +489,14 @@ class QtView(QObject):
         if self.presenter:
             self.presenter.parameter_changed(instance, ":bypass", on)
 
+    @Slot(str, int)
+    def assignFs(self, instance, slot):
+        """FOCUS card A/B/C/D tap -> pin this effect to STOMP footswitch ``slot``
+        (0-3), or unpin if it already holds that slot. The presenter persists the
+        override and re-renders the strip/LEDs and the FOCUS card highlight."""
+        if self.presenter:
+            self.presenter.assign_focus_to_fs(instance, slot)
+
     @Slot(str, str, result="QVariantList")
     def listPatchFiles(self, instance, uri):
         """Picker UI -> list selectable patch files for this URI ([{label,path}]).
@@ -554,6 +562,16 @@ class QtView(QObject):
                 self._snap = name or "—"
         self._rebuild_graph()
         self._rebuild_footswitches()
+        # Re-sync the FOCUS card's bypass from the model. A bypass toggled from
+        # OUTSIDE the card (footswitch, reverse echo, bypass-all) updates the model
+        # but never rebuilds _focus, so the ENGAGED pill would stay stale until the
+        # card is re-entered. This runs on every refresh, so all those paths are
+        # covered at one point (knobs stay on their own targeted update path).
+        inst = self._focus.get("instance")
+        if inst and self.presenter:
+            e = self.presenter.pedalboard.get_effect_by_instance(inst)
+            if e is not None:
+                self._focus["bypassed"] = bool(e.bypassed)
         self.dataChanged.emit()
         # Snapshot state may have changed on ANY refresh path (footswitch
         # NAVIGATE prev/next_snapshot or a board switch while the SNAP modal is
@@ -785,7 +803,8 @@ class QtView(QObject):
                    for pt in d.get("patches", [])]
         return {"instance": inst, "name": d.get("effect_name", inst), "category": cat,
                 "bypassed": bool(d.get("effect_bypassed")), "knobs": knobs, "monitors": monitors,
-                "inputs": ins, "outputs": outs, "patches": patches}
+                "inputs": ins, "outputs": outs, "patches": patches,
+                "fsSlot": int(d.get("effect_fs_slot", -1))}
 
     @staticmethod
     def _patch_str(value):
@@ -924,8 +943,8 @@ class QtView(QObject):
             fx = getattr(self.presenter, "stomp_effects", []) if self.presenter else []
             cells = []
             for i in range(4):
-                if i < len(fx):
-                    e = fx[i]
+                e = fx[i] if i < len(fx) else None   # length-4, None = unbound slot
+                if e is not None:
                     cells.append({"label": e.name,   # full name; QML strip elides
                                   "sub": "BYPASS" if e.bypassed else "ENGAGED",
                                   "led": _LED_RED if e.bypassed else _LED_BLUE})
