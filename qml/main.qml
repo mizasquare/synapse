@@ -107,30 +107,36 @@ Window {
         property bool sysConfirm: false   // system: an action is armed, awaiting 2nd tap
         property string sysAction: ""     // "shutdown" | "reboot"
 
-        // -- Tier-1 glance header (~120px): board name + snapshot --
+        // -- Tier-1 glance header (~152px): title row over a control row --
+        // Two rows so the board name owns the full width up top (long names were
+        // squeezed to ~3 glyphs when it shared the row with the action buttons);
+        // the buttons drop to their own row below, with live BPM on their left.
         Item {
             id: header
             x: 12; y: 6
             width: parent.width - 24
-            height: 120
+            height: 152
 
+            // --- title row: board name (left) + snapshot/mode (right) ---
             Text {
                 anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
+                anchors.top: parent.top
                 text: view.boardName
                 color: cText
                 font.family: uiFont
                 font.pixelSize: 96            // ~80px glyph @133PPI -> glance @1.5m
                 elide: Text.ElideRight
-                // Stop short of the header button row (drawn later = on top):
-                // a fixed 500 overlapped it from x≈210 once SNAP widened the row.
-                width: parent.width - headerBtnRow.width - 24
+                // Now owns the whole top row; only the snapshot/mode column on the
+                // right is subtracted (buttons moved to the control row below).
+                width: parent.width - snapCol.width - 20
             }
             Column {
+                id: snapCol
                 anchors.right: parent.right
                 anchors.top: parent.top
                 anchors.topMargin: 4
                 spacing: 6
+                width: 300
                 Text {
                     anchors.right: parent.right
                     text: "◆ " + view.snapshotLabel
@@ -138,7 +144,7 @@ Window {
                     font.family: uiFont
                     font.pixelSize: 40
                     // long snapshot names grew leftward over the board name
-                    width: Math.min(implicitWidth, headerBtnRow.width)
+                    width: Math.min(implicitWidth, parent.width)
                     elide: Text.ElideRight
                 }
                 Text {
@@ -148,14 +154,28 @@ Window {
                     font.family: uiFont
                     font.pixelSize: 20
                 }
-                // snapshot save / pedalboard edit actions
-                Row {
-                    id: headerBtnRow
-                    anchors.right: parent.right
-                    spacing: 6
-                    // pressed = brighter fill + border, so a touch is acked even
-                    // while the backend round-trip is still in flight
-                    Rectangle {
+            }
+
+            // --- control row: live BPM (left) + action buttons (right) ---
+            Text {
+                anchors.left: parent.left
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 9
+                text: "BPM " + view.bpm
+                color: cMuted
+                font.family: uiFont
+                font.pixelSize: 24
+            }
+            // snapshot save / pedalboard edit actions
+            Row {
+                id: headerBtnRow
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 2
+                spacing: 6
+                // pressed = brighter fill + border, so a touch is acked even
+                // while the backend round-trip is still in flight
+                Rectangle {
                         width: 92; height: 38; radius: 8
                         color: boardsMa.pressed ? "#243247" : "#162033"
                         border.width: 1; border.color: boardsMa.pressed ? "#9cc2ff" : "#3b6fe0"
@@ -208,7 +228,6 @@ Window {
                         MouseArea { id: menuMa; anchors.fill: parent; onClicked: { overviewScreen.hubLeaf = "menu"; overviewScreen.hubOpen = true } }
                     }
                 }
-            }
         }
 
         Rectangle {
@@ -227,7 +246,7 @@ Window {
             id: graph
             x: 12; y: hr.y + 10
             width: 776
-            height: Math.min(view.graphHeight, 236)
+            height: Math.min(view.graphHeight, 220)
             contentWidth: 776
             contentHeight: view.graphHeight
             clip: true
@@ -352,13 +371,8 @@ Window {
             }
         }
 
-        // status line (legend/tutorial text dropped — single-cable-color UI,
-        // and "tap node -> focus" is learned once; BPM is the live info)
-        Row {
-            x: 12; y: graph.y + graph.height + 6
-            spacing: 18
-            Text { text: "BPM " + view.bpm; color: cMuted; font.family: uiFont; font.pixelSize: 16 }
-        }
+        // (status line dropped — BPM now lives in the header control row, and the
+        // single-cable-color UI needs no legend; "tap node -> focus" is learned once)
 
         // footswitch status strip (read-only frame; mode-switching is master-side later)
         Row {
@@ -378,13 +392,8 @@ Window {
                     height: 64
                     radius: 8
                     color: cPanel
-                    // dev keymap hint: which keyboard key fires this footswitch
-                    Text {
-                        anchors.right: parent.right; anchors.top: parent.top
-                        anchors.rightMargin: 7; anchors.topMargin: 4
-                        text: ["Z", "X", "C", "V"][index]
-                        color: cDim; font.family: uiFont; font.pixelSize: 15
-                    }
+                    // (dev Z/X/C/V keymap label dropped — PC-mock-only, meaningless on
+                    // the panel; the keyboard shortcut itself still works for dev use)
                     Row {
                         anchors.left: parent.left
                         anchors.leftMargin: 12
