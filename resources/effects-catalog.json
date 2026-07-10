@@ -1557,7 +1557,7 @@
      "def": 440,
      "unit": "Hz",
      "render": "%f Hz",
-     "w": "enum",
+     "w": "knob",
      "scale": [
       "standard"
      ]
@@ -1593,7 +1593,7 @@
      "def": -60,
      "unit": "dB",
      "render": "%f dB",
-     "w": "enum",
+     "w": "knob",
      "scale": [
       "off"
      ]
@@ -1607,7 +1607,7 @@
      "def": -30,
      "unit": "dB",
      "render": "%f dB",
-     "w": "enum",
+     "w": "knob",
      "scale": [
       "off"
      ]
@@ -1643,7 +1643,7 @@
      "def": -60,
      "unit": "dB",
      "render": "%f dB",
-     "w": "enum",
+     "w": "knob",
      "scale": [
       "off"
      ]
@@ -1657,7 +1657,7 @@
      "def": -30,
      "unit": "dB",
      "render": "%f dB",
-     "w": "enum",
+     "w": "knob",
      "scale": [
       "off"
      ]
@@ -3701,7 +3701,7 @@
      "def": 0,
      "unit": "",
      "render": "",
-     "w": "enum",
+     "w": "knob",
      "scale": [
       "OFF"
      ]
@@ -5996,7 +5996,7 @@
      "def": -12,
      "unit": "dB",
      "render": "%f dB",
-     "w": "enum",
+     "w": "knob",
      "scale": [
       "Off"
      ]
@@ -6032,7 +6032,7 @@
      "def": 0,
      "unit": "dB",
      "render": "%f dB",
-     "w": "enum",
+     "w": "knob",
      "scale": [
       "Off"
      ]
@@ -6046,7 +6046,7 @@
      "def": -30,
      "unit": "dB",
      "render": "%f dB",
-     "w": "enum",
+     "w": "knob",
      "scale": [
       "Off"
      ]
@@ -6060,7 +6060,7 @@
      "def": 0,
      "unit": "Hz",
      "render": "%f Hz",
-     "w": "enum",
+     "w": "knob",
      "scale": [
       "Off"
      ]
