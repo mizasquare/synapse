@@ -39,7 +39,12 @@ pi-stomp는 키트를 팔고 여러 사용자·릴리스 주기가 있는 프로
 
 ## 3. 아키텍처적으로 당기는 2가지 (→ 로드맵/미래 카드)
 
-### (A) 디바운스·콤보 판정을 Presenter → 하드웨어 추상화 단으로 이동 ★ 로드맵 등재
+### (A) 디바운스·콤보 판정을 Presenter → 하드웨어 추상화 단으로 이동 ✅ 완료 (2026-07-11)
+
+> **완료:** `hardwares/footswitches.FootswitchReader`(순수 상태기계, I2C·스레드 무관)로 이관.
+> Presenter 폴링루프는 `raw 읽기 → reader.poll(raw) → 이벤트 마샬`만; 디바운스/래치 부기 전부 리더 소유.
+> 릴리스엣지 콤보 의미는 2000개 랜덤 시퀀스 대조로 구 인라인 루프와 비트동일 검증. press/release 엣지도
+> emit해 모멘터리(홀드) 경로 개통(소비처는 ② 잔여). 상세 [`qt-roadmap-DONE.md`](qt-roadmap-DONE.md). 아래는 착안 기록 보존.
 
 **현 상태(약간 우아하지 않음):** 디바운스와 콤보(릴리스엣지) 판정이 앱 레이어에 섞여 있다.
 - `presenter.py:660` `DEBOUNCE_SAMPLES = 3`

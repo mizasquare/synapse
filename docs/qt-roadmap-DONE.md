@@ -10,6 +10,55 @@
 
 ---
 
+## 풋스위치 디바운스·콤보를 HW 추상화로 이관 ✅ (2026-07-11, 로드맵 ④ · 브랜치 TBD)
+
+> pi-stomp §3A의 "의미 유지, 위치만 이동" 리팩터. Presenter 앱레이어에 섞여 있던 디바운스+릴리스엣지
+> 콤보 판정을 순수 상태기계로 내려 Presenter를 이벤트 구독자로 슬림화, 그 과정에서 press/release 엣지
+> 경로가 생겨 **② 모멘터리(홀드) 모드가 자연히 개통**(소비처만 남음).
+
+- [x] **`FootswitchReader` (신규 `hardwares/footswitches.py`)** — 순수·스레드/I2C 무관 상태기계.
+      `poll(raw) -> list[event]`: 틱마다 raw 샘플 하나 먹으면 이번 틱 이벤트 반환. 내부에 `_stable`/`_counts`
+      (디바운스)+`_latched`(릴리스엣지 콤보 래치) 소유 — 전부 `_footswitch_poll_loop` 인라인에서 이관.
+      이벤트 3종: `('press',i)`/`('release',i)` 디바운스 엣지 + `('commit',status)` 전-릴리스 시 래치 집합 발화.
+- [x] **Presenter 슬림화** (`presenter.py`) — `_footswitch_poll_loop`가 `raw 읽기→reader.poll→이벤트 배치 마샬`
+      3줄로 축소(부기 24줄 제거), 신규 `_dispatch_fs_events`가 `commit`→기존 `handle_footswitch_event(status)`로 라우팅.
+      `handle_footswitch_event`/`handle_multiple_footswitches`/`bypass_all` 등 다운스트림·`footswitch_input_que`
+      외 전부 무변경. press/release는 no-op(모멘터리 훅 지점).
+- [x] **등가성 증명** — `commit` 이벤트 스트림이 구 인라인 루프와 **2000개 랜덤 시퀀스에서 비트동일**(레퍼런스
+      구현 대조 fuzz). +디바운스 임계·단일/오버랩콤보/논오버랩 분리·press/release 엣지 순서 단위테스트.
+      풀 시임 통합(실 Presenter offscreen: poll→reader→dispatch→STOMP 토글·A+B 모드사이클) 통과. 기존 focus_pill/prune 회귀 없음.
+
+## LED seam + FOCUS 풋스위치 수동배정 + 부팅 fallback ✅ (2026-07-10~11, 브랜치 `polish/ui-review-fixes`→`fix/pedalboard-boot-fallback`, 머지 `d276ec5`·`2d44999`)
+
+> 로드맵 ③(LED 정상상태 색) 완료 + 폐기 §ABCD의 "재구현 예정"이던 FS 수동배정 구현 +
+> 실기 테스트 중 드러난 안정성 버그 일괄 수정. 전 변경 headless/offscreen 자가검증 후 배포,
+> 라이브 리그 실기 확인까지 통과. 막판 부팅루프는 **잠재 벽돌 버그**(삭제된 현재보드=크래시)를
+> 무대 전에 잡아 fallback으로 영구 방어.
+
+- [x] **③ LED 정상상태 색 + 블링크 후 복원** (`49fa203`) — 흩어져 있던 LED 색·애니 코드를 전부
+      **`ledview.py`의 `LedView` seam**으로 이관(QtView에 대칭인 렌더링 표면). surface-owner 상태기계
+      (binding/tuner/metronome/boot)로 소유권 조정. `fsledctrl.py`에 `set_resting(state)` 도입 →
+      blink 종료 시 OFF가 아니라 **정상상태 색으로 복원**(활성=파랑/바이패스·기타=OFF, 모드별 토큰).
+      `_COLOR_BITS`(red 0b10/blue 0b01/purple 0b11). 육안검증 "완벽" 통과.
+- [x] **FOCUS 카드 STOMP 풋스위치 수동배정** (`0bb19e6`) — 오버뷰 인스펙터 모니터 패널을 가로 분할
+      (monitors│FS-배정 A/B/C/D). 슬롯별 오버라이드(핀/언핀/스틸 토글) + **자동배정**(앞2·뒤2,
+      `_STOMP_EXCLUDED`로 sim/amp/cab/utility 제외) 위에 얹힘. **페달보드별 영속**
+      (`app_state.json` `fs_assigns`, `utils.load/save_fs_assigns`). `assign_focus_to_fs`/`_resolve_stomp_slots`.
+- [x] **실기 테스트 중 안정성 수정 4건** (`0bb19e6`) —
+      · **stale-object 토글 버그**: refresh_pedalboard가 모델 재빌드 후 stomp_effects 재해석 안 해
+      스트립(stale)↔LED(live) 불일치+역방향 토글 → 클로저가 인스턴스 문자열 캡처+누를 때 live 재조회로 수정.
+      · **FOCUS ENGAGED 필 지연**: 풋스위치 bypass가 모델만 갱신·`_focus` 미갱신 → 오버뷰 왕복해야 반영
+      → `refresh_plugin_display`에서 focus bypass를 모델서 재동기.
+      · **bypass 실패 토스트**: 호스트 무응답 시 "호스트 응답 없음 — 바이패스 실패" 노출(원인=Instrument
+      Tuner FSST 로딩 지연으로 mod-ui HTTP 타임아웃, 코드 아닌 호스트 이슈로 판명).
+      · **삭제보드 로컬설정 청소**: `_prune_stale_local_state`가 기동 시 디스크에 없는 보드의
+      fs_assigns/board_order 항목 제거(빈 호스트 목록이면 보수적으로 미청소).
+- [x] **삭제된 현재 페달보드 부팅 크래시 루프 방지** (`37bfa24`) — 현재 보드 삭제 시 호스트가 유령
+      포인터 유지→`pedalboard/info` 500→`initialize` None→`view_update_effect` AttributeError→Fatal→
+      systemd 무한 재기동(실측 144회). **`_load_pedalboard_with_fallback` 4단계 체인**: 유효 현재보드→
+      첫 비-default 보드→default 로드 후 save-as new→인메모리 빈 보드(UI 부팅 보장). +refresh/view_update
+      None-가드. 4단계 fallback 테스트 통과, 라이브 리그 BluesBreaker로 자가복구(호스트 dangling 포인터도 해소).
+
 ## UI 클렁키니스 리뷰 반영 ✅ (2026-07-10, 브랜치 `polish/ui-review-fixes`, `463d576`)
 
 > Claude Design 점검 문서("Synapse UI 점검") 18주장 코드 대조(일치 15·기각 1·실제가 더 나쁨 2) 후
