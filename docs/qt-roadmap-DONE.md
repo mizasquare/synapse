@@ -46,9 +46,10 @@
 - [x] **리뷰 확정 결함 11건 수정** (`d6256f4`) — 프리셋 칩 스크롤 클램프(실기 25프리셋 오버플로)·프리셋 dirty 표시·60s 타임아웃+bg 로드·단일 토스트·EffectPresetLoad notify_synapsin 훅(mod-tweaks)·SNAP 모달 snapsChanged·헤더 타이틀 침범·보드/뱅크매니저 터치룰(48px)·SYNAPSE_STATE_DIR dev 격리·app_state 비-dict 가드·fake add_effect 포트 시드.
 
 ### 실기 검증 대기 (터치패널 교체·재조립 후)
+- [x] **터치패널 복구 확인** (2026-07-10) — 플렉스 재라우팅 후 `touchtest.py`+`rawtouch.py` 재검증 통과, 구 데드밴드 소멸. 상세 hardware.md.
 - [ ] mod-tweaks 재배포 (EffectPresetLoad notify_synapsin 훅 — 시스템 mod-ui에 복사+재시작)
 - [ ] 신기능 육안확인: 스냅샷 모달·보드 위/아래·프리셋 칩(실 mod-ui 왕복)·bpb·bypass-all(풋스위치 A+D 발감각)·모델형 노드 부제
-- [ ] C* Click add 재시도 — 원인은 터치 데드밴드였음(hardware.md 사후분석). 새 패널에서 정상 예상, 실패 시 이제 토스트에 실사유 뜸
+- [ ] C* Click add 재시도 — 원인은 터치 데드밴드였음(복구 확인). 새 패널에서 정상 예상, 실패 시 이제 토스트에 실사유 뜸
 - [ ] 탭템포 실검증(기존 항목)
 
 ## 데드코드 재수색 2R + 라이브 버그 + 스테일 문서 스윕 ✅ (2026-07-03)

@@ -11,6 +11,14 @@ install -m 0644 "$HERE/synapse-ui.service" /etc/systemd/system/synapse-ui.servic
 systemctl daemon-reload
 systemctl enable synapse-ui.service
 
+# Menu safe-shutdown/reboot: the app runs as a *system* service (no login
+# session), so logind's default power policy denies `systemctl poweroff` --
+# the compositor era had an active session that satisfied it. Grant the miza
+# service user exactly the four power actions via a polkit rule so the ⚙MENU
+# SYSTEM leaf works again (no passworded sudo fallback needed). polkitd picks
+# up rules.d changes live -- no reload required.
+install -m 0644 "$HERE/49-synapse-power.rules" /etc/polkit-1/rules.d/49-synapse-power.rules
+
 # Boot straight to the app: no display manager, no compositor.
 systemctl disable lightdm.service
 systemctl set-default multi-user.target
