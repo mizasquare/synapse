@@ -26,6 +26,7 @@ Item {
     readonly property color cDim:    "#5a6270"
 
     property bool trashHot: false
+    property bool nodeDragging: false     // a node is mid-drag → inspector yields the view
     property bool liveBoardsOpen: false   // live host board switcher (M6a)
     property bool snapsOpen: false        // live snapshot manager (M6c)
     property bool snapNaming: false       // snapshot save-as naming panel (M6c)
@@ -74,14 +75,47 @@ Item {
                 anchors.left: parent.left; anchors.leftMargin: 10; anchors.verticalCenter: parent.verticalCenter
                 spacing: 7
                 Pill { label: "◄ 나가기"; accent: cMuted; onTap: win.exitRequested() }
-                // ADV/QUICK indicator — tappable in live to toggle modes (M6d-3).
-                // QUICK only engages for a quick-representable board.
-                Text {
-                    text: (editor.advanced ? "ADV" : "QUICK") + (editor.live ? " ⇄" : "")
-                    color: editor.advanced ? cOrange : cMuted
-                    font.family: uiFont; font.pixelSize: 15; anchors.verticalCenter: parent.verticalCenter
-                    MouseArea { anchors.fill: parent; enabled: editor.live
-                                onClicked: editor.toggleLiveMode() }
+                // ADV/QUICK indicator — long-press (gauge fills) to toggle modes in
+                // live (M6d-3): an instant tap next to other header buttons could
+                // re-layout the whole graph by accident. QUICK only engages for a
+                // quick-representable board.
+                Item {
+                    id: modeTag
+                    readonly property int holdMs: 1500   // gauge duration — tune to taste
+                    property real holdProgress: 0
+                    width: modeTxt.width + 16; height: 26
+                    anchors.verticalCenter: parent.verticalCenter
+                    Rectangle {   // fill gauge, left -> right while held
+                        anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
+                        width: parent.width * modeTag.holdProgress
+                        radius: 5; color: "#1c3550"
+                        visible: modeTag.holdProgress > 0
+                    }
+                    Rectangle {   // armed outline while the finger is down
+                        anchors.fill: parent; radius: 5; color: "transparent"
+                        border.width: modeMa.pressed && editor.live ? 1 : 0; border.color: cBlue
+                    }
+                    Text {
+                        id: modeTxt
+                        anchors.centerIn: parent
+                        text: (editor.advanced ? "ADV" : "QUICK") + (editor.live ? " ⇄" : "")
+                        color: editor.advanced ? cOrange : cMuted
+                        font.family: uiFont; font.pixelSize: 15
+                    }
+                    NumberAnimation {
+                        id: modeHoldAnim
+                        target: modeTag; property: "holdProgress"
+                        from: 0; to: 1; duration: modeTag.holdMs
+                        // finished() fires on natural completion only, not on stop()
+                        onFinished: { modeTag.holdProgress = 0; editor.toggleLiveMode() }
+                    }
+                    MouseArea {
+                        id: modeMa
+                        anchors.fill: parent; enabled: editor.live
+                        onPressed: modeHoldAnim.restart()
+                        onReleased: { modeHoldAnim.stop(); modeTag.holdProgress = 0 }
+                        onCanceled: { modeHoldAnim.stop(); modeTag.holdProgress = 0 }
+                    }
                 }
                 Pill { label: "BOARD"; accent: cBlue
                        onTap: { editor.refreshBoards(); win.liveBoardsOpen = true } }
@@ -289,16 +323,20 @@ Item {
 
                         MouseArea {
                             anchors.fill: parent
-                            drag.target: nd; drag.threshold: 4
+                            // threshold 10: at 4 a finger's micro-jitter often turned an
+                            // intended tap (inspector) into a phantom 1px drag
+                            drag.target: nd; drag.threshold: 10
                             onPressed: nd.dragged = false
                             onPositionChanged: {
                                 if (drag.active) {
                                     nd.dragged = true
+                                    win.nodeDragging = true
                                     win.trashHot = (nd.x + 62 > canvas.width - 70 && nd.y + 26 > canvas.height - 70)
                                     editor.nodeDragMove(modelData.id, nd.x, nd.y)
                                 }
                             }
                             onReleased: {
+                                win.nodeDragging = false
                                 if (nd.dragged) {
                                     var ot = (nd.x + 62 > canvas.width - 70 && nd.y + 26 > canvas.height - 70)
                                     win.trashHot = false
@@ -307,6 +345,7 @@ Item {
                                     editor.selectNode(modelData.id)
                                 }
                             }
+                            onCanceled: { win.nodeDragging = false; win.trashHot = false }
                         }
                     }
                 }
@@ -334,8 +373,10 @@ Item {
                             }
                         }
                         // tap handle at the cable midpoint (touch-friendly select)
+                        // 44px: at 26 a near-miss fell through to the canvas and
+                        // cancelled an in-progress connection
                         MouseArea {
-                            x: modelData.mx - 13; y: modelData.my - 13; width: 26; height: 26
+                            x: modelData.mx - 22; y: modelData.my - 22; width: 44; height: 44
                             onClicked: editor.selectWire(modelData.id)
                         }
                     }
@@ -450,16 +491,19 @@ Item {
                         // base drag / select (below edge strips)
                         MouseArea {
                             anchors.fill: parent
-                            drag.target: gn; drag.threshold: 4
+                            // threshold 10: see QUICK-mode note (tap vs micro-jitter)
+                            drag.target: gn; drag.threshold: 10
                             onPressed: gn.dragged = false
                             onPositionChanged: {
                                 if (drag.active) {
                                     gn.dragged = true
+                                    win.nodeDragging = true
                                     win.trashHot = (gn.x + 62 > canvas.width - 70 && gn.y + 26 > canvas.height - 70)
                                     editor.gNodeDragMove(modelData.id, gn.x, gn.y)
                                 }
                             }
                             onReleased: {
+                                win.nodeDragging = false
                                 if (gn.dragged) {
                                     var ot = (gn.x + 62 > canvas.width - 70 && gn.y + 26 > canvas.height - 70)
                                     win.trashHot = false
@@ -468,6 +512,7 @@ Item {
                                     editor.selectNode(modelData.id)
                                 }
                             }
+                            onCanceled: { win.nodeDragging = false; win.trashHot = false }
                         }
                         // bypass dot (above base) — re-stated so it wins the press
                         MouseArea {
@@ -627,7 +672,9 @@ Item {
 
         // -------- inspector (overlay, right) --------
         Rectangle {
-            visible: editor.inspOpen
+            // yields while a node is dragged: it covers the trash badge and the
+            // right half of the canvas, exactly where drop targets live
+            visible: editor.inspOpen && !win.nodeDragging
             x: parent.width - 214; y: 34; width: 214; height: parent.height - 34; z: 45
             color: cPanel; border.width: 1; border.color: cBorder
             clip: true   // defense: panel content must never paint over the canvas/footer
@@ -663,7 +710,7 @@ Item {
                         WideBtn { label: "연결 →"; accent: cBlue; visible: editor.inspCanConnect
                                   onTap: editor.connectFromSelected() }
                     }
-                    Text { x: 10; text: editor.inspMeta + " · 노브 더블탭=기본값"; color: cDim
+                    Text { x: 10; text: editor.inspMeta; color: cDim
                            font.family: uiFont; font.pixelSize: 12 }
                 }
                 // patch params (NAM model / IR / cabsim) — live nodes only; tap to pick a file
@@ -767,14 +814,18 @@ Item {
                                         preventStealing: true     // hold the gesture even over the Flickable
                                         property real startY: 0
                                         property real startNorm: 0
-                                        onPressed: function(m) { startY = m.y; startNorm = kcol.liveNorm }
+                                        property bool moved: false
+                                        onPressed: function(m) { startY = m.y; startNorm = kcol.liveNorm; moved = false }
                                         onPositionChanged: function(m) {
+                                            if (Math.abs(m.y - startY) > 6) moved = true
                                             var n = Math.max(0, Math.min(1, startNorm + (startY - m.y) / 90.0))
                                             kcol.liveNorm = n
                                             kcol.liveVal = editor.setKnobNorm(modelData.sym, n)
                                         }
                                         onReleased: editor.syncInspector()
-                                        onDoubleClicked: editor.resetKnob(modelData.sym)
+                                        // reset moved off double-tap (fired during two quick
+                                        // single adjustments) onto a still long-press
+                                        onPressAndHold: if (!moved) editor.resetKnob(modelData.sym)
                                     }
                                 }
                                 Rectangle {
