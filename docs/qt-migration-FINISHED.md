@@ -59,10 +59,11 @@
 - **FS2/FS3 red 링 LED dim 깜빡** = GUI 렌더링의 **HW 전기 커플링**(소프트/폴링/CPU 무관, 격리테스트로 확정). 외형 이슈, 추후 HW(디커플링) 조사거리.
 - **메뉴 안전종료/재부팅 권한 리그레션** *(2026-07-10 해결)* — 무컴포지터 전환으로 앱이 **로그인 세션 없는 시스템 서비스**(`User=miza`)가 되며 `systemctl poweroff`가 logind 기본정책(활성 세션만 허용)에 막힘. 컴포지터 시절엔 세션이 있어 통과했던 것. sudo 폴백도 무효(NOPASSWD는 PatchboxOS `patch` 유저용, miza 아님). **해결**: polkit 규칙(`deploy/ui-service/49-synapse-power.rules`, `install.sh`가 배치)이 miza에게 power-off/reboot 4액션만 허용 → 코드 1차경로가 그대로 성공. pkcheck로 세션리스 qt_main subject 검증 완료(4/4 AUTHORIZED).
 
-## 6. 남은 이주 항목 (→ 로드맵)
+## 6. 이주 완결 (→ 로드맵)
 
-스택은 끝났지만 **무컴포지터 부팅**(lightdm/labwc 제거 후 eglfs 풀스크린 직행)은 아직.
-현재 autostart는 labwc 위에서 qt_main을 **창모드로** 띄우는 잠정 상태(`dfd42c6`).
-이 한 항목 + 모든 기능/정리 작업은 **[`qt-roadmap.md`](qt-roadmap.md)**(로드맵)에 있다.
+**무컴포지터 부팅 완료 (2026-07-08)**: lightdm/labwc 제거 후 eglfs 풀스크린 직행
+(`multi-user.target → synapse-ui.service → run_qt.sh → qt_main.py`, `deploy/ui-service/`).
+이주 스택은 이로써 전부 종료. 잔여 기능/정리 작업은 **[`qt-roadmap.md`](qt-roadmap.md)**(로드맵)에 있다.
+※부작용으로 드러난 메뉴 종료권한 리그레션은 §5 참조(해결됨).
 
 관련: [`README.md`](../README.md) · [`REFERENCES.md`](../REFERENCES.md) · 프로젝트 메모리 `synapse-roadmap`.
