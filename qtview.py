@@ -926,7 +926,7 @@ class QtView(QObject):
             for i in range(4):
                 if i < len(fx):
                     e = fx[i]
-                    cells.append({"label": e.name[:10],
+                    cells.append({"label": e.name,   # full name; QML strip elides
                                   "sub": "BYPASS" if e.bypassed else "ENGAGED",
                                   "led": _LED_RED if e.bypassed else _LED_BLUE})
                 else:
@@ -941,7 +941,7 @@ class QtView(QObject):
                     b = boards[i]
                     name = b.get("title") or b.get("bundle", "").split("/")[-1].replace(".pedalboard", "")
                     is_cur = b.get("bundle") == cur
-                    cells.append({"label": name[:12],
+                    cells.append({"label": name,     # full name; QML strip elides
                                   "sub": "● 현재" if is_cur else "BOARD",
                                   "led": _LED_GREEN if is_cur else _LED_BLUE})
                 else:

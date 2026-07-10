@@ -2000,7 +2000,7 @@ class EditorBridge(QObject):
 
     @Slot(str)
     def resetKnob(self, sym):
-        """Reset a single parameter to its default (double-tap)."""
+        """Reset a single parameter to its default (long-press on the dial)."""
         n = self._node(self.sel)
         if not n:
             return

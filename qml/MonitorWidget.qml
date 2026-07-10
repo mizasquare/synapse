@@ -52,6 +52,9 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             text: root.m ? root.m.name : ""; color: root.cMuted
             font.family: uiFont; font.pixelSize: 15
+            // long port names (e.g. "Gain Reduction") overflowed the 118px cell
+            width: Math.min(implicitWidth, root.width - 8)
+            elide: Text.ElideRight
         }
     }
 

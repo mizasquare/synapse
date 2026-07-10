@@ -137,6 +137,9 @@ Window {
                     color: cMuted
                     font.family: uiFont
                     font.pixelSize: 40
+                    // long snapshot names grew leftward over the board name
+                    width: Math.min(implicitWidth, headerBtnRow.width)
+                    elide: Text.ElideRight
                 }
                 Text {
                     anchors.right: parent.right
@@ -150,50 +153,59 @@ Window {
                     id: headerBtnRow
                     anchors.right: parent.right
                     spacing: 6
+                    // pressed = brighter fill + border, so a touch is acked even
+                    // while the backend round-trip is still in flight
                     Rectangle {
                         width: 92; height: 38; radius: 8
-                        color: "#162033"; border.width: 1; border.color: "#3b6fe0"
+                        color: boardsMa.pressed ? "#243247" : "#162033"
+                        border.width: 1; border.color: boardsMa.pressed ? "#9cc2ff" : "#3b6fe0"
                         Text { anchors.centerIn: parent; text: "BOARDS"; color: "#9cc2ff"; font.family: uiFont; font.pixelSize: 19 }
-                        MouseArea { anchors.fill: parent
+                        MouseArea { id: boardsMa; anchors.fill: parent
                                     onClicked: { view.refreshBoards(); overviewScreen.boardsOpen = true } }
                     }
                     Rectangle {
                         width: 66; height: 38; radius: 8
-                        color: "#241b2e"; border.width: 1; border.color: "#54407a"
+                        color: snapMa.pressed ? "#362a4e" : "#241b2e"
+                        border.width: 1; border.color: snapMa.pressed ? "#cdb6f0" : "#54407a"
                         Text { anchors.centerIn: parent; text: "SNAP"; color: "#cdb6f0"; font.family: uiFont; font.pixelSize: 19 }
-                        MouseArea { anchors.fill: parent
+                        MouseArea { id: snapMa; anchors.fill: parent
                                     onClicked: { view.refreshSnaps(); overviewScreen.snapsOpen = true } }
                     }
                     Rectangle {
                         width: 70; height: 38; radius: 8
-                        color: "#162033"; border.width: 1; border.color: "#3b6fe0"
+                        color: bankMa.pressed ? "#243247" : "#162033"
+                        border.width: 1; border.color: bankMa.pressed ? "#9cc2ff" : "#3b6fe0"
                         Text { anchors.centerIn: parent; text: "BANK"; color: "#9cc2ff"; font.family: uiFont; font.pixelSize: 19 }
-                        MouseArea { anchors.fill: parent
+                        MouseArea { id: bankMa; anchors.fill: parent
                                     onClicked: { view.refreshBanks(); overviewScreen.bankMgrOpen = true } }
                     }
                     Rectangle {
                         width: 72; height: 38; radius: 8
-                        color: "#1b2230"; border.width: 1; border.color: cBorder
+                        color: saveMa.pressed ? "#2a3346" : "#1b2230"
+                        border.width: 1; border.color: saveMa.pressed ? "#7e8694" : cBorder
                         Text { anchors.centerIn: parent; text: "SAVE"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 19 }
-                        MouseArea { anchors.fill: parent; onClicked: view.saveSnapshot() }
+                        MouseArea { id: saveMa; anchors.fill: parent; onClicked: view.saveSnapshot() }
                     }
                     Rectangle {
                         width: 98; height: 38; radius: 8
-                        color: "#1b2230"; border.width: 1; border.color: cBorder
+                        color: saveAsMa.pressed ? "#2a3346" : "#1b2230"
+                        border.width: 1; border.color: saveAsMa.pressed ? "#7e8694" : cBorder
                         Text { anchors.centerIn: parent; text: "SAVE AS"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 19 }
-                        MouseArea { anchors.fill: parent; onClicked: saveAsModal.open = true }
+                        MouseArea { id: saveAsMa; anchors.fill: parent; onClicked: saveAsModal.open = true }
                     }
                     Rectangle {
                         width: 66; height: 38; radius: 8
-                        color: "#241b2e"; border.width: 1; border.color: "#54407a"
+                        color: editMa.pressed ? "#362a4e" : "#241b2e"
+                        border.width: 1; border.color: editMa.pressed ? "#cdb6f0" : "#54407a"
                         Text { anchors.centerIn: parent; text: "EDIT"; color: "#cdb6f0"; font.family: uiFont; font.pixelSize: 19 }
-                        MouseArea { anchors.fill: parent; onClicked: view.enterEdit() }
+                        MouseArea { id: editMa; anchors.fill: parent; onClicked: view.enterEdit() }
                     }
                     Rectangle {
                         width: 66; height: 38; radius: 8
-                        color: "#1b2230"; border.width: 1; border.color: cBorder
+                        color: menuMa.pressed ? "#2a3346" : "#1b2230"
+                        border.width: 1; border.color: menuMa.pressed ? "#7e8694" : cBorder
                         Text { anchors.centerIn: parent; text: "MENU"; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 19 }
-                        MouseArea { anchors.fill: parent; onClicked: { overviewScreen.hubLeaf = "menu"; overviewScreen.hubOpen = true } }
+                        MouseArea { id: menuMa; anchors.fill: parent; onClicked: { overviewScreen.hubLeaf = "menu"; overviewScreen.hubOpen = true } }
                     }
                 }
             }
@@ -243,10 +255,13 @@ Window {
                     x: modelData.x; y: modelData.y
                     width: modelData.w; height: modelData.h
                     radius: 9
-                    color: modelData.isIo ? "#10212a"
+                    // touch ack: brighten while the finger is down (backend follows later)
+                    color: nodeMa.pressed ? "#22304a"
+                         : modelData.isIo ? "#10212a"
                                           : (modelData.on ? "#161b26" : "#13161d")
-                    border.width: modelData.isIo ? 1 : (modelData.selected ? 2 : 1)
-                    border.color: modelData.isIo ? "#2a4a44"
+                    border.width: modelData.isIo ? 1 : (modelData.selected || nodeMa.pressed ? 2 : 1)
+                    border.color: nodeMa.pressed ? "#9cc2ff"
+                                : modelData.isIo ? "#2a4a44"
                                                  : (modelData.selected ? cGreen : cBorder)
                     opacity: (!modelData.isIo && !modelData.on) ? 0.55 : 1.0
 
@@ -328,6 +343,7 @@ Window {
 
                     // tap an effect node -> FOCUS (IO nodes are not interactive)
                     MouseArea {
+                        id: nodeMa
                         anchors.fill: parent
                         enabled: !modelData.isIo
                         onClicked: view.selectNode(modelData.id)
@@ -336,16 +352,11 @@ Window {
             }
         }
 
-        // legend / status line
+        // status line (legend/tutorial text dropped — single-cable-color UI,
+        // and "tap node -> focus" is learned once; BPM is the live info)
         Row {
             x: 12; y: graph.y + graph.height + 6
             spacing: 18
-            Row {
-                spacing: 6
-                Rectangle { width: 18; height: 4; radius: 2; color: cGreen; anchors.verticalCenter: parent.verticalCenter }
-                Text { text: "SIGNAL"; color: "#9aa3b2"; font.family: uiFont; font.pixelSize: 16 }
-            }
-            Text { text: "노드 탭 → 포커스"; color: cDim; font.family: uiFont; font.pixelSize: 16 }
             Text { text: "BPM " + view.bpm; color: cMuted; font.family: uiFont; font.pixelSize: 16 }
         }
 
@@ -362,6 +373,7 @@ Window {
             Repeater {
                 model: view.footswitches
                 Rectangle {
+                    id: fsCell
                     width: (strip.width - 8 * 3) / 4
                     height: 64
                     radius: 8
@@ -385,7 +397,13 @@ Window {
                         }
                         Column {
                             anchors.verticalCenter: parent.verticalCenter
-                            Text { text: modelData.label; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 20 }
+                            // room left of the LED: cell - leftMargin(12) - led(15) - spacing(10) - pad(8)
+                            width: fsCell.width - 45
+                            Text {
+                                text: modelData.label; color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 20
+                                width: Math.min(implicitWidth, parent.width)
+                                elide: Text.ElideRight
+                            }
                             Text { text: modelData.sub; color: modelData.led; font.family: uiFont; font.pixelSize: 15 }
                         }
                     }
@@ -1087,6 +1105,8 @@ Window {
                 Text {
                     text: focusScreen.f ? (focusScreen.f.name + "  ·  " + focusScreen.f.category) : ""
                     color: cText; font.family: uiFont; font.pixelSize: 28
+                    width: Math.min(implicitWidth, idcard.width - 32)
+                    elide: Text.ElideRight
                 }
                 // patch chips (NAM model / IR / cabsim) — tap to open the file picker
                 Row {
@@ -1101,6 +1121,9 @@ Window {
                                 id: pchTxt; anchors.centerIn: parent
                                 text: "▦ " + modelData.label + ": " + (modelData.value || "—") + "  ▾"
                                 color: cGreen; font.family: uiFont; font.pixelSize: 15
+                                // long IR paths filled the card; keep the filename end visible
+                                width: Math.min(implicitWidth, idcard.width - 64)
+                                elide: Text.ElideMiddle
                             }
                             MouseArea {
                                 anchors.fill: parent
@@ -1130,7 +1153,13 @@ Window {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 2
                         Text { text: modelData.t; color: cGreen; font.family: uiFont; font.pixelSize: 15 }
-                        Text { text: (modelData.list || []).join("   "); color: cText; font.family: uiFont; font.pixelSize: 22 }
+                        Text {
+                            text: (modelData.list || []).join("   ")
+                            color: cText; font.family: uiFont; font.pixelSize: 22
+                            // 3+ ports used to overflow the card (no clip on it either)
+                            width: Math.min(implicitWidth, (routing.width - 10) / 2 - 28)
+                            elide: Text.ElideRight
+                        }
                     }
                 }
             }
