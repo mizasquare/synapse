@@ -21,13 +21,15 @@
 - [x] **상시 안내문 제거** — SIGNAL 범례·"노드 탭→포커스"·인스펙터 더블탭 힌트. TAP/TUNER 안내는 풀스크린이라 유지.
 - [x] **모달리티 트랩 완화** — 드래그 중 인스펙터 자동 숨김(`win.nodeDragging`)·drag.threshold 4→10·노브 리셋 더블탭→롱프레스(6px 이동가드)·케이블 핸들 26→44px·모드 태그 롱프레스 게이지(홀드 상수 `modeTag.holdMs=1500`).
 
-### 실기 검증 대기 (터치패널 교체 후 — 전부 손감각 항목)
-- [ ] pressed 피드백 체감 (헤더 버튼·노드 셀)
-- [ ] threshold 10px — 탭 오판정 감소 vs 드래그 시작 둔함
-- [ ] 노브 롱프레스 리셋 — 미세조절 중 오발동 없는지 (기본 800ms + 6px 가드)
-- [ ] 모드 태그 게이지 1.5s 감각 — `PedalboardEditorView.qml` `modeTag.holdMs` 상수로 조절
-- [ ] 드래그 시 인스펙터 숨김/복원 자연스러움
-- [ ] 케이블 핸들 44px — 인접 노드 변 탭과 오버랩 충돌 없는지
+### 손감각 튜닝 — 1차 확인 OK, 실사용 관찰 계속 (2026-07-10)
+> 패널 교체 후 전 항목 1차 체감 양호(사용자 "일단 모두 맘에 든다"). 아래는 계속 써보며
+> 미세조정할 후보 상수들 — 문제 느껴지면 해당 상수부터.
+- [~] pressed 피드백 체감 (헤더 버튼·노드 셀) — OK
+- [~] threshold 10px — 탭 오판정 vs 드래그 둔함 균형 OK (`drag.threshold`)
+- [~] 노브 롱프레스 리셋 — 미세조절 중 오발동 없음 (기본 800ms + 6px 가드)
+- [~] 모드 태그 게이지 1.5s — `PedalboardEditorView.qml` `modeTag.holdMs`
+- [~] 드래그 시 인스펙터 숨김/복원 — 자연스러움 OK
+- [~] 케이블 핸들 44px — 인접 변 탭 충돌 없음
 
 ## 마일스톤 일괄 폴리싱 ✅ (2026-07-09~10, 브랜치 `polish/remaining-milestones` 9커밋)
 
@@ -49,9 +51,9 @@
 - [x] **터치패널 복구 확인** (2026-07-10) — 플렉스 재라우팅 후 `touchtest.py`+`rawtouch.py` 재검증 통과, 구 데드밴드 소멸. 상세 hardware.md.
 - [x] **eglfs 메뉴 종료권한 리그레션 해결** (2026-07-10) — 세션리스 시스템서비스라 `systemctl poweroff`가 polkit에 막힘. `deploy/ui-service/49-synapse-power.rules`(miza에게 power-off/reboot 4액션 허용)로 해결, pkcheck 4/4 검증. 상세 qt-migration-FINISHED §5.
 - [x] **mod-tweaks 재배포** (2026-07-10) — `sudo mod-tweaks/deploy.sh`로 `EffectPresetLoad notify_synapsin` 훅 라이브 반영(webserver.py, notify 15→16), `--check` 전부 `[동일]`, modep-mod-ui 재시작, 앱 graceful 재접속 확인. ※앱 자체 프리셋칩은 이 훅 없이도 self-refresh로 동작 — 훅은 웹UI발 프리셋 로드 desync 방지용(포크↔라이브 패리티 유지).
-- [ ] 신기능 육안확인: 스냅샷 모달·보드 위/아래·프리셋 칩(실 mod-ui 왕복)·bpb·bypass-all(풋스위치 A+D 발감각)·모델형 노드 부제
-- [ ] C* Click add 재시도 — 원인은 터치 데드밴드였음(복구 확인). 새 패널에서 정상 예상, 실패 시 이제 토스트에 실사유 뜸
-- [ ] 탭템포 실검증(기존 항목)
+- [x] **신기능 육안확인 통과** (2026-07-10) — 스냅샷 모달·보드 위/아래·프리셋 칩(실 mod-ui 왕복)·bpb·bypass-all(풋스위치 A+D)·모델형 노드 부제 전부 확인, 이상 없음.
+- [x] **C* Click add 재시도 통과** (2026-07-10) — 진범이던 데드밴드 해소 후 정상 add 확인.
+- [x] **탭템포 실검증 통과** (2026-07-10).
 
 ## 데드코드 재수색 2R + 라이브 버그 + 스테일 문서 스윕 ✅ (2026-07-03)
 
