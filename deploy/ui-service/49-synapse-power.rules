@@ -1,0 +1,15 @@
+// Synapse UI runs as a systemd *system* service (User=miza, no login session),
+// so `systemctl poweroff`/`reboot` from the ⚙MENU->SYSTEM leaf is denied by the
+// default logind power policy (which only grants active local sessions).
+// Grant the miza service user exactly those power actions -- nothing else --
+// so the menu's safe-shutdown works without a passworded sudo fallback.
+// Installed 2026-07-10 after the eglfs migration surfaced the regression.
+polkit.addRule(function(action, subject) {
+    if (subject.user == "miza" &&
+        (action.id == "org.freedesktop.login1.power-off" ||
+         action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
+         action.id == "org.freedesktop.login1.reboot" ||
+         action.id == "org.freedesktop.login1.reboot-multiple-sessions")) {
+        return polkit.Result.YES;
+    }
+});

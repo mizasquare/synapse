@@ -57,6 +57,7 @@
 - **LLVMpipe 소프트 GL**(V3D HW 가속 아님) — 이 UI/해상도엔 충분. 추후 HW가속은 튜닝거리.
 - **GBM 하드웨어 커서 플레인 실패**(-6/-14) — 터치앱은 커서 숨기면 무관.
 - **FS2/FS3 red 링 LED dim 깜빡** = GUI 렌더링의 **HW 전기 커플링**(소프트/폴링/CPU 무관, 격리테스트로 확정). 외형 이슈, 추후 HW(디커플링) 조사거리.
+- **메뉴 안전종료/재부팅 권한 리그레션** *(2026-07-10 해결)* — 무컴포지터 전환으로 앱이 **로그인 세션 없는 시스템 서비스**(`User=miza`)가 되며 `systemctl poweroff`가 logind 기본정책(활성 세션만 허용)에 막힘. 컴포지터 시절엔 세션이 있어 통과했던 것. sudo 폴백도 무효(NOPASSWD는 PatchboxOS `patch` 유저용, miza 아님). **해결**: polkit 규칙(`deploy/ui-service/49-synapse-power.rules`, `install.sh`가 배치)이 miza에게 power-off/reboot 4액션만 허용 → 코드 1차경로가 그대로 성공. pkcheck로 세션리스 qt_main subject 검증 완료(4/4 AUTHORIZED).
 
 ## 6. 남은 이주 항목 (→ 로드맵)
 
