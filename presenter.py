@@ -1,6 +1,6 @@
 import utils
 from modepctrl import get_backend
-from model import initialize_modep_pedalboard, Connection, diff_live_graph
+from model import initialize_modep_pedalboard, Connection, diff_live_graph, Pedalboard
 from taptempo import TapTempoEngine
 from ledview import LedView
 import threading
@@ -61,8 +61,10 @@ class Presenter:
         self._poll_stop = None
         self.start_footswitch_polling(100)  # background thread @100Hz
 
-        # Load pedalboard model
-        self.pedalboard = initialize_modep_pedalboard(self.backend)
+        # Load pedalboard model. Fallback-guarded: if the host's current board was
+        # deleted while the app was off, its info 500s and the plain build returns
+        # None -> the UI would crash into a systemd restart loop. Never None now.
+        self.pedalboard = self._load_pedalboard_with_fallback()
         # EditorBridge ref (wired by the entry point) so footswitch board nav can
         # surface a non-blocking notice when it discards unsaved live editor edits.
         self.editor = None
@@ -147,8 +149,83 @@ class Presenter:
         self.view_update_effect()
         self.view_update_bpm()
 
+    def _try_build_pedalboard(self):
+        """Build the live Pedalboard, swallowing any host/parse failure to None
+        (initialize_modep_pedalboard returns None when the current board's info
+        500s -- e.g. it was deleted -- but can also raise on a wedged host)."""
+        try:
+            return initialize_modep_pedalboard(self.backend)
+        except Exception as e:
+            logging.error("pedalboard build failed: %s", e)
+            return None
+
+    def _recover_onto(self, bundle):
+        """Load ``bundle`` on the host and rebuild the model; None if either step
+        fails. Loading also repoints the host's dangling 'current' at a real board."""
+        try:
+            if self.backend.set_pedalboard(bundle):
+                return self._try_build_pedalboard()
+        except Exception as e:
+            logging.error("recovery load %s failed: %s", bundle, e)
+        return None
+
+    def _load_pedalboard_with_fallback(self):
+        """Build the live Pedalboard at startup, recovering if the host's current
+        board is gone (deleted while the app was off -> pedalboard/info 500 -> None,
+        which used to crash the UI into a systemd restart loop). Every step is
+        defensive -- a crisis-time recovery must never itself raise. Chain:
+          1) host's current board (the normal path; no side effects)
+          2) the first existing user board (host list, default.pedalboard excluded)
+          3) load default.pedalboard, save-as a fresh board, open that
+          4) an empty in-memory board so the UI still boots (never expected)."""
+        pb = self._try_build_pedalboard()
+        if pb is not None:
+            return pb
+        logging.error("current pedalboard failed to load (deleted?) -- recovering")
+
+        try:
+            entries = self.backend.get_all_pedalboard_entries() or []
+        except Exception as e:
+            logging.error("recovery: listing boards failed: %s", e)
+            entries = []
+
+        def _is_default(b):
+            return (b or "").rstrip("/").endswith("default.pedalboard")
+
+        # 2) first existing non-default board
+        for e in entries:
+            bundle = (e.get("bundle") or "").strip()
+            if bundle and not _is_default(bundle):
+                pb = self._recover_onto(bundle)
+                if pb is not None:
+                    logging.warning("recovered onto first board: %s", bundle)
+                    return pb
+
+        # 3) default -> save-as a fresh board -> open it
+        default_bundle = next((e.get("bundle") for e in entries if _is_default(e.get("bundle"))),
+                              "/var/modep/pedalboards/default.pedalboard")
+        if self._recover_onto(default_bundle) is not None:
+            try:
+                self.backend.save_pedalboard_as("Recovered")  # host switches current to the new bundle
+                pb = self._try_build_pedalboard()
+                if pb is not None:
+                    logging.warning("recovered via default -> save-as")
+                    return pb
+            except Exception as e:
+                logging.error("recovery save-as failed: %s", e)
+
+        # 4) last resort: an empty in-memory board so the UI boots and the user can
+        #    pick one (practically unreachable -- default.pedalboard always exists).
+        logging.error("all pedalboard recovery failed -- booting an empty board")
+        return Pedalboard(title="(빈 보드)", current_pb_path="", width=0, height=0)
+
     def refresh_pedalboard(self):
-        self.pedalboard = initialize_modep_pedalboard(self.backend)
+        # Never null the model out: a transient host failure (or a board deleted
+        # elsewhere mid-session) makes the build return None, which would crash the
+        # next view_update_effect. Keep the last-known board on failure instead.
+        rebuilt = self._try_build_pedalboard()
+        if rebuilt is not None:
+            self.pedalboard = rebuilt
         # The rebuilt model may be a different board/snapshot; a stale global-
         # bypass restore map would then restore wrong states, so drop it here.
         # (bypass_all itself never calls refresh, so this can't self-trigger.)
@@ -219,6 +296,12 @@ class Presenter:
     def view_update_effect(self, clear_ports=False):
         if clear_ports:
             self.view.populate_port_area(effectData=None)
+
+        # Insurance: the model should never be None (startup fallback + refresh
+        # guard keep it set), but a None here once boot-looped the whole app, so
+        # never let it become fatal again -- skip the refresh rather than crash.
+        if self.pedalboard is None:
+            return
 
         plugins = []
         for effect in self.pedalboard.effects:
