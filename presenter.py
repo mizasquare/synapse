@@ -3,6 +3,7 @@ from modepctrl import get_backend
 from model import initialize_modep_pedalboard, Connection, diff_live_graph, Pedalboard
 from taptempo import TapTempoEngine
 from ledview import LedView
+from hardwares.footswitches import FootswitchReader, FS_COMMIT
 import threading
 import time
 
@@ -42,7 +43,12 @@ class Presenter:
         # 0: pedalboard nav, 1: parameter assign, 2: pb snapshot assign
         self.footswitch_mode = 0
         self.footswitch_assigns = [None, None, None, None]
-        self.footswitch_input_que = [0] * 4
+        # Footswitch input state machine (debounce + release-edge combo latch).
+        # The poll loop just reads raw samples and feeds this; all the bookkeeping
+        # that used to live inline in _footswitch_poll_loop now lives here, and
+        # it's the seam that surfaces press/release edges for a future momentary
+        # (hold) mode. See hardwares/footswitches.FootswitchReader.
+        self._fsreader = FootswitchReader(count=4, debounce_samples=self.DEBOUNCE_SAMPLES)
         # Tap-tempo engine (the C+D chord enters it; see handle_multiple_footswitches).
         # Framework-agnostic: it only needs the scheduler + the two callbacks below.
         self._mode_before_tap = 0
@@ -887,33 +893,27 @@ class Presenter:
             self._poll_stop.set()
 
     def _footswitch_poll_loop(self):
+        """Read raw switch samples off-thread and feed the FootswitchReader; any
+        events it emits are marshalled to the main thread as a batch so LED
+        blinks and ModepController calls still run there. All debounce/combo
+        bookkeeping lives in the reader now (hardwares/footswitches)."""
         interval = 1.0 / self.FOOTSWITCH_POLL_HZ
-        n = self.DEBOUNCE_SAMPLES
-        stable = [0, 0, 0, 0]   # debounced switch states
-        counts = [0, 0, 0, 0]   # consecutive samples disagreeing with `stable`
         while not self._poll_stop.is_set():
-            raw = self.hwi.read_footswitches()  # one I2C transaction -> [0/1]*4
-            for i in range(4):
-                if raw[i] == stable[i]:
-                    counts[i] = 0
-                else:
-                    counts[i] += 1
-                    if counts[i] >= n:
-                        stable[i] = raw[i]
-                        counts[i] = 0
-                # Latch any switch that is (debounced) pressed during this cycle,
-                # so combos are captured even if released slightly out of sync.
-                if stable[i] == 1:
-                    self.footswitch_input_que[i] = 1
-
-            # Fire only once every switch is released again — release-edge firing
-            # is required to disambiguate single presses from combos (chords).
-            if stable == [0, 0, 0, 0] and self.footswitch_input_que != [0, 0, 0, 0]:
-                status = list(self.footswitch_input_que)
-                self.footswitch_input_que = [0, 0, 0, 0]
-                self.scheduler.schedule_once(lambda dt, s=status: self.handle_footswitch_event(s))
-
+            raw = self.hwi.read_footswitches()      # one I2C transaction -> [0/1]*4
+            events = self._fsreader.poll(raw)
+            if events:
+                self.scheduler.schedule_once(lambda dt, e=events: self._dispatch_fs_events(e))
             time.sleep(interval)
+
+    def _dispatch_fs_events(self, events):
+        """Main-thread fan-out of FootswitchReader events. A 'commit' carries the
+        latched set and drives the actual action (single press or chord), so the
+        release-edge combo semantics are unchanged. 'press'/'release' edges are
+        the momentary (hold) mode hook point — surfaced but not consumed yet."""
+        for kind, payload in events:
+            if kind == FS_COMMIT:
+                self.handle_footswitch_event(payload)
+            # press/release: reserved for a future momentary mode; no-op for now.
 
     def handle_footswitch_event(self, status):
         print(f'Footswitch event: {status}')

@@ -3,7 +3,7 @@
 > 🛠 **살아있는 로드맵 (남은 일만).** 완료 항목은 [`qt-roadmap-DONE.md`](qt-roadmap-DONE.md)로 이관,
 > 맥락 필요 시 포인터로 참조. 마일스톤 최심층 상세 = 메모리 `synapse-roadmap`. 이주 스택 결정·검증 =
 > [`qt-migration-FINISHED.md`](qt-migration-FINISHED.md).
-> 마지막 갱신: **2026-07-11 (기기 재조립·터치패널 복구 후 실기 검증 전 항목 통과 — 탭템포·오버뷰 렌더 이관, eglfs 종료권한 리그레션 해결.)**
+> 마지막 갱신: **2026-07-11 (③ LED seam 완료·이관 + FOCUS 풋스위치 수동배정 재구현 + 삭제보드 부팅 fallback으로 ① 잔여 재확인. 실기 검증 전 항목 통과.)**
 >
 > **정렬 원칙 — 우선순위 축:** ① 안정성(크래시/데이터손상/무대 리스크) → ② 기능(미구현 본체) →
 > ③ 설계상 미덕(상태를 올바로 드러냄) → ④ 아키텍처 우아함(관심사 분리·유지보수성) → ⑤ 미관.
@@ -12,7 +12,8 @@
 **현재 사실관계:** PyQt6+QML 앱이 Pi에서 라이브 동작, autostart 전환됨(`dfd42c6`).
 페달보드 에디터 트랙(M1~M7)·라이브 플러그인 카탈로그·뱅크 매니저·튜너·소프트 마스터볼륨·
 **볼륨페달 Phase 2**·**폴리싱 브랜치**(프리셋 적용·스냅샷 모달·bpb·bypass-all·타입구분·보드순서·
-_uid픽스·리뷰픽스 11건, 2026-07-10 머지)까지 완료. **터치패널은 복구됨**(플렉스 재라우팅,
+_uid픽스·리뷰픽스 11건, 2026-07-10 머지)·**LED seam+FOCUS FS 배정+부팅 fallback**(2026-07-11)까지
+완료. **터치패널은 복구됨**(플렉스 재라우팅,
 [`hardware.md`](hardware.md)) — 2026-07-11 재조립 후 **실기 검증 전 항목 통과**(신기능 육안·탭템포·
 C* Click·오버뷰 렌더·손감각 1차, [`qt-roadmap-DONE.md`](qt-roadmap-DONE.md) 상단). eglfs 이주가
 드러낸 메뉴 종료권한 리그레션도 polkit 규칙으로 해결. 남은 코드 작업은 아래 소항목뿐.
@@ -23,7 +24,9 @@ C* Click·오버뷰 렌더·손감각 1차, [`qt-roadmap-DONE.md`](qt-roadmap-DO
 
 > ✅ 잔여 없음. **탭템포 실검증**(탭→BPM + LED 메트로놈 동기)은 2026-07-11 Pi 실기 통과 →
 > [`qt-roadmap-DONE.md`](qt-roadmap-DONE.md). 인스펙터 ACTIVE/BYPASSED 칩 no-op 버그도 수정 완료(2026-07-03).
-> 볼륨페달 **언플러그 페일세이프**(CC7 램프·홀드)는 안정성 성격이지만 볼륨페달 Phase 2(②)에 묶여 있어 그쪽에 기재.
+> **삭제된 현재 페달보드 부팅 크래시 루프**(잠재 벽돌 버그)는 2026-07-11 4단계 fallback으로 영구 방어 →
+> [`qt-roadmap-DONE.md`](qt-roadmap-DONE.md) 상단(`37bfa24`). 볼륨페달 **언플러그 페일세이프**(CC7 램프·홀드)는
+> 안정성 성격이지만 볼륨페달 Phase 2(②)에 묶여 있어 그쪽에 기재.
 
 ## ② 기능 (미구현 / 부분구현 본체)
 
@@ -41,23 +44,25 @@ C* Click·오버뷰 렌더·손감각 1차, [`qt-roadmap-DONE.md`](qt-roadmap-DO
       유니티로 자연 고정됨 — 실측 확인, [`expression-pedal-handoff-DONE.md`](expression-pedal-handoff-DONE.md) 노트.
       코드개선(미적용): 단발→연속모드, EMA+히스테리시스 CC 지터제거. 앱 내 캘리브레이션 화면
       (reflex 소켓 클라이언트, 프로토콜은 확정됨). (중)
-- [ ] **모멘터리(홀드) 모드** — [`presenter.py`](../presenter.py) 폴링이 릴리스엣지 전용(`stable==[0,0,0,0]`일 때만
-      발화) → press-ON/release-OFF 이벤트 경로 없음. ④ '디바운스·콤보 HW단 이동'과 함께 설계하면 자연히 열림. (중)
+- [ ] **모멘터리(홀드) 모드** — **이벤트 경로는 이제 열림**(2026-07-11 ④ 리팩터로 `FootswitchReader`가
+      `('press',i)`/`('release',i)` 디바운스 엣지를 emit). 남은 건 **소비처**: `_dispatch_fs_events`에서
+      press/release를 홀드 액션(누르는 동안 engage·떼면 disengage)에 연결 + 홀드 모드 진입 UX. 단일/콤보
+      릴리스엣지 판정과 공존하도록 press 즉시발화 vs 콤보윈도 정책 결정 필요(pi-stomp 타임스탬프 윈도 참고). (중)
 - [ ] **이펙터 프리셋 (블록 저장/불러오기)** — 사용자 블록 단위 파라미터셋 저장. 위 LV2 preset 적용과 **별개인 진짜 신규**
       (스냅샷=보드 전체, 이건 단일 블록 재사용). 저장소·모델·UI 전무. (중, 후순위)
 
 ## ③ 설계상 미덕 (상태를 올바로 드러냄)
 
-- [ ] **LED 정상상태 색 + 블링크 후 복원 (한 쌍)** — HW가 red/blue/purple 지원([`fsledctrl.py`](../hardwares/fsledctrl.py))
-      인데 지금은 누를 때 blink만·끝나면 OFF(이전색 기억 없음). ★두 항목은 강결합: **먼저 '정상상태 색' 개념**
-      (할당/포커스/활성-바이패스 상태별 색 유지)을 도입해야 '블링크 후 그 색으로 복원'이 성립. 함께 설계할 것. (중)
+> ✅ 2026-07-11 완료·이관: **LED 정상상태 색 + 블링크 후 복원** — LED 렌더 코드를 `LedView` seam
+> (`ledview.py`)으로 전부 이관, `fsledctrl.set_resting`으로 blink 종료 시 OFF 아닌 정상상태 색 복원.
+> 실기 육안 통과 → [`qt-roadmap-DONE.md`](qt-roadmap-DONE.md) 상단. 잔여 없음.
 
 ## ④ 아키텍처 우아함 (관심사 분리 · 유지보수성)
 
-- [ ] **디바운스·콤보 판정을 하드웨어 추상화 단으로 이동** (2026-07-01 pi-stomp 착안) — 디바운스+릴리스엣지 콤보
-      검출이 Presenter 앱레이어에 섞임(`presenter.py:633~716`). pi-stomp처럼 이벤트 emit `Switch` 클래스로 내리고
-      Presenter는 구독만. **릴리스엣지 콤보 UX는 의미 유지, 위치만 이동.** 현 로직은 정상 동작하므로 저위험·저보상 —
-      서두를 이유 없음(리팩터 실수 시 입력 회귀 위험 신규 도입). → [`pi-stomp-comparison.md`](pi-stomp-comparison.md) §3(A). (중)
+> ✅ 2026-07-11 완료·이관: **디바운스·콤보 판정을 하드웨어 추상화 단으로 이동** — 인라인 디바운스+릴리스엣지
+> 래치를 순수 상태기계 `hardwares/footswitches.FootswitchReader`로 내리고 Presenter는 `poll()`이 emit한
+> 이벤트만 구독. 릴리스엣지 콤보 의미는 2000개 랜덤 시퀀스 비트동일 검증(의미 유지·위치 이동). press/release
+> 엣지도 surface → ② 모멘터리 경로 개통. → [`qt-roadmap-DONE.md`](qt-roadmap-DONE.md) 상단.
 - [ ] **i18n / 테마 토큰화 (한 묶음 — 결정 2026-06-28)** — 다국어·테마 스왑이 요구사항이 아니면 무기한 미룸 가능(순수
       유지보수성). 기계적 스윕이라 멀티에이전트 적합.
       - **문자열 중앙화(i18n)**: 사용자 노출 리터럴 → `resources/strings/<lang>.json` + `tr("key")` 인다이렉션.
@@ -101,7 +106,7 @@ C* Click·오버뷰 렌더·손감각 1차, [`qt-roadmap-DONE.md`](qt-roadmap-DO
 
 ## 폐기 / 재배치 (의도 확정됨)
 
-- **ABCD 버튼** → 시안엔 없음. "포커스 이펙터를 FS에 수동 바인딩"은 오버뷰-인스펙터 이펙터 배정이 대체(재구현 예정). 잔재 삭제 완료(2026-07-03). [[abcd-button-intent]].
+- **ABCD 버튼** → 시안엔 없음. "포커스 이펙터를 FS에 수동 바인딩"은 오버뷰-인스펙터 FS 배정으로 **재구현 완료**(2026-07-11, `0bb19e6` — FOCUS 카드 A/B/C/D 슬롯, 자동배정 위 슬롯별 오버라이드+페달보드별 영속 → [`qt-roadmap-DONE.md`](qt-roadmap-DONE.md)). Qt 잔재 삭제는 2026-07-03. [[abcd-button-intent]].
 - **WebUI(Chromium)** → 온디바이스 폐기(웹UI는 폰/옆 데스크톱 접속). 온디바이스 코드 삭제 완료(2026-07-03).
 - **베젤 합성영역**(save/saveas/pb/ss/mode/bpm) → 해체: 저장/로드→⚙MENU 허브(완료), PB/SS→콤보, 모드→FS 설정, BPM→Tap+헤더.
 - **온스크린 키보드(wvkbd/커스텀)** → 폐기(2026-06-28). 이름추천기+HW 키보드 폴백. 런타임 잔재(`toggle_keyboard`/`toggle_wvkbd`) 삭제 완료(2026-07-03). (dev 스크립트 `tools/test.py`는 존치 — README에 obsolete 표기.)
