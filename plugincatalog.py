@@ -48,14 +48,18 @@ def _bucket(category):
     return category[-1] if category else 'Utility'
 
 
-def _widget(props, has_scalepoints):
-    """Control-port widget kind, in the editor's vocabulary. Reproduces the frozen
-    baker (verified 0 mismatches / 402 ports): scalePoints OR enumeration => enum,
-    tapTempo => button. (This intentionally differs from model.EffectPort.widget_kind,
-    which ignores scalePoints — the editor's catalog consumer expects THIS vocab.)"""
+def _widget(props, n_scalepoints):
+    """Control-port widget kind, in the editor's vocabulary. Mostly reproduces the
+    frozen baker (tapTempo => button, enumeration => enum), but a port is only an
+    enum selector when it carries *2+* scale points: a lone labelled point (e.g. a
+    dB level whose −60 floor reads "Off") is a continuous knob with one named
+    detent, not a one-option selector. The old "any scalePoints => enum" rule made
+    those tap-to-"Off" (Cabinet/Convolution Loader, x42 IR, MDA Stereo, tuner A440).
+    (Intentionally differs from model.EffectPort.widget_kind, which ignores
+    scalePoints — the editor's catalog consumer expects THIS vocab.)"""
     if 'tapTempo' in props:
         return 'button'
-    if 'enumeration' in props or has_scalepoints:
+    if 'enumeration' in props or n_scalepoints >= 2:
         return 'enum'
     if 'toggled' in props:
         return 'toggle'
@@ -83,7 +87,7 @@ def _ctl(port):
         'sym': port.get('symbol', ''),
         'name': port.get('name', ''),
         'short': port.get('shortName') or port.get('name', ''),
-        'w': _widget(props, bool(sps)),
+        'w': _widget(props, len(sps)),
         'def': r.get('default', 0.0),
         'min': r.get('minimum', 0.0),
         'max': r.get('maximum', 1.0),
