@@ -2,6 +2,7 @@ import utils
 from modepctrl import get_backend
 from model import initialize_modep_pedalboard, Connection, diff_live_graph
 from taptempo import TapTempoEngine
+from ledview import LedView
 import threading
 import time
 
@@ -13,17 +14,6 @@ import configs
 # 4 (tap tempo) is a transient mode entered out-of-band (chord) and kept out of
 # that cycle.
 TAP_TEMPO_MODE = 4
-
-# Tuner LED feedback (the 4 footswitch LEDs strobe while tuning, so you can tune
-# eyes-off the screen): off-pitch = a red strobe that speeds up as the note nears
-# pitch; the moment it lands = a short blue flourish, then steady blue. Silence
-# (engine gates on volume/confidence) = LEDs off.
-TUNER_IN_TUNE_CENTS = 3.0
-TUNER_FAR_CENTS = 50.0
-TUNER_LED_TICK_HZ = 30.0
-TUNER_BLINK_SLOW_HZ = 2.0     # far from pitch -> slow red blink
-TUNER_BLINK_FAST_HZ = 10.0    # near pitch -> fast, "nervous" red blink
-TUNER_CEREMONY_SEC = 0.5      # length of the blue flourish on hitting pitch
 
 class Presenter:
     def __init__(self, view, scheduler, backend=None, hardware=None,
@@ -39,6 +29,10 @@ class Presenter:
         # Defaults to the real I2C controller, built lazily so an off-device
         # entry point can inject a fake without importing the Pi-only I2C stack.
         self.hwi = hardware if hardware is not None else self._build_default_hardware(scheduler)
+        # LED rendering surface (the LED-side of `view`; see ledview.LedView).
+        # Fed semantic facts, it owns all colour/animation. None container ->
+        # no-op (a hardware backend without LEDs).
+        self.led = LedView(getattr(self.hwi, "LED", None), scheduler)
 
         # 0: pedalboard nav, 1: parameter assign, 2: pb snapshot assign
         self.footswitch_mode = 0
@@ -56,12 +50,8 @@ class Presenter:
         self._tuner_source_factory = tuner_source_factory
         self._tuner_engine = None
         self._in_tuner = False
-        # LED-feedback strobe state (see TUNER_* constants + _tuner_led_tick).
-        self._tuner_led_handle = None
-        self._tuner_led_phase = 0.0
-        self._tuner_led_state = None
-        self._tuner_was_in_tune = False
-        self._tuner_tune_since = 0.0
+        # (the tuner LED strobe now lives entirely in LedView; the presenter only
+        #  owns the engine lifecycle + exit-on-press.)
         self._poll_thread = None
         self._poll_stop = None
         self.start_footswitch_polling(100)  # background thread @100Hz
@@ -190,6 +180,37 @@ class Presenter:
 
         self.view.refresh_plugin_display(pb_title=self.pedalboard.title, plugins=plugins,
                                          snapshot=[self.pedalboard.current_snapshot_idx, self.pedalboard.list_of_snapshots])
+        # Effect active/bypass (or board/snapshot) state may have changed -> keep
+        # the footswitch LEDs' resting colours in step. This is THE hub for such
+        # changes (local toggle, external echo, bypass_all, board/snapshot switch).
+        self._push_led_bindings()
+
+    def _push_led_bindings(self):
+        """Translate the current footswitch binding into per-slot semantic tokens
+        and hand them to LedView (which owns the colour mapping). STOMP reflects
+        each bound effect's live active/bypass; BANK flags the loaded board;
+        NAVIGATE (and any other mode) has no resting state. Effects are re-looked
+        up by instance so a refresh_pedalboard rebuild can't leave stale flags."""
+        mode = self.footswitch_mode
+        if mode == 1:            # STOMP: active(blue) / bypassed(off)
+            tokens = []
+            for i in range(4):
+                bound = self.stomp_effects[i] if i < len(self.stomp_effects) else None
+                live = self.pedalboard.get_effect_by_instance(bound.instance) if bound else None
+                tokens.append('empty' if live is None else
+                              ('bypassed' if live.bypassed else 'active'))
+        elif mode == 2:          # BANK: current board(blue) / other(off)
+            cur = ((self.pedalboard.current_pb_path if self.pedalboard else "") or "").rstrip("/")
+            tokens = []
+            for i in range(4):
+                bundle = self.bank_boards[i]["bundle"] if i < len(self.bank_boards) else None
+                if not bundle:
+                    tokens.append('empty')
+                else:
+                    tokens.append('current' if bundle.rstrip("/") == cur else 'other')
+        else:                    # NAVIGATE (0), tap tempo (4), etc. -> no resting state
+            tokens = ['nav', 'nav', 'nav', 'nav']
+        self.led.set_bindings(tokens)
 
     def view_render_parameters(self, effect_instance):
         effect = self.pedalboard.get_effect_by_instance(effect_instance)
@@ -762,13 +783,11 @@ class Presenter:
         if self._in_tuner:
             self.exit_tuner()
             return
-        # For each pressed (or released) footswitch, trigger a blink on its corresponding LED.
+        # Ack each press with a red flash on its LED. LedView ignores this while
+        # a takeover (tuner/metronome) owns the surface, so no mode guard here.
         for i, s in enumerate(status):
-            # In tap-tempo mode the metronome owns the LEDs; skip the per-press
-            # blink so it doesn't fight the beat flashes.
-            if s == 1 and self.footswitch_mode != TAP_TEMPO_MODE:
-                # Blink the red LED on the corresponding LED object. Here, one blink cycle.
-                self.hwi.LED.get_led(i).blink(color='red', times=1, interval=0.1)
+            if s == 1:
+                self.led.flash(i)
         if sum(status) == 1:
             idx = status.index(1)
             callback = self.footswitch_assigns[idx]
@@ -819,8 +838,7 @@ class Presenter:
             self.view_update_effect()
             self._notify('전역 BYPASS ON')
             # All four LEDs blink to confirm the kill switch is engaged.
-            for i in range(4):
-                self.hwi.LED.get_led(i).blink(color='red', times=2, interval=0.1)
+            self.led.flash_all(times=2)
         else:
             for effect in self.pedalboard.effects:
                 if effect.instance not in self._bypass_restore:
@@ -863,6 +881,7 @@ class Presenter:
                 print("Warning: Not enough non-simulator effects to assign all four footswitches.")
                 self.footswitch_assigns = [None, None, None, None]
                 self.stomp_effects = []
+                self._push_led_bindings()
                 return
 
             e0 = valid_effects[0]  # first effect
@@ -914,6 +933,10 @@ class Presenter:
             # Any single press is a beat tap; chords exit (handle_multiple_footswitches).
             self.footswitch_assigns = [self.tap_input] * 4
 
+        # Binding changed -> refresh the LEDs' resting colours (mode-2 fallback
+        # returns early above, but its recursive assign_footswitches already did).
+        self._push_led_bindings()
+
     def view_update_bpm(self):
         self.view.update_bpm_display(self.pedalboard.bpm)
 
@@ -935,7 +958,7 @@ class Presenter:
         self._mode_before_tap = self.footswitch_mode
         self.footswitch_mode = TAP_TEMPO_MODE
         self.assign_footswitches()
-        self.hwi.LED.stop_all_blinking()   # clear before the metronome owns the LEDs
+        self.led.metronome_start()   # the metronome takes the LED surface
         self.view.update_mode_display(TAP_TEMPO_MODE)
         self.view.show_tap_tempo(self.pedalboard.bpm, self.pedalboard.bpb)
         self.tap_tempo.start(self.pedalboard.bpm, self.pedalboard.bpb)
@@ -943,9 +966,9 @@ class Presenter:
     def exit_tap_tempo(self):
         """Leave tap-tempo (any chord) -> stop the metronome, restore the prior mode."""
         self.tap_tempo.stop()
-        self.hwi.LED.stop_all_blinking()
         self.footswitch_mode = self._mode_before_tap
         self.assign_footswitches()
+        self.led.metronome_stop()    # release the surface; restores resting colours
         self.view.hide_tap_tempo()
         self.view.update_mode_display(self.footswitch_mode)
 
@@ -970,26 +993,17 @@ class Presenter:
             return
         self._tuner_engine = engine
         self._in_tuner = True
-        self.hwi.LED.stop_all_blinking()
         self.view.show_tuner(engine)
-        # Drive the footswitch LED strobe from the reading (GUI-thread ticker).
-        self._tuner_led_state = None
-        self._tuner_led_phase = 0.0
-        self._tuner_was_in_tune = False
-        self._tuner_led_handle = self.scheduler.schedule_interval(
-            self._tuner_led_tick, 1.0 / TUNER_LED_TICK_HZ)
+        # Hand the LED surface to the tuner strobe. LedView pulls the latest
+        # reading each tick and owns the entire visual mapping.
+        self.led.tuner_start(lambda: engine.get_reading())
 
     def exit_tuner(self):
         """Leave the tuner -> stop the audio engine + LED strobe, back to overview."""
         if not self._in_tuner:
             return
         self._in_tuner = False
-        if self._tuner_led_handle is not None:
-            self.scheduler.unschedule(self._tuner_led_handle)
-            self._tuner_led_handle = None
-        for i in range(4):
-            self.hwi.LED[i] = 0
-        self._tuner_led_state = 0
+        self.led.tuner_stop()        # release the surface; restores resting colours
         engine, self._tuner_engine = self._tuner_engine, None
         if engine is not None:
             try:
@@ -997,47 +1011,6 @@ class Presenter:
             except Exception as e:
                 logging.error("tuner stop failed: %s", e)
         self.view.hide_tuner()
-
-    def _tuner_led_tick(self, dt):
-        """~30 Hz while tuning: drive the 4 footswitch LEDs from the latest reading.
-        Off-pitch = red strobe that speeds up as the note nears pitch; the moment
-        it lands = a short blue flourish, then steady blue; silence = LEDs off."""
-        engine = self._tuner_engine
-        if engine is None:
-            return
-        r = engine.get_reading()
-        if r is None:                              # engine already gates on volume/confidence
-            self._tuner_was_in_tune = False
-            self._tuner_led_phase = 0.0
-            self._set_all_leds(0)
-            return
-        if abs(r.cents) < TUNER_IN_TUNE_CENTS:
-            now = time.monotonic()
-            if not self._tuner_was_in_tune:        # just landed on pitch
-                self._tuner_was_in_tune = True
-                self._tuner_tune_since = now
-                self._tuner_led_phase = 0.0
-            if now - self._tuner_tune_since < TUNER_CEREMONY_SEC:
-                self._tuner_led_phase = (self._tuner_led_phase + 12.0 / TUNER_LED_TICK_HZ) % 1.0
-                self._set_all_leds(0b01 if self._tuner_led_phase < 0.5 else 0)   # quick blue flourish
-            else:
-                self._set_all_leds(0b01)           # steady blue = in tune
-            return
-        # off pitch: red strobe, faster the closer to pitch
-        self._tuner_was_in_tune = False
-        span = TUNER_FAR_CENTS - TUNER_IN_TUNE_CENTS
-        closeness = 1.0 - min(1.0, max(0.0, (abs(r.cents) - TUNER_IN_TUNE_CENTS) / span))
-        blink_hz = TUNER_BLINK_SLOW_HZ + closeness * (TUNER_BLINK_FAST_HZ - TUNER_BLINK_SLOW_HZ)
-        self._tuner_led_phase = (self._tuner_led_phase + blink_hz / TUNER_LED_TICK_HZ) % 1.0
-        self._set_all_leds(0b10 if self._tuner_led_phase < 0.5 else 0)
-
-    def _set_all_leds(self, state):
-        """Set all 4 footswitch LEDs to `state`, skipping redundant I2C writes."""
-        if state == self._tuner_led_state:
-            return
-        for i in range(4):
-            self.hwi.LED[i] = state
-        self._tuner_led_state = state
 
     def _tap_on_bpm(self, bpm):
         """Engine produced a refined BPM -> tell MODEP + update the on-screen widget."""
@@ -1049,48 +1022,13 @@ class Presenter:
         self.view.update_bpm_display(bpm)
 
     def _tap_on_beat(self, led_index, is_downbeat, duration):
-        """Metronome beat -> flash one LED (red downbeat / blue off-beat)."""
-        self.hwi.LED[led_index] = 0b10 if is_downbeat else 0b01
-        self.scheduler.schedule_once(
-            lambda dt, i=led_index: self._tap_beat_off(i), duration)
-
-    def _tap_beat_off(self, led_index):
-        self.hwi.LED[led_index] = 0
-
-    # Boot LED ceremony: a scripted ~3s light show over the 4 footswitch LEDs.
-    # Each frame is (delay_seconds, [s0, s1, s2, s3]) where a per-LED state is
-    # 0=off 1=blue 2=red 3=purple (see fsledctrl.LED.set_state). Runs on the
-    # event loop (non-blocking) so the splash->overview handoff isn't frozen.
-    _BOOT_FRAMES = [
-        # blue Knight-Rider sweep out and back
-        (0.00, [1, 0, 0, 0]), (0.10, [0, 1, 0, 0]), (0.20, [0, 0, 1, 0]),
-        (0.30, [0, 0, 0, 1]), (0.40, [0, 0, 1, 0]), (0.50, [0, 1, 0, 0]),
-        (0.60, [1, 0, 0, 0]),
-        # red sweep back the other way
-        (0.70, [0, 0, 0, 2]), (0.80, [0, 0, 2, 0]), (0.90, [0, 2, 0, 0]),
-        (1.00, [2, 0, 0, 0]),
-        # purple wipe filling left->right
-        (1.15, [3, 0, 0, 0]), (1.25, [3, 3, 0, 0]), (1.35, [3, 3, 3, 0]),
-        (1.45, [3, 3, 3, 3]),
-        # red/blue sparkle alternation
-        (1.60, [1, 2, 1, 2]), (1.72, [2, 1, 2, 1]), (1.84, [1, 2, 1, 2]),
-        (1.96, [2, 1, 2, 1]),
-        # triple purple finale, then dark
-        (2.10, [3, 3, 3, 3]), (2.25, [0, 0, 0, 0]), (2.40, [3, 3, 3, 3]),
-        (2.55, [0, 0, 0, 0]), (2.70, [3, 3, 3, 3]), (2.85, [0, 0, 0, 0]),
-    ]
+        """Metronome beat callback -> LedView flashes one LED (red downbeat /
+        blue off-beat)."""
+        self.led.metronome_beat(led_index, is_downbeat, duration)
 
     def boot_lightshow(self, i=None):
-        """Play the boot LED ceremony (see _BOOT_FRAMES). No-op if the hardware
-        can't drive LEDs (e.g. a fake injected in tests)."""
-        def paint(states):
-            try:
-                for idx, state in enumerate(states):
-                    self.hwi.LED[idx] = state
-            except Exception:
-                pass  # fake/absent LED backend -> silently skip the show
-        for delay, states in self._BOOT_FRAMES:
-            self.scheduler.schedule_once(lambda dt, s=states: paint(s), delay)
+        """Play the boot LED ceremony (see ledview.LedView.boot_show)."""
+        self.led.boot_show()
 
     def save_snapshot(self):
         self._audit_desync("save_snapshot")
