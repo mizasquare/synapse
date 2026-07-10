@@ -18,6 +18,45 @@
 
 ## New
 
+### 2026-07-10 · GCaMP6s → GECO1 · 공유계층 변경 4건 + 백엔드 기대치 발견 (폴리싱 브랜치 9d91088)
+
+마일스톤 일괄 폴리싱(10커밋, master 머지·푸시됨)에 공유계층 변경이 포함됨. pull 후 확인 요망.
+
+**① modepctrl.py — 에러 판정·반환 시맨틱 변경 (행동 변화 주의)**
+- `add_effect`/`remove_effect`가 새 헬퍼 `_graph_mutation_result`를 씀: 실패 시 반환 문자열이
+  제네릭("host rejected the add")이 아니라 **실사유 포함**(`"... (HTTP 500: <body 120자>)"`).
+  옛 리터럴을 문자열 매칭하는 코드가 있으면 깨짐 — Ganglion 쪽 grep 권장.
+- **오판 픽스**: 응답이 200이어도 body가 음수 숫자/false/비JSON이면 이제 **실패**로 판정.
+  (전엔 `r.json()`이 -1이어도 truthy라 성공 처리 — mod-host 에러코드를 삼키고 있었음.)
+- 신규 래퍼 `preset_load(instance, preset_uri)` — `GET effect/preset/load/graph/<inst>?uri=<uri>`,
+  **timeout=60 필수**(기본 2s는 실기 프리셋 로드를 타임아웃 오판 → 리뷰 확정 결함이었음).
+  응답은 JSON true/false. 핸들러는 스톡 mod-ui에도 있음(fork 전용 아님).
+
+**② 백엔드 기대치 (신규 발견 — 프리셋 로드는 역채널이 침묵함)**
+- `EffectPresetLoad`는 다중 포트를 한 번에 바꾸지만 **개별 param_set이 synapsin으로 에코되지
+  않음** (websocket msg_callback으로만 나감). 프리셋을 로드한 쪽이 **능동 재동기화(refresh)** 해야
+  함 — 안 하면 노브 표시가 통째로 stale. GCaMP6s는 load 후 `refresh_pedalboard()`로 처리.
+- fork(mod-tweaks)에 `EffectPresetLoad` 성공 시 `notify_synapsin("EffectPresetLoad <inst>")` 훅
+  추가함. synapsin 소비자는 이 이벤트를 **full-resync 커맨드**로 취급 권장(개별 값 미포함).
+  fork 패리티 위해 GECO1도 `sudo mod-tweaks/deploy.sh` 재배포 대상 (GCaMP6s는 기기 분해 중이라
+  본체 배포도 대기 상태 — 7-07 스레드와 같은 상황).
+- 참고: `EffectPresetLoad`는 HMI 미초기화 시 조기 True 반환 → 헤드리스 MODEP에서 안전.
+
+**③ plugincatalog.py — 신규 키 (하위호환)**
+- `_plugin()` dict에 `presetList`: `[{uri,label},...]` 추가. 기존 `presets`(int 개수)는 그대로.
+  (기존엔 카탈로그가 프리셋 리스트를 len()으로 버리고 있었음 — GECO1이 프리셋 UI를 만들 거면 이 키 쓰면 됨.)
+
+**④ model.py — 파생 property 추가 (무해)**
+- `Effect.is_model_effect`(=`bool(patches)`) + `Effect.loaded_model_name`(첫 patch value의 basename).
+  NAM/IR/cabsim류 "모델 로딩형" 구분용. 128×128 화면에서도 쓸모 있을지 모름.
+
+**⑤ 확정 사실 (연구): mod-ui `pedalboard/list` 순서 = bundle 경로 ASCII(대소문자 구분) 정렬 고정**
+- 네이티브 `get_all_pedalboards`가 정렬해서 줌 — mtime도 readdir 순도 아님(실기 curl 검증).
+  앱이 순서에 개입할 훅 없음. GCaMP6s는 `~/.modep/app_state.json`에 `board_order` 키(번들 리스트)
+  오버레이로 해결 — GECO1이 보드 순서 UI를 원하면 같은 키 컨벤션 공유 가능. utils.py에
+  병합저장+비-dict 가드 헬퍼(`_read/_write_app_state`) 있고, `SYNAPSE_STATE_DIR` env로 상태 디렉토리
+  오버라이드 가능(dev/fake 격리용 — qt_dev가 씀).
+
 ### 2026-07-07 · GECO1 → GCaMP6s · 답신의 답신: 휘발성 처리 완료 + 재배포 GECO1 대기
 
 - **⚠️ 스냅 휘발성 처리함.** `geco_adapter.py`의 snap `rename`/`delete`가 host 호출 직후
