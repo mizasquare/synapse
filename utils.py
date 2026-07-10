@@ -44,6 +44,26 @@ def save_last_bank(idx):
     _write_app_state("last_bank", int(idx))
 
 
+def load_fs_assigns():
+    """Manual STOMP footswitch assignments, per pedalboard, held across restarts.
+
+    Shape: ``{pb_path: {slot_str: instance}}``. STOMP (mode 1) auto-picks the
+    category-filtered front-2/back-2 effects; this overlay lets the FOCUS card
+    pin a focused effect to a specific slot, PER BOARD, overriding the auto pick
+    for that slot only. instance is unique per saved board (and pb_path scopes
+    the map, so the same instance id in two boards never collides); a stale one
+    -- block removed then re-added mints a new instance -- resolves to nothing
+    and the slot falls back to the auto pick. Non-dict content folds to {} (same
+    discipline as board_order, which also runs on the live footswitch path)."""
+    m = _read_app_state().get("fs_assigns", {})
+    return m if isinstance(m, dict) else {}
+
+
+def save_fs_assigns(mapping):
+    """Persist the whole fs_assigns map, preserving any other app_state keys."""
+    _write_app_state("fs_assigns", mapping)
+
+
 def load_board_order():
     """User-controlled pedalboard order (list of bundle paths). mod-ui's
     pedalboard/list is hard-sorted by bundle path in the native layer (the app

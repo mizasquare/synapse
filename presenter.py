@@ -15,6 +15,11 @@ import configs
 # that cycle.
 TAP_TEMPO_MODE = 4
 
+# STOMP auto-pick excludes these categories (amp/cab/sim/utility are set-and-forget
+# tone blocks, not per-song stomps). Manual FOCUS-card assignment can still pin any
+# effect regardless of category -- this only bounds the AUTO fill.
+_STOMP_EXCLUDED = ("simulator", "amp", "cab", "utility")
+
 class Presenter:
     def __init__(self, view, scheduler, backend=None, hardware=None,
                  tuner_source_factory=None):
@@ -71,10 +76,15 @@ class Presenter:
         self.current_bank = utils.load_last_bank()
         self.bank_boards = []
 
-        # Mode-1 STOMP: the 4 category-filtered effects bound to FS0-3. Exposed so
-        # the QtView strip captions mirror exactly what a press toggles (kept in
-        # sync by assign_footswitches, same lifecycle as bank_boards).
+        # Mode-1 STOMP: the 4 effects bound to FS0-3 (length-4, None where a slot
+        # is empty). Exposed so the QtView strip captions mirror exactly what a
+        # press toggles (kept in sync by assign_footswitches, same lifecycle as
+        # bank_boards). Resolved from manual per-board overrides + the auto pick.
         self.stomp_effects = []
+        # Manual STOMP assignments {pb_path: {slot_str: instance}} (utils/app_state).
+        # Per-slot overrides on top of the auto front-2/back-2 pick; see
+        # _resolve_stomp_slots / assign_focus_to_fs. Held across restarts.
+        self._fs_assigns = utils.load_fs_assigns()
 
         # Global bypass ("panic button", the A+D chord -> bypass_all): toggle
         # state + per-effect restore map ({instance: pre-engage bypassed}).
@@ -82,6 +92,10 @@ class Presenter:
         # resurrect stale states from a previous board.
         self._global_bypass = False
         self._bypass_restore = {}
+
+        # Drop persisted per-board local settings whose pedalboard was deleted
+        # while the app was off (or via the web UI), so orphans don't accumulate.
+        self._prune_stale_local_state()
 
         self.assign_footswitches()
         self.boot_lightshow()
@@ -98,6 +112,37 @@ class Presenter:
         from hardwares import fsledctrl
         return fsledctrl.Controller(scheduler)
 
+    def _prune_stale_local_state(self):
+        """Drop persisted per-board local settings whose pedalboard no longer
+        exists (deleted while the app was off, or from the web UI), so app_state
+        doesn't accumulate orphan fs_assigns / board_order entries keyed by a
+        dead bundle path.
+
+        Best-effort and conservative: if the host can't be listed (down at boot)
+        it returns an empty set, and we skip pruning rather than wipe everything
+        on a transient failure. Runs once at startup. (Per-instance staleness --
+        an effect removed from a still-existing board -- needs no cleanup here:
+        _resolve_stomp_slots already falls back to auto for a missing instance.)"""
+        try:
+            entries = self.backend.get_all_pedalboard_entries() or []
+        except Exception as e:
+            logging.debug("prune: could not list pedalboards: %s", e)
+            return
+        live = {e["bundle"].rstrip("/") for e in entries if e.get("bundle")}
+        if not live:
+            return  # host returned nothing -> don't nuke on uncertainty
+
+        pruned = {pb: m for pb, m in self._fs_assigns.items()
+                  if pb.rstrip("/") in live}
+        if pruned != self._fs_assigns:
+            self._fs_assigns = pruned
+            utils.save_fs_assigns(self._fs_assigns)
+
+        order = utils.load_board_order()
+        kept = [b for b in order if b.rstrip("/") in live]
+        if kept != order:
+            utils.save_board_order(kept)
+
     def initiate_view(self):
         self.view_update_effect()
         self.view_update_bpm()
@@ -109,6 +154,13 @@ class Presenter:
         # (bypass_all itself never calls refresh, so this can't self-trigger.)
         self._global_bypass = False
         self._bypass_restore = {}
+        # STOMP binds effect OBJECTS (self.stomp_effects), which the rebuild above
+        # just orphaned -> the strip (reads those objects) would show stale bypass
+        # while the LEDs (live-lookup) show fresh, and the two diverge. Re-resolve
+        # so stomp_effects holds the live objects again. Only mode 1 binds objects
+        # (mode 2 holds bundle dicts, mode 0 holds none), so guard on it.
+        if self.footswitch_mode == 1:
+            self.assign_footswitches()
         self.view_update_effect()
 
     def _audit_desync(self, context):
@@ -227,7 +279,11 @@ class Presenter:
                 self.pedalboard.get_effect_by_instance(effect_instance).bypassed = port_value
                 self.view_update_effect()
             else:
+                # The host didn't answer (e.g. a slow-loading board stalling mod-host):
+                # the toggle silently no-op'd and model/host may now disagree. Surface
+                # it so a dead-looking footswitch reads as "host busy", not "broken".
                 print(error_msg)
+                self._notify("호스트 응답 없음 — 바이패스 실패")
 
         effect = self.pedalboard.get_effect_by_instance(effect_instance)
         if effect and port_symbol in effect.ports:
@@ -863,46 +919,26 @@ class Presenter:
             ]
 
         elif self.footswitch_mode == 1:
-            # Mode 1: parameter assign mode (bypass toggles)
-            # 1) Filter out any effects that are in “simulator” categories
-            #    (or keep them, depending on your actual “excluded” vs. “included” logic).
-            valid_effects = []
-            for effect in self.pedalboard.effects:
-                # Example: exclude categories like "Simulator", "Amp", or "Cab"
-                # Adjust to match your actual category naming
-                if not any(cat.lower() in ["simulator", "amp", "cab", "utility"] for cat in effect.category):
-                    valid_effects.append(effect)
+            # Mode 1: STOMP (per-effect bypass toggles). Resolve the 4 slots from
+            # the manual per-board overrides + the auto front-2/back-2 pick
+            # (_resolve_stomp_slots); a None slot is left unbound. Each bound slot
+            # toggles that effect's bypass. stomp_effects is length-4 so captions,
+            # LED bindings and the assigns line up 1:1 by index.
+            slots = self._resolve_stomp_slots()
+            self.stomp_effects = slots
 
-            # 2) Grab the first two and last two from this filtered list
-            #    If fewer than 4 are available, handle that gracefully
-            if len(valid_effects) < 4:
-                # If you expect always to have enough “toggle-able” effects,
-                # you can just skip or implement partial assignment here.
-                print("Warning: Not enough non-simulator effects to assign all four footswitches.")
-                self.footswitch_assigns = [None, None, None, None]
-                self.stomp_effects = []
-                self._push_led_bindings()
-                return
+            def toggle_bypass(instance):
+                # Read the LIVE effect at PRESS time and compute the toggle
+                # direction from its current bypass -- never from a snapshot
+                # captured at bind time, which a model rebuild (refresh_pedalboard)
+                # would have left stale (wrong direction / no-op presses).
+                live = self.pedalboard.get_effect_by_instance(instance)
+                if live is not None:
+                    self.parameter_changed(instance, ':bypass', not live.bypassed)
 
-            e0 = valid_effects[0]  # first effect
-            e1 = valid_effects[1]  # second effect
-            e2 = valid_effects[-2]  # second-last effect
-            e3 = valid_effects[-1]  # last effect
-
-            # Expose the chosen 4 so the QtView strip captions match the toggles.
-            self.stomp_effects = [e0, e1, e2, e3]
-
-            # 3) Define a small helper to toggle bypass:
-            def toggle_bypass(effect):
-                current_val = effect.bypassed
-                self.parameter_changed(effect.instance, ':bypass', not current_val)
-
-            # 4) Assign footswitch 0–3 to lambda toggles of the chosen effects
             self.footswitch_assigns = [
-                lambda: toggle_bypass(e0),
-                lambda: toggle_bypass(e1),
-                lambda: toggle_bypass(e2),
-                lambda: toggle_bypass(e3),
+                (lambda inst=eff.instance: toggle_bypass(inst)) if eff is not None else None
+                for eff in slots
             ]
 
         elif self.footswitch_mode == 2:
@@ -936,6 +972,91 @@ class Presenter:
         # Binding changed -> refresh the LEDs' resting colours (mode-2 fallback
         # returns early above, but its recursive assign_footswitches already did).
         self._push_led_bindings()
+
+    def _board_fs_map(self):
+        """Manual FS overrides for the CURRENT board as {slot_int: instance}.
+        JSON keys are strings (int slots don't survive a round-trip); non-int
+        keys are dropped defensively."""
+        pb = ((self.pedalboard.current_pb_path if self.pedalboard else "") or "")
+        out = {}
+        for k, inst in (self._fs_assigns.get(pb, {}) or {}).items():
+            try:
+                out[int(k)] = inst
+            except (TypeError, ValueError):
+                pass
+        return out
+
+    def _resolve_stomp_slots(self):
+        """The 4 effects bound to FS0-3 in STOMP mode, as a length-4 list of
+        Effect|None. Manual per-board overrides are placed first (each on its
+        slot, if the instance still resolves on this board); the remaining empty
+        slots are auto-filled left-to-right from the category-filtered
+        front-2/back-2 picks, skipping any effect already placed manually.
+
+        This also fixes the old all-or-nothing auto: a small board (<4 toggleable
+        effects) used to bind NOTHING; now manual pins still hold and auto fills
+        whatever it can."""
+        effects = self.pedalboard.effects if self.pedalboard else []
+        filtered = [e for e in effects
+                    if not any(str(c).lower() in _STOMP_EXCLUDED for c in (e.category or []))]
+        slots = [None, None, None, None]
+        placed = set()
+        for slot, inst in self._board_fs_map().items():
+            if 0 <= slot < 4:
+                eff = self.pedalboard.get_effect_by_instance(inst)
+                if eff is not None:
+                    slots[slot] = eff
+                    placed.add(eff.instance)
+        auto = []
+        if len(filtered) >= 4:
+            for e in (filtered[0], filtered[1], filtered[-2], filtered[-1]):
+                if e.instance not in placed and e not in auto:
+                    auto.append(e)
+        ai = 0
+        for i in range(4):
+            if slots[i] is None and ai < len(auto):
+                slots[i] = auto[ai]
+                ai += 1
+        return slots
+
+    def fs_slot_for(self, instance):
+        """The STOMP footswitch slot (0-3) this effect is MANUALLY pinned to on
+        the current board, or -1 if unpinned. Drives the FOCUS card's A/B/C/D
+        highlight (auto-picked, non-pinned slots read as -1 -- the card only
+        reflects explicit user assignment)."""
+        for slot, inst in self._board_fs_map().items():
+            if inst == instance and 0 <= slot < 4:
+                return slot
+        return -1
+
+    def assign_focus_to_fs(self, instance, slot):
+        """FOCUS card: pin effect ``instance`` to STOMP footswitch ``slot`` (0-3)
+        on the current board, or UNPIN if it already holds that slot (toggle).
+        An instance occupies at most one slot, so it's cleared from any other
+        slot first; pinning a slot another effect held replaces it. Persists the
+        overlay and, if STOMP is live, re-resolves the strip + LEDs. Returns the
+        slot now holding it, or -1 when unpinned/out of range."""
+        if not (0 <= slot < 4) or self.pedalboard is None:
+            return -1
+        pb = self.pedalboard.current_pb_path or ""
+        prior = self._fs_assigns.get(pb, {}) or {}
+        board = {str(s): inst for s, inst in prior.items()
+                 if inst != instance}                    # drop this instance from every slot
+        if prior.get(str(slot)) == instance:
+            result = -1                                  # re-tapped its own slot -> unpin (already dropped)
+        else:
+            board[str(slot)] = instance                  # occupy target (replacing any prior holder)
+            result = slot
+        if board:
+            self._fs_assigns[pb] = board
+        else:
+            self._fs_assigns.pop(pb, None)
+        utils.save_fs_assigns(self._fs_assigns)
+        if self.footswitch_mode == 1:
+            self.assign_footswitches()          # re-resolve slots -> LED bindings
+        self.view_update_effect()               # rebuild the FS strip (mode-1 captions)
+        self.view_render_parameters(instance)   # refresh the FOCUS card's A/B/C/D highlight
+        return result
 
     def view_update_bpm(self):
         self.view.update_bpm_display(self.pedalboard.bpm)
@@ -1104,7 +1225,10 @@ class Presenter:
                     "patch_file_path": patch.file_path,
                     "patch_value": patch.value,
                 } for patch in effect.patches.values()
-            ]
+            ],
+            # Which STOMP footswitch slot this effect is manually pinned to (-1 =
+            # none) -> the FOCUS card's A/B/C/D highlight.
+            "effect_fs_slot": self.fs_slot_for(effect.instance),
         }
 
 
