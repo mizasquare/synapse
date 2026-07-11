@@ -1,0 +1,13 @@
+{
+  "_comment": "Synapse UI strings — PRIMARY language (English), the source of truth. Read by strings.py (Python) and injected into QML as `Tr` (qt_main.py). ko.json is a frozen snapshot that falls back here per missing key. Keys are screen-domain dotted; {0}/{name} are str.format placeholders. Glyphs (✕ + ▸ ◆ …) and the SYNAPSE wordmark / BPM unit are NOT keyed. See docs/string-i18n-plan.md.",
+
+  "boot.waiting": "Waiting for MODEP…",
+
+  "chrome.boards": "BOARDS",
+  "chrome.snap":   "SNAP",
+  "chrome.bank":   "BANK",
+  "chrome.save":   "SAVE",
+  "chrome.saveAs": "SAVE AS",
+  "chrome.edit":   "EDIT",
+  "chrome.menu":   "MENU"
+}

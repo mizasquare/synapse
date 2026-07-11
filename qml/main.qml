@@ -78,7 +78,7 @@ Window {
             }
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "MODEP 대기 중…"
+                text: Tr.tr("boot.waiting")
                 color: cMuted
                 font: Theme.typeFont("title")
                 // Pulse while the splash is up; stops when hidden (no idle work).
@@ -174,7 +174,7 @@ Window {
                         width: 92; height: 38; radius: 8
                         color: boardsMa.pressed ? Theme.color("btn.blue.fillPressed") : Theme.color("btn.blue.fill")
                         border.width: 1; border.color: boardsMa.pressed ? Theme.color("accent.blueBright") : Theme.color("accent.blue")
-                        Text { anchors.centerIn: parent; text: "BOARDS"; color: Theme.color("accent.blueBright"); font: Theme.typeFont("button") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("chrome.boards"); color: Theme.color("accent.blueBright"); font: Theme.typeFont("button") }
                         MouseArea { id: boardsMa; anchors.fill: parent
                                     onClicked: { view.refreshBoards(); overviewScreen.boardsOpen = true } }
                     }
@@ -182,7 +182,7 @@ Window {
                         width: 66; height: 38; radius: 8
                         color: snapMa.pressed ? Theme.color("btn.purple.fillPressed") : Theme.color("btn.purple.fill")
                         border.width: 1; border.color: snapMa.pressed ? Theme.color("accent.purpleBright") : Theme.color("btn.purple.border")
-                        Text { anchors.centerIn: parent; text: "SNAP"; color: Theme.color("accent.purpleBright"); font: Theme.typeFont("button") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("chrome.snap"); color: Theme.color("accent.purpleBright"); font: Theme.typeFont("button") }
                         MouseArea { id: snapMa; anchors.fill: parent
                                     onClicked: { view.refreshSnaps(); overviewScreen.snapsOpen = true } }
                     }
@@ -190,7 +190,7 @@ Window {
                         width: 70; height: 38; radius: 8
                         color: bankMa.pressed ? Theme.color("btn.blue.fillPressed") : Theme.color("btn.blue.fill")
                         border.width: 1; border.color: bankMa.pressed ? Theme.color("accent.blueBright") : Theme.color("accent.blue")
-                        Text { anchors.centerIn: parent; text: "BANK"; color: Theme.color("accent.blueBright"); font: Theme.typeFont("button") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("chrome.bank"); color: Theme.color("accent.blueBright"); font: Theme.typeFont("button") }
                         MouseArea { id: bankMa; anchors.fill: parent
                                     onClicked: { view.refreshBanks(); overviewScreen.bankMgrOpen = true } }
                     }
@@ -198,28 +198,28 @@ Window {
                         width: 72; height: 38; radius: 8
                         color: saveMa.pressed ? Theme.color("btn.neutral.fillPressed") : Theme.color("surface.control")
                         border.width: 1; border.color: saveMa.pressed ? Theme.color("text.secondary") : cBorder
-                        Text { anchors.centerIn: parent; text: "SAVE"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("chrome.save"); color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { id: saveMa; anchors.fill: parent; onClicked: view.saveSnapshot() }
                     }
                     Rectangle {
                         width: 98; height: 38; radius: 8
                         color: saveAsMa.pressed ? Theme.color("btn.neutral.fillPressed") : Theme.color("surface.control")
                         border.width: 1; border.color: saveAsMa.pressed ? Theme.color("text.secondary") : cBorder
-                        Text { anchors.centerIn: parent; text: "SAVE AS"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("chrome.saveAs"); color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { id: saveAsMa; anchors.fill: parent; onClicked: saveAsModal.open = true }
                     }
                     Rectangle {
                         width: 66; height: 38; radius: 8
                         color: editMa.pressed ? Theme.color("btn.purple.fillPressed") : Theme.color("btn.purple.fill")
                         border.width: 1; border.color: editMa.pressed ? Theme.color("accent.purpleBright") : Theme.color("btn.purple.border")
-                        Text { anchors.centerIn: parent; text: "EDIT"; color: Theme.color("accent.purpleBright"); font: Theme.typeFont("button") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("chrome.edit"); color: Theme.color("accent.purpleBright"); font: Theme.typeFont("button") }
                         MouseArea { id: editMa; anchors.fill: parent; onClicked: view.enterEdit() }
                     }
                     Rectangle {
                         width: 66; height: 38; radius: 8
                         color: menuMa.pressed ? Theme.color("btn.neutral.fillPressed") : Theme.color("surface.control")
                         border.width: 1; border.color: menuMa.pressed ? Theme.color("text.secondary") : cBorder
-                        Text { anchors.centerIn: parent; text: "MENU"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("chrome.menu"); color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { id: menuMa; anchors.fill: parent; onClicked: { overviewScreen.hubLeaf = "menu"; overviewScreen.hubOpen = true } }
                     }
                 }

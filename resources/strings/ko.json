@@ -1,0 +1,13 @@
+{
+  "_comment": "Synapse UI strings — Korean (frozen snapshot, toggle/regression only). English (en.json) is the source of truth; any key missing here falls back to en. Terse chrome (SAVE/BANK/…) stays English even in the Korean build, matching the pre-i18n UI. See docs/string-i18n-plan.md.",
+
+  "boot.waiting": "MODEP 대기 중…",
+
+  "chrome.boards": "BOARDS",
+  "chrome.snap":   "SNAP",
+  "chrome.bank":   "BANK",
+  "chrome.save":   "SAVE",
+  "chrome.saveAs": "SAVE AS",
+  "chrome.edit":   "EDIT",
+  "chrome.menu":   "MENU"
+}
