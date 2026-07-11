@@ -30,10 +30,12 @@ Item {
         }
     }
 
-    readonly property color cGreen:  "#5fd0a0"
-    readonly property color cText:   "#e8edf4"
-    readonly property color cMuted:  "#7e8694"
-    readonly property color cTrack:  "#222a38"
+    // Palette + type now resolve from the shared Theme token source (theme/tokens.json).
+    // Kept as local aliases so the many `root.cX` call sites below stay untouched.
+    readonly property color cGreen:  Theme.color("accent.green")
+    readonly property color cText:   Theme.color("text.primary")
+    readonly property color cMuted:  Theme.color("text.secondary")
+    readonly property color cTrack:  Theme.color("surface.track")
 
     Column {
         anchors.centerIn: parent
@@ -51,7 +53,7 @@ Item {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: root.m ? root.m.name : ""; color: root.cMuted
-            font.family: uiFont; font.pixelSize: 15
+            font: Theme.typeFont("smallLabel")
             // long port names (e.g. "Gain Reduction") overflowed the 118px cell
             width: Math.min(implicitWidth, root.width - 8)
             elide: Text.ElideRight
@@ -78,8 +80,8 @@ Item {
         Rectangle {
             width: 30; height: 30; radius: 15
             property bool lit: root.liveValue >= 0.5
-            color: lit ? "#e2524a" : "#3a2222"
-            border.width: 2; border.color: lit ? "#ff7a70" : "#5a2a2a"
+            color: lit ? Theme.color("clip.lit") : Theme.color("clip.idle")
+            border.width: 2; border.color: lit ? Theme.color("clip.litBorder") : Theme.color("clip.idleBorder")
         }
     }
 
@@ -88,7 +90,7 @@ Item {
         id: numericC
         Text {
             text: root.liveDisplay
-            color: root.cText; font.family: uiFont; font.pixelSize: 28
+            color: root.cText; font: Theme.typeFont("title")
         }
     }
 
