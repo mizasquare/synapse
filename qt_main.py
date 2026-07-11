@@ -35,6 +35,7 @@ from monitorfeed import MonitorFeed
 from presenter import Presenter
 from qtscheduler import QtScheduler
 from qtview import QtView
+from theme_qml import ThemeProvider
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 logging.basicConfig(level=logging.INFO)
@@ -233,6 +234,11 @@ def main():
     ctx.setContextProperty("view", view)
     ctx.setContextProperty("editor", editor)
     ctx.setContextProperty("uiFont", ui_font)
+    # Theme tokens (colors + type hierarchy) from theme/tokens.json — the same file
+    # theme.py resolves on the Python side. `theme_provider` is kept alive by this
+    # function's scope for the life of the event loop. See docs/theme-tokenization-plan.md.
+    theme_provider = ThemeProvider(ui_font)
+    ctx.setContextProperty("Theme", theme_provider)
     engine.load(QUrl.fromLocalFile(os.path.join(BASE, "qml", "main.qml")))
     if not engine.rootObjects():
         print("[qt_main] QML failed to load")
