@@ -63,12 +63,15 @@ C* Click·오버뷰 렌더·손감각 1차, [`qt-roadmap-DONE.md`](qt-roadmap-DO
 > 래치를 순수 상태기계 `hardwares/footswitches.FootswitchReader`로 내리고 Presenter는 `poll()`이 emit한
 > 이벤트만 구독. 릴리스엣지 콤보 의미는 2000개 랜덤 시퀀스 비트동일 검증(의미 유지·위치 이동). press/release
 > 엣지도 surface → ② 모멘터리 경로 개통. → [`qt-roadmap-DONE.md`](qt-roadmap-DONE.md) 상단.
-- [ ] **i18n / 테마 토큰화 (한 묶음 — 결정 2026-06-28)** — 다국어·테마 스왑이 요구사항이 아니면 무기한 미룸 가능(순수
-      유지보수성). 기계적 스윕이라 멀티에이전트 적합.
-      - **문자열 중앙화(i18n)**: 사용자 노출 리터럴 → `resources/strings/<lang>.json` + `tr("key")` 인다이렉션.
-        (현재 `qsTr()`/`tr()` 0건, 리터럴이 QML에 직접 하드코딩.)
-      - **테마 토큰화**: `qml/Theme.qml`(`pragma Singleton`)에 색/폰트 토큰 집약. ⚠️ **색이 QML뿐 아니라 파이썬
-        (`editor_bridge`/`qtview`)에도 있음** → 진짜 단일 소스화하려면 파이썬 측 색도 함께 중앙화해야 완전.
+- [ ] **i18n / 테마 토큰화 (한 묶음 — 결정 2026-06-28)** — 설계·진행 = [`theme-tokenization-plan.md`](theme-tokenization-plan.md).
+      - **테마 토큰화 (색)**: ✅ **완료** 2026-07-11 (`8b9eb72`, Pi 색검증 통과). 언어중립 정본 `theme/tokens.json`
+        하나를 QML(`Theme` 컨텍스트 prop)·Python(`theme.py`)이 각자 읽음 → 파이썬 이중소스 함정 해소. 7파일 코드
+        hex 리터럴 0, 색토큰 72개. 값 비트동일(collapse 2곳만 sub-perceptual).
+      - [ ] **테마 토큰화 (폰트)**: ⬜ Phase 3+4 잔여 — 역할토큰(button/title/smallLabel…) + 27종 px→9스케일
+        합리화. 인프라(`scale`/`type` 토큰·`Theme.typeFont`)는 이미 존재, 요소별 역할배정+스냅만. **실제 시각변화 →
+        화면별 Pi 확인 필요.**
+      - [ ] **문자열 중앙화(i18n)**: 사용자 노출 리터럴 → `resources/strings/<lang>.json` + `tr("key")` 인다이렉션.
+        (현재 `qsTr()`/`tr()` 0건, 리터럴이 QML에 직접 하드코딩.) 별건, 미착수.
       - **열린 결정**: 런타임 언어/테마 전환 UI를 config에 둘지, 빌드 고정할지(후순위). (중)
 
 ## ⑤ 미관
