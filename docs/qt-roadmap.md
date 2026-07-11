@@ -67,9 +67,10 @@ C* Click·오버뷰 렌더·손감각 1차, [`qt-roadmap-DONE.md`](qt-roadmap-DO
       - **테마 토큰화 (색)**: ✅ **완료** 2026-07-11 (`8b9eb72`, Pi 색검증 통과). 언어중립 정본 `theme/tokens.json`
         하나를 QML(`Theme` 컨텍스트 prop)·Python(`theme.py`)이 각자 읽음 → 파이썬 이중소스 함정 해소. 7파일 코드
         hex 리터럴 0, 색토큰 72개. 값 비트동일(collapse 2곳만 sub-perceptual).
-      - [ ] **테마 토큰화 (폰트)**: ⬜ Phase 3+4 잔여 — 역할토큰(button/title/smallLabel…) + 27종 px→9스케일
-        합리화. 인프라(`scale`/`type` 토큰·`Theme.typeFont`)는 이미 존재, 요소별 역할배정+스냅만. **실제 시각변화 →
-        화면별 Pi 확인 필요.**
+      - **테마 토큰화 (폰트)**: ✅ **완료** 2026-07-11 (`e7e9361`). 27종 인라인 px + 굵기(전무)를 역할 토큰으로 —
+        완만한 10단 scale 위 semantic 역할(button/title/smallLabel…), "버튼만 키우기"가 한 줄. 6화면 그룹
+        각 Pi 육안검증 통과. 앱 전 QML raw pixelSize 0·uiFont 0, 글리프는 typeSize(family-less). **→ 테마
+        토큰화(색+폰트) 전체 완료.** 굵기 축은 신설·전부 Normal(도입 시 시각변화 0, 향후 역할별 튜닝 가능).
       - [ ] **문자열 중앙화(i18n)**: 사용자 노출 리터럴 → `resources/strings/<lang>.json` + `tr("key")` 인다이렉션.
         (현재 `qsTr()`/`tr()` 0건, 리터럴이 QML에 직접 하드코딩.) 별건, 미착수.
       - **열린 결정**: 런타임 언어/테마 전환 UI를 config에 둘지, 빌드 고정할지(후순위). (중)
