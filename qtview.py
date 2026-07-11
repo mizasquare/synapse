@@ -22,6 +22,7 @@ import subprocess
 from PyQt6.QtCore import QObject, QTimer, pyqtProperty as Property, pyqtSignal as Signal, pyqtSlot as Slot
 
 import theme
+import strings
 
 # SAVE AS naming (tap a stage term -> "term-quirkysuffix", e.g. "Drive-cupcake").
 # The stage terms are the names you actually want (song section / tone); the random
@@ -96,7 +97,7 @@ class QtView(QObject):
         self._board = ""
         self._snap = "—"
         self._bpm = "—"
-        self._mode = "NAVIGATE"
+        self._mode = strings.tr('hmi.modeNavigate')
         self._nodes = []
         self._cables = []
         self._graph_h = _GH
@@ -286,12 +287,12 @@ class QtView(QObject):
     @Slot()
     def systemShutdown(self):
         """Safely power the device off (confirmed in the UI before this is called)."""
-        self._system_power("poweroff", ["shutdown", "-h", "now"], "종료")
+        self._system_power("poweroff", ["shutdown", "-h", "now"], strings.tr('power.shutdown'))
 
     @Slot()
     def systemReboot(self):
         """Safely reboot the device (confirmed in the UI before this is called)."""
-        self._system_power("reboot", ["reboot"], "재부팅")
+        self._system_power("reboot", ["reboot"], strings.tr('power.reboot'))
 
     def _system_power(self, systemctl_verb, shutdown_args, label):
         log = logging.getLogger(__name__)
@@ -306,7 +307,7 @@ class QtView(QObject):
                 log.warning("%s exited %s, trying next", cmd, result.returncode)
             except Exception as exc:  # FileNotFoundError, TimeoutExpired, ...
                 log.warning("%s failed: %s", cmd, exc)
-        self.toastRequested.emit(f"{label} 실패 — 권한 확인 필요 (sudo/polkit)")
+        self.toastRequested.emit(strings.trf('power.fail', label))
 
     # ------------------------------------- master volume (synapse-volume daemon)
     # Pisound's ALSA PCM control is driver read-only (access=r-------), so software
@@ -710,8 +711,8 @@ class QtView(QObject):
         self.dataChanged.emit()
 
     def update_mode_display(self, mode):
-        self._mode = {0: "NAVIGATE", 1: "STOMP", 2: "BANK",
-                      4: "TAP TEMPO"}.get(mode, str(mode))
+        self._mode = {0: strings.tr('hmi.modeNavigate'), 1: strings.tr('hmi.modeStomp'),
+                      2: strings.tr('hmi.modeBank'), 4: strings.tr('hmi.modeTap')}.get(mode, str(mode))
         self._rebuild_footswitches()
         self.dataChanged.emit()
 
@@ -731,7 +732,7 @@ class QtView(QObject):
     @staticmethod
     def _build_tap(bpm, bpb):
         n = max(1, int(bpb or 4))
-        klass = "WALTZ" if n % 3 == 0 else ("EVEN" if n % 2 == 0 else "ODD")
+        klass = strings.tr('hmi.meterWaltz') if n % 3 == 0 else (strings.tr('hmi.meterEven') if n % 2 == 0 else strings.tr('hmi.meterOdd'))
         return {"bpb": n, "klass": klass}
 
     # --------------------------------------------------------- FOCUS builder
@@ -953,10 +954,10 @@ class QtView(QObject):
                 e = fx[i] if i < len(fx) else None   # length-4, None = unbound slot
                 if e is not None:
                     cells.append({"label": e.name,   # full name; QML strip elides
-                                  "sub": "BYPASS" if e.bypassed else "ENGAGED",
+                                  "sub": strings.tr('focus.bypass') if e.bypassed else strings.tr('focus.engaged'),
                                   "led": _LED_RED if e.bypassed else _LED_BLUE})
                 else:
-                    cells.append({"label": "—", "sub": "OFF", "led": _LED_OFF})
+                    cells.append({"label": "—", "sub": strings.tr('value.off'), "led": _LED_OFF})
             self._foot = cells
         elif mode == 2:  # BANK: the active bank's first 4 boards mapped to FS0-3
             boards = getattr(self.presenter, "bank_boards", []) if self.presenter else []
@@ -968,15 +969,15 @@ class QtView(QObject):
                     name = b.get("title") or b.get("bundle", "").split("/")[-1].replace(".pedalboard", "")
                     is_cur = b.get("bundle") == cur
                     cells.append({"label": name,     # full name; QML strip elides
-                                  "sub": "● 현재" if is_cur else "BOARD",
+                                  "sub": ("● " + strings.tr('hmi.now')) if is_cur else strings.tr('editor.board'),
                                   "led": _LED_GREEN if is_cur else _LED_BLUE})
                 else:
-                    cells.append({"label": "—", "sub": "OFF", "led": _LED_OFF})
+                    cells.append({"label": "—", "sub": strings.tr('value.off'), "led": _LED_OFF})
             self._foot = cells
         else:  # NAVIGATE (0): board + snapshot scroll
             self._foot = [
-                {"label": "BOARD", "sub": "◄", "led": _LED_BLUE},
-                {"label": "BOARD", "sub": "►", "led": _LED_BLUE},
-                {"label": "SNAP", "sub": "◄", "led": _LED_GREEN},
-                {"label": "SNAP", "sub": "►", "led": _LED_GREEN},
+                {"label": strings.tr('editor.board'), "sub": "◄", "led": _LED_BLUE},
+                {"label": strings.tr('editor.board'), "sub": "►", "led": _LED_BLUE},
+                {"label": strings.tr('editor.snap'), "sub": "◄", "led": _LED_GREEN},
+                {"label": strings.tr('editor.snap'), "sub": "►", "led": _LED_GREEN},
             ]

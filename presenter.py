@@ -10,6 +10,7 @@ import time
 import logging
 import os
 import configs
+import strings
 
 # Footswitch mode ids. 0-2 are the press-driven modes cycled by modechange();
 # 4 (tap tempo) is a transient mode entered out-of-band (chord) and kept out of
@@ -223,7 +224,7 @@ class Presenter:
         # 4) last resort: an empty in-memory board so the UI boots and the user can
         #    pick one (practically unreachable -- default.pedalboard always exists).
         logging.error("all pedalboard recovery failed -- booting an empty board")
-        return Pedalboard(title="(빈 보드)", current_pb_path="", width=0, height=0)
+        return Pedalboard(title=strings.tr('board.empty'), current_pb_path="", width=0, height=0)
 
     def refresh_pedalboard(self):
         # Never null the model out: a transient host failure (or a board deleted
@@ -372,7 +373,7 @@ class Presenter:
                 # the toggle silently no-op'd and model/host may now disagree. Surface
                 # it so a dead-looking footswitch reads as "host busy", not "broken".
                 print(error_msg)
-                self._notify("호스트 응답 없음 — 바이패스 실패")
+                self._notify(strings.tr('toast.hostNoResponse'))
 
         effect = self.pedalboard.get_effect_by_instance(effect_instance)
         if effect and port_symbol in effect.ports:
@@ -556,7 +557,7 @@ class Presenter:
         warn — a known limitation of the seed-relative dirty model.)"""
         ed = self.editor
         if ed is not None and getattr(ed, '_live_flag', False) and getattr(ed, '_dirty', False):
-            self._notify('보드 전환 — 미저장 편집 폐기')
+            self._notify(strings.tr('toast.switchDiscard'))
 
     def _notify(self, text):
         """Transient on-screen message (toast). Guarded so a view without
@@ -704,7 +705,7 @@ class Presenter:
         """Banks for the manager: ``[{title, pedalboards:[{bundle,title}], active}]``.
         ``active`` flags the bank mode-2 currently maps to (current_bank)."""
         draft = getattr(self, "_bank_draft", [])
-        return [{"title": b.get("title", "") or "(이름 없음)",
+        return [{"title": b.get("title", "") or strings.tr('bank.untitled'),
                  "pedalboards": [{"bundle": p["bundle"],
                                   "title": p.get("title", "") or self._board_label(p["bundle"])}
                                  for p in b.get("pedalboards", [])],
@@ -733,9 +734,9 @@ class Presenter:
         """A unique default name ("뱅크 N") so a bank can be created without typing."""
         existing = {b.get("title", "") for b in getattr(self, "_bank_draft", [])}
         n = 1
-        while ("뱅크 %d" % n) in existing:
+        while strings.trf('bank.defaultName', n) in existing:
             n += 1
-        return "뱅크 %d" % n
+        return strings.trf('bank.defaultName', n)
 
     def create_bank(self, title):
         title = (title or "").strip() or self.suggest_bank_name()
@@ -752,7 +753,7 @@ class Presenter:
         if len(self._bank_draft) <= 1:
             # Never strand the user with zero banks (mode-2 would have nothing to
             # map, and the host's banks.json would go empty). Keep the last one.
-            self._notify("마지막 뱅크는 삭제할 수 없어요")
+            self._notify(strings.tr('toast.lastBank'))
             return
         if 0 <= idx < len(self._bank_draft):
             del self._bank_draft[idx]
@@ -975,7 +976,7 @@ class Presenter:
                     effect.bypassed = True
             self._global_bypass = True
             self.view_update_effect()
-            self._notify('전역 BYPASS ON')
+            self._notify(strings.tr('toast.globalBypassOn'))
             # All four LEDs blink to confirm the kill switch is engaged.
             self.led.flash_all(times=2)
         else:
@@ -989,7 +990,7 @@ class Presenter:
             self._global_bypass = False
             self._bypass_restore = {}
             self.view_update_effect()
-            self._notify('전역 BYPASS OFF')
+            self._notify(strings.tr('toast.globalBypassOff'))
 
     def assign_footswitches(self):
         if self.footswitch_mode == 0:
@@ -1036,7 +1037,7 @@ class Presenter:
                 utils.save_last_bank(0)
                 entries = self.backend.get_bank_pedalboard_entries(0)
             if not entries:
-                self._notify("뱅크 없음 — STOMP 모드로")
+                self._notify(strings.tr('toast.noBank'))
                 self.bank_boards = []
                 self.footswitch_mode = 1
                 self.assign_footswitches()
@@ -1151,7 +1152,7 @@ class Presenter:
         if error_msg is None:
             self.pedalboard.bpb = int(value)
         else:
-            self._notify("박자표 설정 실패")
+            self._notify(strings.tr('toast.timeSigFail'))
 
     # ── Tap tempo (entered via the C+D footswitch chord) ─────────────────
     def enter_tap_tempo(self):
@@ -1193,7 +1194,7 @@ class Presenter:
             engine.start()
         except Exception as e:
             logging.error("tuner start failed: %s", e)
-            self._notify("튜너: 오디오 입력 없음")
+            self._notify(strings.tr('toast.tunerNoInput'))
             return
         self._tuner_engine = engine
         self._in_tuner = True
