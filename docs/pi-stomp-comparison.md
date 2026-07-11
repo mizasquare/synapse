@@ -131,8 +131,87 @@ pi-stomp의 `setup/mod-tweaks/*.diff`가 그의 경로를 드러낸다:
 
 ---
 
+## 5. ganglion 로터리 인코더 입력 경로 심화 (2026-07-05 세션)
+
+§1~4는 synapse(풋스위치/MCP23017/웹소켓) 축이었다. 이 세션은 **다른 서브시스템** —
+`ganglion` 앱의 **로터리 인코더 2개 입력 경로**(seesaw I2C, `ganglion/input.py`의
+`GestureRecognizer`)를 pi-stomp `pistomp/encoder.py`·`encoderswitch.py`·`gpioswitch.py`와 비교.
+둘 다 "Pi + 오디오호스트 + 인코더 2개" 스택이지만 **인코더를 읽는 층위가 정반대**라는 게 핵심.
+
+### 5.1 읽기 층위 비교 — 우리가 한 단계 위에서 논다
+
+| 축 | pi-stomp | ganglion |
+|---|---|---|
+| 하드웨어 | 인코더 **raw GPIO 핀**(clk/d) 직결 | **Adafruit seesaw** 칩(I2C) 경유 |
+| 쿼드러처 디코드 | **직접** — 그레이코드 상태머신 | seesaw 펌웨어가 대신 (`IncrementalEncoder.position` diff) |
+| 트리거 | GPIO **인터럽트**(`add_event_detect(BOTH)`) + `threading.Lock` | 메인루프 **폴링**(`seesaw.py:81 poll`) |
+| 스위치 디바운스 | SW `bounce_time=250ms` + 16-entry 유효성 테이블 | (없음 — `seesaw.py:55`는 생짜 읽기) |
+
+pi-stomp 디코드 알맹이(유명한 best-microcontroller-projects 알고리즘):
+```python
+self.rot_enc_table = [0,1,1,0,1,0,0,1,1,0,0,1,0,1,1,0]  # 1=유효, 0=바운스
+if (self.store & 0xff) == 0x2b: direction = -1  # CCW (full seq 13,4,2,11)
+if (self.store & 0xff) == 0x17: direction = +1  # CW  (full seq 14,8,1,7)
+```
+→ **우리가 seesaw를 버리고 raw GPIO로 내려가는 날(I2C 비용·레이턴시 이유)이 오면 이 테이블이
+그대로 레퍼런스.** 대신 `seesaw.py:9-19`의 metal 미확정 리스크(주소/방향/핀)는 사라지고,
+이 디바운스를 우리가 떠안게 되는 트레이드오프. (우리는 이미 `ganglion/i2c_cost.py`로 I2C 바이트-비용을
+모델링 중 — pi-stomp가 인터럽트 GPIO로 회피하는 바로 그 폴링 비용 축. 단 i2c_cost는 디스플레이용이나
+인코더도 같은 버스.)
+
+### 5.2 ganglion이 이미 앞선 것 (후퇴 금지)
+
+- **단일 `GestureRecognizer` 심** — 에뮬레이터(`KeyboardInput`)와 실물(`SeesawInput`)이 **동일한
+  `raw (pressed, delta)` 샘플을 하나의 recognizer에 먹임**(`input.py:6-8`). 클릭/롱/콤보/가속 시맨틱이
+  한 군데. pi-stomp는 에뮬레이터가 별도 경로라 이 통일성 없음.
+- **회전 가속(momentum)** — `input.py:82-90`, 0.08s 내 연속 회전 시 step에 관성 누적(최대 7).
+  pi-stomp `read_rotary()`는 큐를 **한 detent씩만** 소비(`self.direction -= d`) → 폴링당 1스텝, 가속 없음.
+  플러그인 롱리스트 스크롤엔 우리가 유리(반대급부: 메뉴 오버슈트 위험 — 1스텝이 나은 상황도 있음).
+
+### 5.3 pi-stomp에서 배울 것 (프레스 처리)
+
+- **① 스위치 디바운스 — 우리 stub엔 아예 없음 (실물 갭, 버그급).** pi-stomp `bounce_time=250ms`.
+  우리 `seesaw.py:55 read_pressed()`는 `not self._button.value` 생짜 읽기 → 기계식 바운스가 press/release
+  엣지를 튀기면 **유령 click, 심하면 유령 combo.** seesaw 버튼엔 HW 디바운스 없음 → recognizer에
+  디바운스 창을 넣거나 폴링 주기를 조정해야. **metal 전 필수.**
+- **② 롱프레스 즉시 발화 (UX 선택).** pi-stomp는 0.5s 지나는 순간 바로 `LONGPRESSED`. 우리(`input.py:114`)는
+  **릴리스 때** 판정 → 꾹 누르는 동안 화면 무반응. "롱프레스=메뉴진입"이면 즉시 발화가 나음. 단 콤보
+  판정과 얽히니 도입 시 주의.
+- **③ 더블클릭 (제스처 어휘 확장).** pi-stomp엔 `DOUBLECLICKED`. 인코더 2개뿐이라 제스처가 귀한데
+  더블클릭은 콤보(양손 필요)와 달리 **한 손**으로 쓰는 값싼 추가.
+
+### 5.4 안 가져올 것
+
+pi-stomp `Controller`(midi_channel/midi_CC/`set_value` 템플릿메서드)는 **자기가 MIDI 컨트롤러**라 필요한 층.
+우린 이벤트(`Rotate`/`Press`/`Combo`)를 앱이 직접 소비 → 이 층 불필요, 도입하면 과설계.
+
+### 5.5 ★ 실물 배선 후 검증 체크리스트
+
+seesaw 모듈 2개를 배선한 뒤 순서대로 확인. 앞 3개는 `seesaw.py:9-19` 헤더의 기존 미확정,
+뒤 3개는 이번 pi-stomp 스터디에서 나온 항목.
+
+- [ ] **I2C 주소** — 기본 0x36, 2번째 모듈은 주소 점퍼(코드상 0x37). 배선 후 `i2cdetect -y 1`로 확인.
+- [ ] **회전 방향 부호** — `IncrementalEncoder.position` 방향 vs 물리 CW는 배선/방향 의존.
+      틀리면 `SeesawInput(invert=(...))`로 모듈별 뒤집기(`seesaw.py:70`).
+- [ ] **버튼/NeoPixel 핀** — QT Rotary Encoder 문서상 스위치=seesaw pin 24(PULLUP, 눌림=low),
+      NeoPixel=pin 6. 보드 리비전 대조.
+- [ ] **① 스위치 디바운스 검증** — 실제로 눌러 유령 click/combo가 뜨는지 관찰. 뜨면 recognizer에
+      디바운스 도입(에뮬/실물 공통 심이라 유닛테스트로 재현 가능).
+- [ ] **② 롱프레스 타이밍 체감** — 릴리스-판정(현재)이 답답하면 즉시-발화로 전환 검토.
+- [ ] **③ 더블클릭 필요성** — 실제 조작해보고 제스처 어휘가 부족하면 추가.
+
+**한 줄 결론:** ganglion 아키텍처(단일 recognizer 심 + 가속)는 pi-stomp보다 깔끔·선진. 하지만 pi-stomp가
+우리 stub의 실물 갭 3개(**디바운스 부재①**=필수, 즉시발화②·더블클릭③=선택)를 정확히 짚어줌.
+①은 metal 배선 후 최우선 검증.
+
+---
+
 ## 참조
 - pi-stomp 레포: `C:\Users\swson\pi-stomp` (`modalapi/websocket_bridge.py`, `modalapi/ws_protocol.py`,
   `pistomp/gpioswitch.py`, `pistomp/footswitch.py`, `setup/mod-tweaks/*.diff`)
+- pi-stomp 인코더(§5): `pistomp/encoder.py`(그레이코드 디코드), `pistomp/encoderswitch.py`,
+  `pistomp/gpioswitch.py`(bounce_time·long_press_threshold=0.5s).
 - synapse 관련: [`qt-roadmap.md`](qt-roadmap.md)(디바운스 카드), [`config-todo.md`](config-todo.md)(콤보 리맵),
   `mod-tweaks/webserver.py`(`notify_synapsin`), `qt_main.py`(역방향 리스너), `presenter.py:206`(수신 핸들러).
+- ganglion 인코더(§5): `ganglion/input.py`(`GestureRecognizer`), `ganglion/hw/seesaw.py`(실물 소스·미확정),
+  `ganglion/i2c_cost.py`(I2C 바이트-비용), `ganglion/docs/design.md`.
