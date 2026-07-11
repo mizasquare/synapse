@@ -87,11 +87,16 @@ hmi.mode.navigate / hmi.mode.stomp / hmi.mode.bank / hmi.mode.tap / hmi.current
 각 왕복: 오프디바이스 컴파일·잔여리터럴 grep 클린 → 커밋 아님(그룹 끝 커밋) → Pi 재시작 육안 →
 "이상무" 확인 후 다음. 색/폰트처럼 그룹 완료 시 커밋, 전체 완료 시 master 머지 완주.
 
-## 5. 진행
+## 5. 진행 — ✅ 전체 완료 (2026-07-12, 6그룹 Pi 육안검증·master 머지)
 
-- [ ] 1. 인프라 + top-bar 파일럿
-- [ ] 2. 오버뷰/보드전환/뱅크
-- [ ] 3. 스냅샷/네이밍/tap/tuner
-- [ ] 4. 메뉴/시스템/config
-- [ ] 5. 에디터 QML
-- [ ] 6. Python 토스트/상태
+- [x] 1. 인프라 + top-bar 파일럿 (`9273691`) — strings.py·strings_qml.py·en/ko.json·Tr 주입
+- [x] 2. 오버뷰/보드전환/뱅크 (`71db936`) — common.*·action.* 공유키 신설
+- [x] 3. 스냅샷/네이밍/tap/tuner/FOCUS (`08455fc`) — main.qml 대부분
+- [x] 4. 메뉴/시스템/config (`29f7e30`) — **main.qml 한글 리터럴 0 달성**
+- [x] 5. 에디터 QML (`315d369`) — PedalboardEditorView·ControlWidget·PatchPicker
+- [x] 6. Python 토스트/상태 (`06c47d2`) — editor_bridge·qtview·presenter
+
+**결과:** 참조 키 **173개**, en=ko **완전 동수**, 누락(⟨key⟩) 0. 기본 언어 영어. 스킵(의도):
+editor_bridge 죽은 quick-reason 4개(표시·비교 안 됨), mono/stereo·quick/advanced·화면상태·
+노드 id "IN"/"OUT"·LED상수(로직), 라디얼 포트라벨·노드라벨 IN/OUT/GUITAR/STEREO(영어·로직인접,
+번역가치 0). 런타임 언어전환 UI는 후순위(인프라는 `Tr.setLang`/`strings.set_lang`로 준비됨).
