@@ -10,11 +10,13 @@ Item {
     property string instance
     width: 118; height: 130
 
-    readonly property color cGreen:  "#5fd0a0"
-    readonly property color cBorder: "#2c3648"
-    readonly property color cText:   "#e8edf4"
-    readonly property color cMuted:  "#7e8694"
-    readonly property color cElev:   "#1d2433"
+    // Palette resolves from the shared Theme token source (theme/tokens.json);
+    // aliases retained so the `root.cX` call sites below stay untouched.
+    readonly property color cGreen:  Theme.color("accent.green")
+    readonly property color cBorder: Theme.color("border.default")
+    readonly property color cText:   Theme.color("text.primary")
+    readonly property color cMuted:  Theme.color("text.secondary")
+    readonly property color cElev:   Theme.color("surface.elevated")
 
     property real dispNorm: m ? m.norm : 0
     readonly property bool isKnob: m && (m.kind === "knob" || m.kind === "knob_int" || m.kind === "knob_log")
@@ -98,10 +100,11 @@ Item {
             id: tgl
             width: 84; height: 44; radius: 22
             property bool on: root.m ? root.m.value >= 0.5 : false
-            color: on ? root.cGreen : "#2c3648"
+            color: on ? root.cGreen : root.cBorder
             Text {
                 anchors.centerIn: parent; text: tgl.on ? "ON" : "OFF"
-                color: tgl.on ? "#0e1118" : "#9aa3b2"; font.family: uiFont; font.pixelSize: 16
+                // dark text on the green ON fill; muted grey when OFF
+                color: tgl.on ? Theme.color("bg.screen") : Theme.color("text.mutedAlt"); font.family: uiFont; font.pixelSize: 16
             }
             MouseArea {
                 anchors.fill: parent
@@ -122,7 +125,7 @@ Item {
             color: ma.pressed ? root.cGreen : root.cElev
             border.width: 2; border.color: root.cGreen
             Text { anchors.centerIn: parent; text: "↻"
-                   color: ma.pressed ? "#0e1118" : root.cGreen; font.family: uiFont; font.pixelSize: 30 }
+                   color: ma.pressed ? Theme.color("bg.screen") : root.cGreen; font.family: uiFont; font.pixelSize: 30 }
             MouseArea {
                 id: ma; anchors.fill: parent
                 onPressed:  if (root.m) view.setParameter(root.instance, root.m.symbol, root.m.max)

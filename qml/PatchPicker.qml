@@ -14,13 +14,14 @@ Rectangle {
     anchors.fill: parent
     visible: false
     z: 200
-    color: "#e60a0d14"
+    color: Theme.color("overlay.pickerScrim")
 
-    // theme tokens (host-provided)
-    property color colElev: "#171c26"
-    property color colBorder: "#2a3344"
-    property color colText: "#cfd6e2"
-    property color colAccent: "#5fd0a0"
+    // theme tokens (host-provided; these defaults are dead fallbacks — both hosts
+    // always pass their own palette — but resolve from Theme for correctness).
+    property color colElev: Theme.color("surface.elevated")
+    property color colBorder: Theme.color("border.default")
+    property color colText: Theme.color("text.onLight")
+    property color colAccent: Theme.color("accent.green")
     property string fontFamily: ""
 
     property var files: []
@@ -52,7 +53,7 @@ Rectangle {
                     elide: Text.ElideRight
                 }
                 Rectangle {
-                    width: 52; height: 36; radius: 8; color: "#2c3648"
+                    width: 52; height: 36; radius: 8; color: Theme.color("border.default")
                     Text { anchors.centerIn: parent; text: "✕"; color: root.colText; font.family: root.fontFamily; font.pixelSize: 20 }
                     MouseArea { anchors.fill: parent; onClicked: root.visible = false }
                 }
@@ -68,7 +69,7 @@ Rectangle {
                     delegate: Rectangle {
                         width: ListView.view ? ListView.view.width : 0; height: 46
                         property bool isCur: (("" + modelData.label).split("/").pop() === root.currentName)
-                        color: isCur ? "#2e5fd0a0" : "transparent"
+                        color: isCur ? Theme.alpha("accent.green", 0.18) : "transparent"
                         Text {
                             anchors.left: parent.left; anchors.leftMargin: 10
                             anchors.verticalCenter: parent.verticalCenter
@@ -76,7 +77,7 @@ Rectangle {
                             text: modelData.label; color: isCur ? root.colAccent : root.colText
                             font.family: root.fontFamily; font.pixelSize: 18; elide: Text.ElideMiddle
                         }
-                        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: "#1b2230" }
+                        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.color("border.subtle") }
                         MouseArea {
                             anchors.fill: parent
                             onClicked: { root.picked(modelData.path); root.visible = false; }
@@ -87,7 +88,7 @@ Rectangle {
                     id: sbTrack
                     visible: fileList.contentHeight > fileList.height
                     anchors { right: parent.right; top: parent.top; bottom: parent.bottom }
-                    width: 14; radius: 7; color: "#141a24"
+                    width: 14; radius: 7; color: Theme.color("surface.scrollTrack")
                     function scrollTo(my) {
                         var usable = sbTrack.height - sbThumb.height;
                         if (usable <= 0) return;
@@ -97,7 +98,7 @@ Rectangle {
                     Rectangle {
                         id: sbThumb
                         x: 0; width: parent.width; radius: 7
-                        color: sbArea.pressed ? root.colAccent : "#3a4458"
+                        color: sbArea.pressed ? root.colAccent : Theme.color("surface.scrollThumb")
                         height: Math.max(40, sbTrack.height * fileList.visibleArea.heightRatio)
                         y: fileList.visibleArea.yPosition * sbTrack.height   // follows flick; never set imperatively
                     }

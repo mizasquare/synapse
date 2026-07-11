@@ -32,23 +32,16 @@ import unicodedata
 
 import configs
 import plugincatalog
+import theme
 
 from PyQt6.QtCore import (QObject, pyqtProperty as Property,
                           pyqtSignal as Signal, pyqtSlot as Slot)
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 
-# bucket -> (color, 3-letter abbreviation) — verbatim from the design's BUCKET map
-BUCKET = {
-    'Drive': ('#d99a4e', 'DRV'), 'Comp': ('#5fd0a0', 'CMP'), 'Gate': ('#5fd0a0', 'GTE'),
-    'Dynamics': ('#5fd0a0', 'DYN'), 'EQ': ('#3b6fe0', 'EQ'), 'Filter': ('#3b6fe0', 'FLT'),
-    'Mod': ('#b58af0', 'MOD'), 'Delay': ('#b58af0', 'DLY'), 'Reverb': ('#3b6fe0', 'RVB'),
-    'Pitch': ('#b58af0', 'PIT'), 'Amp·Cab': ('#d99a4e', 'AMP'), 'Synth': ('#5fd0a0', 'SYN'),
-    'Spatial': ('#3b6fe0', 'SPT'), 'Utility': ('#9aa3b2', 'UTL'), 'CV': ('#5a6270', 'CV'),
-    'MIDI': ('#e8694a', 'MID'),
-}
-
-PORTCOL = {'audio': '#3b6fe0', 'midi': '#e8694a', 'cv': '#b58af0'}
+# Bucket colors/abbreviations and port-type colors now live in theme/tokens.json
+# (theme.bucket_color / theme.bucket_abbr / theme.port_color) — the shared source
+# also read by QML, so the graph the Python side paints stays in lockstep.
 
 
 def _symbolify(name):
@@ -102,11 +95,11 @@ OUT_PX = CANVAS_W - 54  # HW OUT port column x
 
 
 def bcol(bucket):
-    return BUCKET.get(bucket, ('#9aa3b2', ''))[0]
+    return theme.bucket_color(bucket)
 
 
 def abbr(bucket):
-    return BUCKET.get(bucket, ('#9aa3b2', bucket[:3].upper()))[1] or bucket[:3].upper()
+    return theme.bucket_abbr(bucket)
 
 
 def pin_lbl(n):
@@ -665,18 +658,18 @@ class EditorBridge(QObject):
             out_p = (n['x'] + NODEW, n['y'] + HALF)
             a = adapt(trunk_ch, ai, n.get('inAdapt', 'auto'))
             wires.append(mkwire(trunk_x, trunk_y, in_p[0], in_p[1],
-                                '#2c3648' if n['bypass'] else '#3b6fe0', trunk_ch == 2))
+                                (theme.color('border.default') if n['bypass'] else theme.port_color('audio')), trunk_ch == 2))
             if a:
                 chips.append({'label': a['label'], 'x': (trunk_x + in_p[0]) / 2, 'y': (trunk_y + in_p[1]) / 2,
-                              'bg': '#1f2636', 'accent': '#d99a4e', 'fg': '#e8b06a', 'nid': n['id'], 'kind': 'in'})
+                              'bg': theme.color('chip.in.bg'), 'accent': theme.color('accent.amber'), 'fg': theme.color('chip.fgAmber'), 'nid': n['id'], 'kind': 'in'})
             segments.append({'x1': trunk_x, 'y1': trunk_y, 'x2': in_p[0], 'y2': in_p[1], 'ch': trunk_ch})
             roles[n['id']] = 'fx'
             trunk_ch, trunk_x, trunk_y = ao, out_p[0], out_p[1]
         oa = adapt(trunk_ch, 2, self.out_adapt)
-        wires.append(mkwire(trunk_x, trunk_y, OUT_X, MID_Y, '#d99a4e', trunk_ch == 2))
+        wires.append(mkwire(trunk_x, trunk_y, OUT_X, MID_Y, theme.color('accent.amber'), trunk_ch == 2))
         if oa:
             chips.append({'label': oa['label'], 'x': (trunk_x + OUT_X) / 2, 'y': (trunk_y + MID_Y) / 2,
-                          'bg': '#2a221a', 'accent': '#d99a4e', 'fg': '#e8b06a', 'nid': -1, 'kind': 'out'})
+                          'bg': theme.color('chip.out.bg'), 'accent': theme.color('accent.amber'), 'fg': theme.color('chip.fgAmber'), 'nid': -1, 'kind': 'out'})
         segments.append({'x1': trunk_x, 'y1': trunk_y, 'x2': OUT_X, 'y2': MID_Y, 'ch': trunk_ch})
 
         def seg_at(x):
@@ -701,14 +694,14 @@ class EditorBridge(QObject):
             conn_y = n['y'] if line_above else n['y'] + 2 * HALF
             conn_x = cx
             if ao == 0:
-                wires.append(vwire(mp[0], mp[1], conn_x, conn_y, '#2c3648' if n['bypass'] else '#5a6270'))
+                wires.append(vwire(mp[0], mp[1], conn_x, conn_y, theme.color('border.default') if n['bypass'] else theme.color('text.tertiary')))
                 roles[n['id']] = 'tap'
             else:
                 a = adapt(ao, mp[2], n.get('mergeAdapt', 'auto'))
-                wires.append(vwire(conn_x, conn_y, mp[0], mp[1], '#2c3648' if n['bypass'] else '#5fd0a0', ao == 2))
+                wires.append(vwire(conn_x, conn_y, mp[0], mp[1], theme.color('border.default') if n['bypass'] else theme.color('accent.green'), ao == 2))
                 if a:
                     chips.append({'label': a['label'], 'x': (conn_x + mp[0]) / 2, 'y': (conn_y + mp[1]) / 2,
-                                  'bg': '#16241c', 'accent': '#5fd0a0', 'fg': '#8fe0bd', 'nid': n['id'], 'kind': 'merge'})
+                                  'bg': theme.color('chip.merge.bg'), 'accent': theme.color('accent.green'), 'fg': theme.color('chip.fgGreen'), 'nid': n['id'], 'kind': 'merge'})
                 roles[n['id']] = 'source'
         return wires, chips, roles
 
@@ -720,24 +713,24 @@ class EditorBridge(QObject):
             role = roles.get(n['id'], 'fx')
             sel = self.sel == n['id']
             is_branch = role in ('tap', 'source')
-            badge, badge_color = '', '#5a6270'
+            badge, badge_color = '', theme.color('text.tertiary')
             if role == 'tap':
-                badge, badge_color = 'TAP', '#9aa3b2'
+                badge, badge_color = 'TAP', theme.color('text.mutedAlt')
             elif role == 'source':
-                badge, badge_color = 'MIX▸', '#5fd0a0'
+                badge, badge_color = 'MIX▸', theme.color('accent.green')
             if sel:
-                bord = '#3b6fe0'
+                bord = theme.color('ui.selection')
             elif n['bypass']:
-                bord = '#2c3648'
+                bord = theme.color('border.default')
             elif role == 'tap':
-                bord = '#5a6270'
+                bord = theme.color('text.tertiary')
             elif role == 'source':
-                bord = '#5fd0a0'
+                bord = theme.color('accent.green')
             else:
                 bord = bcol(b)
             out.append({
                 'id': n['id'], 'x': n['x'], 'y': n['y'], 'name': p['name'], 'bucket': abbr(b),
-                'border': bord, 'dot': '#5a6270' if n['bypass'] else bcol(b),
+                'border': bord, 'dot': theme.color('text.tertiary') if n['bypass'] else bcol(b),
                 'glow': 'transparent' if n['bypass'] else bcol(b), 'bypass': n['bypass'], 'sel': sel,
                 'inPins': 0 if is_branch else p['ai'], 'outPins': 0 if is_branch else p['ao'],
                 'badge': badge, 'badgeColor': badge_color, 'hasBadge': bool(badge),
@@ -1000,7 +993,7 @@ class EditorBridge(QObject):
         ports = []
 
         def port_dot(x, y, col, ch, dim):
-            return {'x': x, 'y': y, 'color': '#3a4252' if dim else col, 'ch': ch}
+            return {'x': x, 'y': y, 'color': theme.color('text.disabled') if dim else col, 'ch': ch}
 
         for node in self.gnodes:
             ins, outs = self._ports_of(node)
@@ -1010,7 +1003,7 @@ class EditorBridge(QObject):
                     x = node['x'] if side == 'in' else node['x'] + NODEW
                     y = node['y'] + HH + PTOP + li * PR + PH / 2
                     pos['%s:%s:%s:%d' % (node['id'], side, pt['type'], pt['ti'])] = (x, y, pt['type'])
-                    ports.append(port_dot(x, y, PORTCOL[pt['type']], pt['ch'], node['bypass']))
+                    ports.append(port_dot(x, y, theme.port_color(pt['type']), pt['ch'], node['bypass']))
             place(ins, 'in')
             place(outs, 'out')
 
@@ -1027,15 +1020,15 @@ class EditorBridge(QObject):
             for li, pt in enumerate(arr):
                 y = start_y + li * PR
                 pos['%s:%s:%s:%d' % (node, 'out' if node == 'IN' else 'in', pt['type'], pt['ti'])] = (x, y, pt['type'])
-                ports.append(port_dot(x, y, PORTCOL[pt['type']], pt['ch'], False))
+                ports.append(port_dot(x, y, theme.port_color(pt['type']), pt['ch'], False))
         stack(in_p, IN_PX, 'IN')
         stack(out_p, OUT_PX, 'OUT')
         in_tot, out_tot = len(in_p) * PR, len(out_p) * PR
         self._g_hw = [
             {'x': 18, 'y': g_mid - in_tot / 2 - 6, 'w': 30, 'h': in_tot + 12,
-             'label': 'IN', 'sub': 'ST' if self.in_mode == 'stereo' else 'M', 'color': '#5fd0a0'},
+             'label': 'IN', 'sub': 'ST' if self.in_mode == 'stereo' else 'M', 'color': theme.color('accent.green')},
             {'x': gw - 48, 'y': g_mid - out_tot / 2 - 6, 'w': 30, 'h': out_tot + 12,
-             'label': 'OUT', 'sub': 'ST', 'color': '#d99a4e'},
+             'label': 'OUT', 'sub': 'ST', 'color': theme.color('accent.amber')},
         ]
 
         # candidate-edge highlighting while choosing a target
@@ -1098,7 +1091,7 @@ class EditorBridge(QObject):
             mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + (64 if fb else 0)
             mid_of[w['id']] = (mx, my)
             dash = '7 5' if fb else ('2 4' if a[2] == 'midi' else ('1 5' if a[2] == 'cv' else ''))
-            color = '#eaf2ff' if is_sel else ('#2c3648' if dim else ('#e0a458' if fb else PORTCOL[a[2]]))
+            color = theme.color('state.selected') if is_sel else (theme.color('border.default') if dim else (theme.color('state.feedback') if fb else theme.port_color(a[2])))
             wires.append({'id': w['id'], 'd': d, 'w': (2.6 if a[2] == 'audio' else 2.0) + (2.2 if is_sel else 0),
                           'dash': dash, 'color': color, 'mx': mx, 'my': my})
             if fb and ('%s>%s' % (from_id, to_id)) not in fbtags:
@@ -1124,7 +1117,7 @@ class EditorBridge(QObject):
                 ang = self._opt_angle(cn['side'], i, len(cn['opts']))
                 rad.append({'label': o['label'], 'idx': i,
                             'x': cx + RR * math.cos(ang), 'y': cy + RR * math.sin(ang),
-                            'color': PORTCOL[o['type']]})
+                            'color': theme.port_color(o['type'])})
         self._rad_items = rad
 
     def _build_g_nodes(self):
@@ -1136,7 +1129,7 @@ class EditorBridge(QObject):
             p = self.by_uri[node['uri']]
             b = p['bucket']
             sel = self.sel == node['id']
-            bord = '#3b6fe0' if sel else ('#2c3648' if node['bypass'] else bcol(b))
+            bord = theme.color('ui.selection') if sel else (theme.color('border.default') if node['bypass'] else bcol(b))
             ci = self._port_counts(node['id'], 'in')
             co = self._port_counts(node['id'], 'out')
             has_in = (ci['a'] + ci['m'] + ci['cv']) > 0
@@ -1151,7 +1144,7 @@ class EditorBridge(QObject):
             out.append({
                 'id': node['id'], 'x': node['x'], 'y': node['y'], 'h': self._card_h(node),
                 'name': p['name'], 'bucket': abbr(b), 'bypass': node['bypass'], 'sel': sel,
-                'border': bord, 'dot': '#5a6270' if node['bypass'] else bcol(b),
+                'border': bord, 'dot': theme.color('text.tertiary') if node['bypass'] else bcol(b),
                 'glow': 'transparent' if node['bypass'] else bcol(b),
                 'hasIn': has_in, 'hasOut': has_out,
                 'edgeInGlow': cand('in', has_in), 'edgeOutGlow': cand('out', has_out),
@@ -1212,7 +1205,7 @@ class EditorBridge(QObject):
 
     @Property(str, notify=changed)
     def flyColor(self):
-        return bcol(self.fly_bucket) if self.fly_bucket else '#9aa3b2'
+        return bcol(self.fly_bucket) if self.fly_bucket else theme.color('text.mutedAlt')
 
     @Property('QVariantList', notify=changed)
     def flyItems(self):

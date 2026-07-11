@@ -12,18 +12,20 @@ Item {
     // Emitted by the header "나가기" affordance. The host decides what leaving means.
     signal exitRequested()
 
-    readonly property color cScreen: "#0e1118"
-    readonly property color cPanel:  "#141925"
-    readonly property color cGraph:  "#0a0d13"
-    readonly property color cElev:   "#1d2433"
-    readonly property color cBorder: "#2c3648"
-    readonly property color cGreen:  "#5fd0a0"
-    readonly property color cOrange: "#d99a4e"
-    readonly property color cBlue:   "#3b6fe0"
-    readonly property color cPurple: "#b58af0"
-    readonly property color cText:   "#e8edf4"
-    readonly property color cMuted:  "#7e8694"
-    readonly property color cDim:    "#5a6270"
+    // Palette resolves from the shared Theme token source (theme/tokens.json);
+    // local alias names retained so the many `cX` call sites stay untouched.
+    readonly property color cScreen: Theme.color("bg.screen")
+    readonly property color cPanel:  Theme.color("surface.panel")
+    readonly property color cGraph:  Theme.color("bg.graph")
+    readonly property color cElev:   Theme.color("surface.elevated")
+    readonly property color cBorder: Theme.color("border.default")
+    readonly property color cGreen:  Theme.color("accent.green")
+    readonly property color cOrange: Theme.color("accent.amber")
+    readonly property color cBlue:   Theme.color("accent.blue")
+    readonly property color cPurple: Theme.color("accent.purple")
+    readonly property color cText:   Theme.color("text.primary")
+    readonly property color cMuted:  Theme.color("text.secondary")
+    readonly property color cDim:    Theme.color("text.tertiary")
 
     property bool trashHot: false
     property bool nodeDragging: false     // a node is mid-drag → inspector yields the view
@@ -88,7 +90,7 @@ Item {
                     Rectangle {   // fill gauge, left -> right while held
                         anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
                         width: parent.width * modeTag.holdProgress
-                        radius: 5; color: "#1c3550"
+                        radius: 5; color: Theme.color("glow.edge")
                         visible: modeTag.holdProgress > 0
                     }
                     Rectangle {   // armed outline while the finger is down
@@ -146,7 +148,7 @@ Item {
                 font.family: uiFont; font.pixelSize: 14; elide: Text.ElideRight; width: 360
                 horizontalAlignment: Text.AlignRight
             }
-            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: "#1b2230" }
+            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.color("border.subtle") }
         }
 
         // -------- category rail (shared) --------
@@ -154,7 +156,7 @@ Item {
             id: rail
             x: 0; y: 34; width: 66; height: parent.height - 34; z: 6
             color: cPanel
-            Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: "#1b2230" }
+            Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.color("border.subtle") }
             // Scrollable: 16 buckets don't all fit the 446px rail (only ~9 do), so
             // a fixed Column clipped the tail (Pitch/Amp·Cab/…/MIDI). Flick to reach them.
             Flickable {
@@ -169,7 +171,7 @@ Item {
                         Rectangle {
                             width: 54; height: 44; radius: 5
                             color: modelData.sel ? cElev : "transparent"
-                            border.width: 1; border.color: modelData.sel ? modelData.color : "#1b2230"
+                            border.width: 1; border.color: modelData.sel ? modelData.color : Theme.color("border.subtle")
                             Column {
                                 anchors.centerIn: parent; spacing: 2
                                 Rectangle { width: 8; height: 8; radius: 2; color: modelData.color
@@ -191,13 +193,13 @@ Item {
             id: canvas
             x: 66; y: 34; width: 734; height: 446; clip: true
             // ADVANCED gets a warm amber-tinted board so it reads differently from QUICK
-            color: editor.advanced ? "#140f09" : cGraph
+            color: editor.advanced ? Theme.color("bg.graphWarm") : cGraph
 
             // grid
             Canvas {
                 id: grid
                 anchors.fill: parent
-                property color gridColor: editor.advanced ? "#241a0d" : "#11161f"
+                property color gridColor: editor.advanced ? Theme.color("graph.gridWarm") : Theme.color("graph.grid")
                 onGridColorChanged: requestPaint()
                 onPaint: {
                     var c = getContext("2d"); c.strokeStyle = grid.gridColor; c.lineWidth = 1
@@ -283,7 +285,7 @@ Item {
                     Rectangle {
                         id: nd
                         x: modelData.x; y: modelData.y; width: 124; height: 52; radius: 7
-                        color: "#161b26"; border.width: 2; border.color: modelData.border
+                        color: Theme.color("surface.card"); border.width: 2; border.color: modelData.border
                         opacity: modelData.flying ? 0 : (modelData.pending ? 0.4 : (modelData.bypass ? 0.55 : 1.0))
                         property bool dragged: false
 
@@ -387,8 +389,8 @@ Item {
                     model: editor.gMerges
                     Rectangle {
                         x: modelData.x - 9; y: modelData.y - 9; width: 18; height: 18; radius: 9
-                        color: "#16241c"; border.width: 1; border.color: cGreen
-                        Text { anchors.centerIn: parent; text: "+"; color: "#8fe0bd"; font.family: uiFont; font.pixelSize: 14 }
+                        color: Theme.color("chip.merge.bg"); border.width: 1; border.color: cGreen
+                        Text { anchors.centerIn: parent; text: "+"; color: Theme.color("chip.fgGreen"); font.family: uiFont; font.pixelSize: 14 }
                     }
                 }
                 // feedback tags
@@ -396,16 +398,16 @@ Item {
                     model: editor.gFbTags
                     Rectangle {
                         x: modelData.x - width / 2; y: modelData.y - 9; height: 18; width: fbTxt.width + 12; radius: 9
-                        color: "#2a221a"; border.width: 1; border.color: "#e0a458"
-                        Text { id: fbTxt; anchors.centerIn: parent; text: "FB"; color: "#e8b06a"; font.family: uiFont; font.pixelSize: 12 }
+                        color: Theme.color("chip.out.bg"); border.width: 1; border.color: Theme.color("state.feedback")
+                        Text { id: fbTxt; anchors.centerIn: parent; text: "FB"; color: Theme.color("chip.fgAmber"); font.family: uiFont; font.pixelSize: 12 }
                     }
                 }
                 // selected-cable delete
                 Rectangle {
                     visible: editor.gWireDel
                     x: editor.gWireDelX - 14; y: editor.gWireDelY - 14; width: 28; height: 28; radius: 14
-                    color: "#3a1f1a"; border.width: 1; border.color: "#e8694a"; z: 20
-                    Text { anchors.centerIn: parent; text: "X"; color: "#ff8a6a"; font.family: uiFont; font.pixelSize: 15 }
+                    color: Theme.color("delete.bg"); border.width: 1; border.color: Theme.color("accent.midi"); z: 20
+                    Text { anchors.centerIn: parent; text: "X"; color: Theme.color("delete.glyph"); font.family: uiFont; font.pixelSize: 15 }
                     MouseArea { anchors.fill: parent; onClicked: editor.removeSelectedWire() }
                 }
 
@@ -437,8 +439,8 @@ Item {
                     model: editor.hwEdges
                     Rectangle {
                         x: modelData.x; y: modelData.y; width: modelData.w; height: modelData.h; radius: 5; z: 13
-                        color: modelData.glow ? "#1c3550" : "transparent"
-                        border.width: modelData.glow ? 1 : 0; border.color: "#78c8ff"
+                        color: modelData.glow ? Theme.color("glow.edge") : "transparent"
+                        border.width: modelData.glow ? 1 : 0; border.color: Theme.color("accent.cyan")
                         MouseArea {
                             anchors.fill: parent
                             onClicked: editor.edgeTap(modelData.node, modelData.side,
@@ -464,7 +466,7 @@ Item {
                     Rectangle {
                         id: gn
                         x: modelData.x; y: modelData.y; width: 124; height: modelData.h; radius: 7
-                        color: "#161b26"; border.width: 2; border.color: modelData.border
+                        color: Theme.color("surface.card"); border.width: 2; border.color: modelData.border
                         opacity: modelData.flying ? 0 : (modelData.pending ? 0.4 : (modelData.bypass ? 0.55 : 1.0))
                         property bool dragged: false
 
@@ -523,14 +525,14 @@ Item {
                         Rectangle {
                             visible: modelData.hasIn
                             x: -3; y: 5; width: 16; height: parent.height - 10; radius: 5
-                            color: modelData.edgeInGlow ? "#1c3550" : "transparent"
+                            color: modelData.edgeInGlow ? Theme.color("glow.edge") : "transparent"
                             MouseArea { anchors.fill: parent
                                 onClicked: editor.edgeTap("" + modelData.id, "in", gn.x, gn.y + gn.height / 2) }
                         }
                         Rectangle {
                             visible: modelData.hasOut
                             x: parent.width - 13; y: 5; width: 16; height: parent.height - 10; radius: 5
-                            color: modelData.edgeOutGlow ? "#1c3550" : "transparent"
+                            color: modelData.edgeOutGlow ? Theme.color("glow.edge") : "transparent"
                             MouseArea { anchors.fill: parent
                                 onClicked: editor.edgeTap("" + modelData.id, "out", gn.x + gn.width, gn.y + gn.height / 2) }
                         }
@@ -552,9 +554,9 @@ Item {
                     visible: editor.targeting
                     anchors.horizontalCenter: parent.horizontalCenter; y: parent.height - 46
                     height: 32; width: tgtTxt.width + 24; radius: 16; z: 46
-                    color: "#162338"; border.width: 1; border.color: cBlue
+                    color: Theme.color("surface.hintBlue"); border.width: 1; border.color: cBlue
                     Text { id: tgtTxt; anchors.centerIn: parent; text: editor.targetHint
-                           color: "#cfe0ff"; font.family: uiFont; font.pixelSize: 14 }
+                           color: Theme.color("accent.pale"); font.family: uiFont; font.pixelSize: 14 }
                 }
 
                 // radial port menu
@@ -568,8 +570,8 @@ Item {
                     }
                     Rectangle {
                         x: editor.radCx - 15; y: editor.radCy - 15; width: 30; height: 30; radius: 15
-                        color: "#3a1f1a"; border.width: 1; border.color: "#e8694a"
-                        Text { anchors.centerIn: parent; text: "X"; color: "#ff8a6a"; font.family: uiFont; font.pixelSize: 13 }
+                        color: Theme.color("delete.bg"); border.width: 1; border.color: Theme.color("accent.midi")
+                        Text { anchors.centerIn: parent; text: "X"; color: Theme.color("delete.glyph"); font.family: uiFont; font.pixelSize: 13 }
                         MouseArea { anchors.fill: parent; onClicked: editor.cancelConn() }
                     }
                     Repeater {
@@ -577,9 +579,9 @@ Item {
                         Rectangle {
                             x: modelData.x - width / 2; y: modelData.y - 17
                             height: 34; width: Math.max(36, riTxt.width + 20); radius: 17
-                            color: "#161b26"; border.width: 1; border.color: modelData.color
+                            color: Theme.color("surface.card"); border.width: 1; border.color: modelData.color
                             Text { id: riTxt; anchors.centerIn: parent; text: modelData.label
-                                   color: "#cfe0ff"; font.family: uiFont; font.pixelSize: 14 }
+                                   color: Theme.color("accent.pale"); font.family: uiFont; font.pixelSize: 14 }
                             MouseArea { anchors.fill: parent; onClicked: editor.commitRadialOpt(modelData.idx) }
                         }
                     }
@@ -589,7 +591,7 @@ Item {
                 Row {
                     x: 8; y: parent.height - 22; spacing: 12; z: 7
                     LegendDot { c: cBlue; t: "AUDIO" }
-                    LegendDot { c: "#e8694a"; t: "MIDI" }
+                    LegendDot { c: Theme.color("accent.midi"); t: "MIDI" }
                     LegendDot { c: cPurple; t: "CV" }
                 }
             }
@@ -598,9 +600,9 @@ Item {
             Rectangle {
                 id: trash
                 x: canvas.width - 52; y: canvas.height - 52; width: 40; height: 40; radius: 8
-                color: win.trashHot ? "#3a2026" : "#12161f"
-                border.width: 1; border.color: win.trashHot ? "#e8694a" : cBorder
-                Text { anchors.centerIn: parent; text: "DEL"; color: win.trashHot ? "#e8694a" : cDim
+                color: win.trashHot ? Theme.color("trash.hot") : Theme.color("trash.idle")
+                border.width: 1; border.color: win.trashHot ? Theme.color("accent.midi") : cBorder
+                Text { anchors.centerIn: parent; text: "DEL"; color: win.trashHot ? Theme.color("accent.midi") : cDim
                        font.family: uiFont; font.pixelSize: 14 }
             }
 
@@ -608,7 +610,7 @@ Item {
             Rectangle {
                 id: flyGhost
                 visible: false; width: 124; height: 52; radius: 7; z: 80
-                color: "#161b26"; border.width: 2; border.color: accent
+                color: Theme.color("surface.card"); border.width: 2; border.color: accent
                 property color accent: cBlue
                 Row {
                     width: parent.width; height: 30; leftPadding: 7; rightPadding: 7; spacing: 6
@@ -700,7 +702,7 @@ Item {
                         width: parent.width - 20; x: 10; spacing: 6
                         Rectangle {
                             height: 30; width: bypTxt.width + 22; radius: 5
-                            color: editor.inspBypassed ? "transparent" : "rgba(95,208,160,0.12)"
+                            color: editor.inspBypassed ? "transparent" : Theme.alpha("accent.green", 0.12)
                             border.width: 1; border.color: editor.inspBypassed ? cDim : cGreen
                             Text { id: bypTxt; anchors.centerIn: parent; text: editor.inspBypassed ? "BYPASSED" : "ACTIVE"
                                    color: editor.inspBypassed ? cMuted : cGreen; font.family: uiFont; font.pixelSize: 14 }
@@ -723,7 +725,7 @@ Item {
                         model: editor.inspPatches
                         Rectangle {
                             x: 10; width: parent.width - 20; height: 30; radius: 5
-                            color: "#1f5fd0a0"; border.width: 1; border.color: cGreen
+                            color: Theme.alpha("accent.green", 0.12); border.width: 1; border.color: cGreen
                             Text {
                                 anchors.left: parent.left; anchors.leftMargin: 8
                                 anchors.verticalCenter: parent.verticalCenter
@@ -798,8 +800,8 @@ Item {
                                     width: 48; height: 48; radius: 24
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     gradient: Gradient {
-                                        GradientStop { position: 0.0; color: "#252e40" }
-                                        GradientStop { position: 1.0; color: "#161b26" }
+                                        GradientStop { position: 0.0; color: Theme.color("surface.gradTop") }
+                                        GradientStop { position: 1.0; color: Theme.color("surface.card") }
                                     }
                                     border.width: 2; border.color: dialMA.pressed ? cBlue : cBorder
                                     Rectangle {
@@ -833,7 +835,7 @@ Item {
                                     width: 46; height: 26; radius: 13
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     color: modelData.on ? cGreen : cBorder
-                                    Rectangle { width: 20; height: 20; radius: 10; color: "#0e1118"
+                                    Rectangle { width: 20; height: 20; radius: 10; color: cScreen
                                                 y: 3; x: modelData.on ? 23 : 3; Behavior on x { NumberAnimation { duration: 120 } } }
                                     MouseArea { anchors.fill: parent; onClicked: editor.toggleSwitch(modelData.sym) }
                                 }
@@ -866,7 +868,7 @@ Item {
                 nameField.forceActiveFocus()
             }
             MouseArea { anchors.fill: parent; onClicked: win.namingMode = "" }
-            Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.62 }
+            Rectangle { anchors.fill: parent; color: Theme.color("overlay.scrim"); opacity: 0.62 }
             Rectangle {
                 width: 478; height: 286; radius: 10; anchors.centerIn: parent
                 color: cPanel; border.width: 1; border.color: cBlue
@@ -896,9 +898,9 @@ Item {
                             model: editor.boardTerms
                             Rectangle {
                                 height: 26; width: termTxt.width + 16; radius: 13
-                                color: "#1b2230"; border.width: 1; border.color: cBorder
+                                color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
                                 Text { id: termTxt; anchors.centerIn: parent; text: modelData
-                                       color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 14 }
+                                       color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 14 }
                                 MouseArea { anchors.fill: parent; onClicked: nameField.text = editor.suggestName(modelData) }
                             }
                         }
@@ -920,7 +922,7 @@ Item {
         Item {
             visible: win.liveBoardsOpen; anchors.fill: parent; z: 72
             MouseArea { anchors.fill: parent; onClicked: win.liveBoardsOpen = false }
-            Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.55 }
+            Rectangle { anchors.fill: parent; color: Theme.color("overlay.scrim"); opacity: 0.55 }
             Rectangle {
                 width: 478; height: 408; radius: 10; anchors.centerIn: parent
                 color: cPanel; border.width: 1; border.color: cBorder
@@ -954,7 +956,7 @@ Item {
                                 model: editor.liveBoardList
                                 Rectangle {
                                     width: liveCol.width; height: 44; radius: 5
-                                    color: modelData.current ? cElev : "#161b26"
+                                    color: modelData.current ? cElev : Theme.color("surface.card")
                                     border.width: 1; border.color: modelData.current ? cBlue : cBorder
                                     Row {
                                         anchors.fill: parent; anchors.margins: 8; spacing: 8
@@ -987,7 +989,7 @@ Item {
         Item {
             visible: win.pendingSwitchBundle !== ""; anchors.fill: parent; z: 82
             MouseArea { anchors.fill: parent; onClicked: win.pendingSwitchBundle = "" }
-            Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.6 }
+            Rectangle { anchors.fill: parent; color: Theme.color("overlay.scrim"); opacity: 0.6 }
             Rectangle {
                 width: 388; height: 168; radius: 10; anchors.centerIn: parent
                 color: cPanel; border.width: 1; border.color: cOrange
@@ -1020,7 +1022,7 @@ Item {
         Item {
             visible: win.snapsOpen; anchors.fill: parent; z: 73
             MouseArea { anchors.fill: parent; onClicked: win.snapsOpen = false }
-            Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.55 }
+            Rectangle { anchors.fill: parent; color: Theme.color("overlay.scrim"); opacity: 0.55 }
             Rectangle {
                 width: 478; height: 408; radius: 10; anchors.centerIn: parent
                 color: cPanel; border.width: 1; border.color: cBorder
@@ -1052,7 +1054,7 @@ Item {
                                 model: editor.snapList
                                 Rectangle {
                                     width: snapCol.width; height: 44; radius: 5
-                                    color: modelData.current ? cElev : "#161b26"
+                                    color: modelData.current ? cElev : Theme.color("surface.card")
                                     border.width: 1; border.color: modelData.current ? cPurple : cBorder
                                     Row {
                                         anchors.fill: parent; anchors.margins: 8; spacing: 8
@@ -1083,7 +1085,7 @@ Item {
             visible: win.snapNaming; anchors.fill: parent; z: 83
             onVisibleChanged: if (visible) snapNameField.text = ""
             MouseArea { anchors.fill: parent; onClicked: win.snapNaming = false }
-            Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.6 }
+            Rectangle { anchors.fill: parent; color: Theme.color("overlay.scrim"); opacity: 0.6 }
             Rectangle {
                 width: 460; height: 300; radius: 10; anchors.centerIn: parent
                 color: cPanel; border.width: 1; border.color: cPurple
@@ -1109,9 +1111,9 @@ Item {
                             model: editor.boardTerms
                             Rectangle {
                                 height: 26; width: stTxt.width + 16; radius: 13
-                                color: "#1b2230"; border.width: 1; border.color: cBorder
+                                color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
                                 Text { id: stTxt; anchors.centerIn: parent; text: modelData
-                                       color: "#cfd6e2"; font.family: uiFont; font.pixelSize: 14 }
+                                       color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 14 }
                                 MouseArea { anchors.fill: parent; onClicked: snapNameField.text = editor.suggestSnapshotName(modelData) }
                             }
                         }
@@ -1132,7 +1134,7 @@ Item {
         Item {
             visible: win.newBoardOpen; anchors.fill: parent; z: 84
             MouseArea { anchors.fill: parent; onClicked: win.newBoardOpen = false }
-            Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.6 }
+            Rectangle { anchors.fill: parent; color: Theme.color("overlay.scrim"); opacity: 0.6 }
             Rectangle {
                 width: 440; height: 196; radius: 10; anchors.centerIn: parent
                 color: cPanel; border.width: 1; border.color: cBlue
@@ -1174,8 +1176,8 @@ Item {
             property real elapsed: 0
             property var parts: []
             property var rng: null
-            readonly property var hot:  ["#fff4e0", "#ffd49a", "#ff9a4e", "#e8694a"]
-            readonly property var cool: ["#eafff5", "#bdf0d8", "#8fe0bd", "#5fd0a0"]
+            readonly property var hot:  Theme.fx("hot")   // ["#fff4e0","#ffd49a","#ff9a4e","#e8694a"]
+            readonly property var cool: Theme.fx("cool")  // ["#eafff5","#bdf0d8","#8fe0bd","#5fd0a0"]
 
             // small deterministic LCG so the scatter looks the same each run (no Math.imul dep)
             function _mk(seed) { var a = seed >>> 0; return function () { a = (a * 1664525 + 1013904223) >>> 0; return a / 4294967296; }; }
@@ -1240,7 +1242,7 @@ Item {
                     var sxb = W * _easeIn(Math.min(1, t / 0.72));
                     ctx.fillStyle = "rgba(8,6,3,0.45)"; ctx.fillRect(sxb, 0, W - sxb, H);   // dim the un-charged side
                     var end = Math.max(0, (t - 0.78) / 0.22);
-                    if (end > 0) { ctx.fillStyle = _rgba("#ff9a4e", 0.4 * (1 - end)); ctx.fillRect(0, 0, W, H); }
+                    if (end > 0) { ctx.fillStyle = _rgba(hot[2], 0.4 * (1 - end)); ctx.fillRect(0, 0, W, H); }
                 }
                 // --- particles (additive) ---
                 ctx.save(); ctx.globalCompositeOperation = "lighter";
@@ -1253,15 +1255,15 @@ Item {
                 if (adv) {
                     var sxf = W * _easeIn(Math.min(1, t / 0.72));
                     if (t < 0.74) {
-                        ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = _rgba("#ffd49a", 0.85);
-                        ctx.shadowColor = "#ff9a4e"; ctx.shadowBlur = 16; ctx.lineWidth = 3;
+                        ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = _rgba(hot[1], 0.85);
+                        ctx.shadowColor = hot[2]; ctx.shadowBlur = 16; ctx.lineWidth = 3;
                         ctx.beginPath(); ctx.moveTo(sxf, 0); ctx.lineTo(sxf, H); ctx.stroke(); ctx.restore();
                     }
                 } else {
                     var sy = H * _smooth(0, 1, Math.min(1, t / 0.75));
                     if (t < 0.8) {
-                        ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = _rgba("#8fe0bd", 0.8);
-                        ctx.shadowColor = "#5fd0a0"; ctx.shadowBlur = 10; ctx.lineWidth = 2;
+                        ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = _rgba(cool[2], 0.8);
+                        ctx.shadowColor = cool[3]; ctx.shadowBlur = 10; ctx.lineWidth = 2;
                         ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
                         for (var gx = 20; gx < W; gx += 40) { ctx.beginPath(); ctx.moveTo(gx, sy); ctx.lineTo(gx, sy + 9); ctx.stroke(); }
                         ctx.restore();
@@ -1269,7 +1271,7 @@ Item {
                     var va = 0.16 * _smooth(.5, .9, t);
                     if (va > 0) {
                         var g = ctx.createRadialGradient(W / 2, H / 2, H * 0.22, W / 2, H / 2, W * 0.62);
-                        g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, _rgba("#5fd0a0", va));
+                        g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, _rgba(cool[3], va));
                         ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
                     }
                 }
@@ -1308,9 +1310,9 @@ Item {
         property bool dim: false
         signal tap()
         height: 22; width: pillTxt.width + 16; radius: 5
-        color: "transparent"; border.width: 1; border.color: dim ? "#1b2230" : accent
+        color: "transparent"; border.width: 1; border.color: dim ? Theme.color("border.subtle") : accent
         anchors.verticalCenter: parent.verticalCenter
-        Text { id: pillTxt; anchors.centerIn: parent; text: label; color: dim ? "#3a4252" : "#cfe0ff"
+        Text { id: pillTxt; anchors.centerIn: parent; text: label; color: dim ? Theme.color("text.disabled") : Theme.color("accent.pale")
                font.family: uiFont; font.pixelSize: 13 }
         MouseArea { anchors.fill: parent; onClicked: parent.tap() }
     }
@@ -1321,7 +1323,7 @@ Item {
         property bool dim: false
         signal tap()
         height: 32; width: wbTxt.width + 24; radius: 6
-        color: "#161b26"; border.width: 1; border.color: dim ? "#1b2230" : accent
+        color: Theme.color("surface.card"); border.width: 1; border.color: dim ? Theme.color("border.subtle") : accent
         opacity: dim ? 0.45 : 1.0
         Text { id: wbTxt; anchors.centerIn: parent; text: label; color: dim ? cDim : cText
                font.family: uiFont; font.pixelSize: 14 }
@@ -1329,7 +1331,7 @@ Item {
     }
 
     component LegendDot: Row {
-        property color c: "#3b6fe0"
+        property color c: Theme.color("accent.blue")
         property string t: ""
         spacing: 5
         Rectangle { width: 9; height: 9; radius: 4.5; color: c; anchors.verticalCenter: parent.verticalCenter }
