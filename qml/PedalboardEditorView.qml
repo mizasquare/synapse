@@ -655,15 +655,16 @@ Item {
                                 Row {
                                     anchors.fill: parent; anchors.margins: 7; spacing: 8
                                     Column {
-                                        // reserve exactly the pins' real width (+spacing) so long
-                                        // io labels like "2ch▸2ch" never spill past the card edge
-                                        width: parent.width - pinsText.width - 8
+                                        width: parent.width - 52
                                         Text { text: modelData.name; color: cText; font: Theme.typeFont("label")
                                                elide: Text.ElideRight; width: parent.width }
                                         Text { text: modelData.brand; color: cMuted; font: Theme.typeFont("caption")
                                                elide: Text.ElideRight; width: parent.width }
                                     }
-                                    Text { id: pinsText; text: modelData.pins; color: cGreen; font: Theme.typeFont("caption")
+                                    // I/O signature badge (e.g. "M▸2ch"); micro so the longest
+                                    // ("2ch▸2ch") fits the reserved right column without overflow.
+                                    Text { text: modelData.pins; color: cGreen; font: Theme.typeFont("micro")
+                                           width: 44; horizontalAlignment: Text.AlignRight
                                            anchors.verticalCenter: parent.verticalCenter }
                                 }
                                 MouseArea { anchors.fill: parent; onClicked: editor.addEffect(modelData.uri) }
