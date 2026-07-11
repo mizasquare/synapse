@@ -424,14 +424,14 @@ Window {
                     anchors.fill: parent; anchors.margins: 18; spacing: 12
                     Item {
                         width: parent.width; height: 30
-                        Text { text: "보드 전환"; color: cText; font.family: uiFont; font.pixelSize: 24
+                        Text { text: "보드 전환"; color: cText; font: Theme.typeFont("overlayTitle")
                                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: "✕"; color: cMuted; font.pixelSize: 24
+                        Text { text: "✕"; color: cMuted; font.pixelSize: Theme.typeSize("heading")
                                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                                MouseArea { anchors.fill: parent; onClicked: overviewScreen.boardsOpen = false } }
                     }
                     Text { text: "호스트 보드 (" + view.boardList.length + ")"; color: cDim
-                           font.family: uiFont; font.pixelSize: 16 }
+                           font: Theme.typeFont("label") }
                     Flickable {
                         width: parent.width; height: 324; contentHeight: bcol.height; clip: true
                         boundsBehavior: Flickable.StopAtBounds
@@ -449,7 +449,7 @@ Window {
                                             width: parent.width - 228; anchors.verticalCenter: parent.verticalCenter
                                             text: (modelData.current ? "● " : "") + modelData.title
                                             color: modelData.current ? Theme.color("accent.blueBright") : cText
-                                            font.family: uiFont; font.pixelSize: 19; elide: Text.ElideRight
+                                            font: Theme.typeFont("body"); elide: Text.ElideRight
                                         }
                                         // 위/아래: reorder the saved display order (footswitch NAVIGATE
                                         // steps through the same order). Opposite actions side by side,
@@ -460,12 +460,12 @@ Window {
                                             spacing: 12; anchors.verticalCenter: parent.verticalCenter
                                             Rectangle { width: 48; height: 40; radius: 5; color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
                                                 opacity: index === 0 ? 0.35 : 1.0
-                                                Text { anchors.centerIn: parent; text: "위"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 15 }
+                                                Text { anchors.centerIn: parent; text: "위"; color: Theme.color("text.onLight"); font: Theme.typeFont("smallLabel") }
                                                 MouseArea { anchors.fill: parent; anchors.margins: -5; enabled: index > 0
                                                             onClicked: view.moveBoardOrder(modelData.bundle, -1) } }
                                             Rectangle { width: 48; height: 40; radius: 5; color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
                                                 opacity: index === view.boardList.length - 1 ? 0.35 : 1.0
-                                                Text { anchors.centerIn: parent; text: "아래"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 15 }
+                                                Text { anchors.centerIn: parent; text: "아래"; color: Theme.color("text.onLight"); font: Theme.typeFont("smallLabel") }
                                                 MouseArea { anchors.fill: parent; anchors.margins: -5; enabled: index < view.boardList.length - 1
                                                             onClicked: view.moveBoardOrder(modelData.bundle, 1) } }
                                         }
@@ -474,7 +474,7 @@ Window {
                                             color: modelData.current ? "transparent" : Theme.color("btn.blue.fill")
                                             border.width: 1; border.color: modelData.current ? cBorder : Theme.color("accent.blue")
                                             Text { anchors.centerIn: parent; text: modelData.current ? "현재" : "전환"
-                                                   color: modelData.current ? cMuted : Theme.color("accent.blueBright"); font.family: uiFont; font.pixelSize: 17 }
+                                                   color: modelData.current ? cMuted : Theme.color("accent.blueBright"); font: Theme.typeFont("body") }
                                             MouseArea { anchors.fill: parent; enabled: !modelData.current
                                                         onClicked: { view.switchBoard(modelData.bundle); overviewScreen.boardsOpen = false } }
                                         }
@@ -483,7 +483,7 @@ Window {
                             }
                             Text { visible: view.boardList.length === 0
                                    text: "호스트 보드 목록 없음"; color: cDim
-                                   font.family: uiFont; font.pixelSize: 17; topPadding: 20 }
+                                   font: Theme.typeFont("body"); topPadding: 20 }
                         }
                     }
                 }
@@ -505,14 +505,14 @@ Window {
                     anchors.fill: parent; anchors.margins: 18; spacing: 12
                     Item {
                         width: parent.width; height: 30
-                        Text { text: "스냅샷"; color: cText; font.family: uiFont; font.pixelSize: 24
+                        Text { text: "스냅샷"; color: cText; font: Theme.typeFont("overlayTitle")
                                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: "✕"; color: cMuted; font.pixelSize: 24
+                        Text { text: "✕"; color: cMuted; font.pixelSize: Theme.typeSize("heading")
                                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                                MouseArea { anchors.fill: parent; onClicked: overviewScreen.snapsOpen = false } }
                     }
                     Text { text: "보드 스냅샷 (" + view.snapList.length + ")"; color: cDim
-                           font.family: uiFont; font.pixelSize: 16 }
+                           font: Theme.typeFont("label") }
                     Flickable {
                         width: parent.width; height: 324; contentHeight: scol.height; clip: true
                         boundsBehavior: Flickable.StopAtBounds
@@ -530,14 +530,14 @@ Window {
                                             width: parent.width - 110; anchors.verticalCenter: parent.verticalCenter
                                             text: (modelData.current ? "◆ " : "") + modelData.idx + " · " + modelData.name
                                             color: modelData.current ? cPurple : cText
-                                            font.family: uiFont; font.pixelSize: 19; elide: Text.ElideRight
+                                            font: Theme.typeFont("body"); elide: Text.ElideRight
                                         }
                                         Rectangle {
                                             width: 84; height: 34; radius: 7; anchors.verticalCenter: parent.verticalCenter
                                             color: modelData.current ? "transparent" : Theme.color("btn.purple.fill")
                                             border.width: 1; border.color: modelData.current ? cBorder : Theme.color("btn.purple.border")
                                             Text { anchors.centerIn: parent; text: modelData.current ? "현재" : "전환"
-                                                   color: modelData.current ? cMuted : Theme.color("accent.purpleBright"); font.family: uiFont; font.pixelSize: 17 }
+                                                   color: modelData.current ? cMuted : Theme.color("accent.purpleBright"); font: Theme.typeFont("body") }
                                             MouseArea { anchors.fill: parent; enabled: !modelData.current
                                                         onClicked: { view.selectSnapshot(modelData.idx); overviewScreen.snapsOpen = false } }
                                         }
@@ -546,7 +546,7 @@ Window {
                             }
                             Text { visible: view.snapList.length === 0
                                    text: "스냅샷 없음"; color: cDim
-                                   font.family: uiFont; font.pixelSize: 17; topPadding: 20 }
+                                   font: Theme.typeFont("body"); topPadding: 20 }
                         }
                     }
                 }
