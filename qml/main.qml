@@ -824,16 +824,16 @@ Window {
                     Item {
                         width: parent.width; height: 30
                         Text { visible: overviewScreen.hubLeaf !== "menu"
-                               text: "< 뒤로"; color: cMuted; font.family: uiFont; font.pixelSize: 20
+                               text: "< 뒤로"; color: cMuted; font: Theme.typeFont("button")
                                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
                                MouseArea { anchors.fill: parent
                                            onClicked: { overviewScreen.hubLeaf = "menu"; overviewScreen.sysConfirm = false } } }
                         Text { text: overviewScreen.hubLeaf === "system" ? "시스템"
                                      : overviewScreen.hubLeaf === "config" ? "설정" : "설정 / 시스템"
-                               color: cText; font.family: uiFont; font.pixelSize: 24
+                               color: cText; font: Theme.typeFont("overlayTitle")
                                anchors.horizontalCenter: parent.horizontalCenter
                                anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: "✕"; color: cMuted; font.pixelSize: 24
+                        Text { text: "✕"; color: cMuted; font.pixelSize: Theme.typeSize("heading")
                                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                                MouseArea { anchors.fill: parent
                                            onClicked: { overviewScreen.hubOpen = false; overviewScreen.sysConfirm = false } } }
@@ -851,10 +851,10 @@ Window {
                                 Column {
                                     anchors.left: parent.left; anchors.leftMargin: 14
                                     anchors.verticalCenter: parent.verticalCenter; spacing: 3
-                                    Text { text: modelData.t; color: cText; font.family: uiFont; font.pixelSize: 20 }
-                                    Text { text: modelData.s; color: cDim;  font.family: uiFont; font.pixelSize: 15 }
+                                    Text { text: modelData.t; color: cText; font: Theme.typeFont("heading") }
+                                    Text { text: modelData.s; color: cDim;  font: Theme.typeFont("smallLabel") }
                                 }
-                                Text { text: ">"; color: cMuted; font.pixelSize: 24
+                                Text { text: ">"; color: cMuted; font.pixelSize: Theme.typeSize("heading")
                                        anchors.right: parent.right; anchors.rightMargin: 16
                                        anchors.verticalCenter: parent.verticalCenter }
                                 MouseArea { anchors.fill: parent
@@ -912,7 +912,7 @@ Window {
 
                         // --- master volume (software) section ---
                         Text { text: "마스터 볼륨"
-                               color: cText; font.family: uiFont; font.pixelSize: 20 }
+                               color: cText; font: Theme.typeFont("heading") }
 
                         // slider row (hand-rolled, house style) — hidden if gain stage unavailable
                         Row {
@@ -950,20 +950,20 @@ Window {
                             Text { text: configLeaf.masterVol + "%"
                                    width: 64; horizontalAlignment: Text.AlignRight
                                    anchors.verticalCenter: parent.verticalCenter
-                                   color: cGreen; font.family: uiFont; font.pixelSize: 22 }
+                                   color: cGreen; font: Theme.typeFont("heading") }
                         }
                         Text { visible: configLeaf.volAvail
                                text: "출력단 소프트웨어 게인(JACK)입니다. 100% = 유니티, 아래로 감쇠.\n보드의 물리 노브가 최종 아날로그 마스터입니다."
-                               color: cDim; font.family: uiFont; font.pixelSize: 15
+                               color: cDim; font: Theme.typeFont("smallLabel")
                                wrapMode: Text.WordWrap; width: parent.width }
                         Text { visible: !configLeaf.volAvail
                                text: "게인 스테이지를 찾을 수 없습니다 (synapse-mastervol 서비스 확인)."
-                               color: cMuted; font.family: uiFont; font.pixelSize: 16
+                               color: cMuted; font: Theme.typeFont("label")
                                wrapMode: Text.WordWrap; width: parent.width }
 
                         // --- time signature (beats per bar) section ---
                         Text { text: "박자표 BEATS / BAR"
-                               color: cText; font.family: uiFont; font.pixelSize: 20 }
+                               color: cText; font: Theme.typeFont("heading") }
                         Row {
                             spacing: 14
                             Rectangle {   // minus
@@ -971,7 +971,7 @@ Window {
                                 color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
                                 Text { text: "−"; anchors.centerIn: parent
                                        color: configLeaf.bpbVal > 2 ? cText : cMuted
-                                       font.family: uiFont; font.pixelSize: 30 }
+                                       font: Theme.typeFont("title") }
                                 MouseArea { anchors.fill: parent
                                             onClicked: if (configLeaf.bpbVal > 2) {
                                                 configLeaf.bpbVal -= 1;
@@ -981,13 +981,13 @@ Window {
                             Text { text: configLeaf.bpbVal
                                    width: 72; horizontalAlignment: Text.AlignHCenter
                                    anchors.verticalCenter: parent.verticalCenter
-                                   color: cGreen; font.family: uiFont; font.pixelSize: 32 }
+                                   color: cGreen; font: Theme.typeFont("title") }
                             Rectangle {   // plus
                                 width: 64; height: 48; radius: 8
                                 color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
                                 Text { text: "＋"; anchors.centerIn: parent
                                        color: configLeaf.bpbVal < 12 ? cText : cMuted
-                                       font.family: uiFont; font.pixelSize: 30 }
+                                       font: Theme.typeFont("title") }
                                 MouseArea { anchors.fill: parent
                                             onClicked: if (configLeaf.bpbVal < 12) {
                                                 configLeaf.bpbVal += 1;
@@ -996,7 +996,7 @@ Window {
                             }
                         }
                         Text { text: "탭 템포 메트로놈의 마디당 비트 수입니다 (2–12)."
-                               color: cDim; font.family: uiFont; font.pixelSize: 15
+                               color: cDim; font: Theme.typeFont("smallLabel")
                                wrapMode: Text.WordWrap; width: parent.width }
                     }
                     // ---- system (real: shutdown / reboot, 2-tap confirm) ----
@@ -1004,7 +1004,7 @@ Window {
                         visible: overviewScreen.hubLeaf === "system"
                         width: parent.width; spacing: 14
                         Text { text: "장치를 안전하게 종료/재부팅합니다.\n전원을 그냥 뽑으면 SD 카드가 손상될 수 있습니다."
-                               color: cDim; font.family: uiFont; font.pixelSize: 16
+                               color: cDim; font: Theme.typeFont("label")
                                wrapMode: Text.WordWrap; width: parent.width }
                         Row {
                             spacing: 14
@@ -1013,7 +1013,7 @@ Window {
                                 color: Theme.color("btn.danger.fill"); border.width: 1; border.color: Theme.color("btn.danger.border")
                                 Text { anchors.centerIn: parent
                                        text: (overviewScreen.sysConfirm && overviewScreen.sysAction === "shutdown") ? "정말 종료?" : "안전 종료"
-                                       color: Theme.color("btn.danger.text"); font.family: uiFont; font.pixelSize: 23 }
+                                       color: Theme.color("btn.danger.text"); font: Theme.typeFont("button") }
                                 MouseArea { anchors.fill: parent
                                     onClicked: {
                                         if (overviewScreen.sysConfirm && overviewScreen.sysAction === "shutdown") view.systemShutdown();
@@ -1025,7 +1025,7 @@ Window {
                                 color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
                                 Text { anchors.centerIn: parent
                                        text: (overviewScreen.sysConfirm && overviewScreen.sysAction === "reboot") ? "정말 재부팅?" : "재부팅"
-                                       color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 23 }
+                                       color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                                 MouseArea { anchors.fill: parent
                                     onClicked: {
                                         if (overviewScreen.sysConfirm && overviewScreen.sysAction === "reboot") view.systemReboot();
@@ -1035,7 +1035,7 @@ Window {
                         }
                         Text { visible: overviewScreen.sysConfirm
                                text: "한 번 더 누르면 실행됩니다. (취소: 패널 밖을 탭)"
-                               color: cMuted; font.family: uiFont; font.pixelSize: 15 }
+                               color: cMuted; font: Theme.typeFont("smallLabel") }
                     }
                 }
             }
@@ -1193,7 +1193,7 @@ Window {
                 visible: ctrlrow.width > ctrlflick.width
                 anchors.right: parent.right; anchors.rightMargin: 10
                 anchors.bottom: parent.bottom; anchors.bottomMargin: 6
-                text: "⟷ 스크롤"; color: cDim; font.family: uiFont; font.pixelSize: 14
+                text: "⟷ 스크롤"; color: cDim; font: Theme.typeFont("caption")
             }
         }
 
@@ -1215,7 +1215,7 @@ Window {
                 Text {
                     visible: monrow.children.length <= 1
                     anchors.centerIn: parent; text: "모니터 없음"
-                    color: cDim; font.family: uiFont; font.pixelSize: 16
+                    color: cDim; font: Theme.typeFont("label")
                 }
                 Row {
                     id: monrow
@@ -1242,7 +1242,7 @@ Window {
                 spacing: 8
                 Text {
                     text: "STOMP FS 배정"; color: cDim
-                    font.family: uiFont; font.pixelSize: 14
+                    font: Theme.typeFont("caption")
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
                 Row {
@@ -1259,7 +1259,7 @@ Window {
                                 anchors.centerIn: parent
                                 text: ["A", "B", "C", "D"][index]
                                 color: sel ? cGraph : cText
-                                font.family: uiFont; font.pixelSize: 20
+                                font: Theme.typeFont("heading")
                             }
                             MouseArea {
                                 anchors.fill: parent
@@ -1300,12 +1300,12 @@ Window {
         Text {
             x: 16; y: 16
             text: "TAP TEMPO"
-            color: cGreen; font.family: uiFont; font.pixelSize: 44
+            color: cGreen; font: Theme.typeFont("display")
         }
         Text {
             anchors.right: parent.right; anchors.rightMargin: 16; y: 26
             text: tapScreen.t && tapScreen.t.klass ? tapScreen.t.klass : ""
-            color: cMuted; font.family: uiFont; font.pixelSize: 28
+            color: cMuted; font: Theme.typeFont("title")
         }
 
         // big last-set BPM, centred
@@ -1314,12 +1314,12 @@ Window {
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: view.bpm
-                color: cText; font.family: uiFont; font.pixelSize: 200
+                color: cText; font: Theme.typeFont("heroNumeric")
             }
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: "BPM"
-                color: cMuted; font.family: uiFont; font.pixelSize: 38
+                color: cMuted; font: Theme.typeFont("display")
             }
         }
 
@@ -1328,13 +1328,13 @@ Window {
             anchors.horizontalCenter: parent.horizontalCenter
             y: parent.height - 92
             text: (tapScreen.t && tapScreen.t.bpb ? tapScreen.t.bpb : 4) + " BEATS / BAR"
-            color: cGreen; font.family: uiFont; font.pixelSize: 30
+            color: cGreen; font: Theme.typeFont("title")
         }
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom; anchors.bottomMargin: 16
             text: "탭: 풋스위치 아무거나  ·  종료: 콤보(2개 동시)"
-            color: cDim; font.family: uiFont; font.pixelSize: 22
+            color: cDim; font: Theme.typeFont("heading")
         }
     }
 
@@ -1379,12 +1379,12 @@ Window {
         // header
         Text {
             x: 16; y: 16; text: "TUNER"
-            color: cPurple; font.family: uiFont; font.pixelSize: 44
+            color: cPurple; font: Theme.typeFont("display")
         }
         Text {
             anchors.right: parent.right; anchors.rightMargin: 16; y: 26
             text: "A 440"
-            color: cMuted; font.family: uiFont; font.pixelSize: 28
+            color: cMuted; font: Theme.typeFont("title")
         }
 
         // big note name
@@ -1394,7 +1394,7 @@ Window {
             y: 92
             text: tunerScreen.live ? tunerScreen.note : "--"
             color: tunerScreen.stateColor
-            font.family: uiFont; font.pixelSize: 190
+            font: Theme.typeFont("heroNumeric")
         }
 
         // cents readout
@@ -1405,7 +1405,7 @@ Window {
                   ? ((tunerScreen.cents >= 0 ? "+" : "") + tunerScreen.cents.toFixed(1) + "¢")
                   : ""
             color: tunerScreen.stateColor
-            font.family: uiFont; font.pixelSize: 40
+            font: Theme.typeFont("display")
         }
 
         // deviation meter: a needle over a +/-50 cent scale
@@ -1451,7 +1451,7 @@ Window {
                   ? (tunerScreen.strg + "    " + tunerScreen.freq.toFixed(1) + " Hz")
                   : "듣는 중…"
             color: tunerScreen.live ? cText : cDim
-            font.family: uiFont; font.pixelSize: 28
+            font: Theme.typeFont("title")
         }
 
         // footer
@@ -1459,7 +1459,7 @@ Window {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom; anchors.bottomMargin: 12
             text: "종료: 풋스위치 아무거나"
-            color: cDim; font.family: uiFont; font.pixelSize: 22
+            color: cDim; font: Theme.typeFont("heading")
         }
     }
 
