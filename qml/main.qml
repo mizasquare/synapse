@@ -74,15 +74,13 @@ Window {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: "SYNAPSE"
                 color: cText
-                font.family: uiFont
-                font.pixelSize: 56
+                font: Theme.typeFont("displayLg")
             }
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: "MODEP 대기 중…"
                 color: cMuted
-                font.family: uiFont
-                font.pixelSize: 30
+                font: Theme.typeFont("title")
                 // Pulse while the splash is up; stops when hidden (no idle work).
                 SequentialAnimation on opacity {
                     running: bootingScreen.visible
@@ -124,8 +122,7 @@ Window {
                 anchors.top: parent.top
                 text: view.boardName
                 color: cText
-                font.family: uiFont
-                font.pixelSize: 96            // ~80px glyph @133PPI -> glance @1.5m
+                font: Theme.typeFont("hero")   // ~96px glance @1.5m (board name)
                 elide: Text.ElideRight
                 // Now owns the whole top row; only the snapshot/mode column on the
                 // right is subtracted (buttons moved to the control row below).
@@ -142,8 +139,7 @@ Window {
                     anchors.right: parent.right
                     text: "◆ " + view.snapshotLabel
                     color: cMuted
-                    font.family: uiFont
-                    font.pixelSize: 40
+                    font: Theme.typeFont("display")
                     // long snapshot names grew leftward over the board name
                     width: Math.min(implicitWidth, parent.width)
                     elide: Text.ElideRight
@@ -152,8 +148,7 @@ Window {
                     anchors.right: parent.right
                     text: view.modeLabel
                     color: cGreen
-                    font.family: uiFont
-                    font.pixelSize: 20
+                    font: Theme.typeFont("heading")
                 }
             }
 
@@ -164,8 +159,7 @@ Window {
                 anchors.bottomMargin: 9
                 text: "BPM " + view.bpm
                 color: cMuted
-                font.family: uiFont
-                font.pixelSize: 24
+                font: Theme.typeFont("heading")
             }
             // snapshot save / pedalboard edit actions
             Row {
@@ -180,7 +174,7 @@ Window {
                         width: 92; height: 38; radius: 8
                         color: boardsMa.pressed ? Theme.color("btn.blue.fillPressed") : Theme.color("btn.blue.fill")
                         border.width: 1; border.color: boardsMa.pressed ? Theme.color("accent.blueBright") : Theme.color("accent.blue")
-                        Text { anchors.centerIn: parent; text: "BOARDS"; color: Theme.color("accent.blueBright"); font.family: uiFont; font.pixelSize: 19 }
+                        Text { anchors.centerIn: parent; text: "BOARDS"; color: Theme.color("accent.blueBright"); font: Theme.typeFont("button") }
                         MouseArea { id: boardsMa; anchors.fill: parent
                                     onClicked: { view.refreshBoards(); overviewScreen.boardsOpen = true } }
                     }
@@ -188,7 +182,7 @@ Window {
                         width: 66; height: 38; radius: 8
                         color: snapMa.pressed ? Theme.color("btn.purple.fillPressed") : Theme.color("btn.purple.fill")
                         border.width: 1; border.color: snapMa.pressed ? Theme.color("accent.purpleBright") : Theme.color("btn.purple.border")
-                        Text { anchors.centerIn: parent; text: "SNAP"; color: Theme.color("accent.purpleBright"); font.family: uiFont; font.pixelSize: 19 }
+                        Text { anchors.centerIn: parent; text: "SNAP"; color: Theme.color("accent.purpleBright"); font: Theme.typeFont("button") }
                         MouseArea { id: snapMa; anchors.fill: parent
                                     onClicked: { view.refreshSnaps(); overviewScreen.snapsOpen = true } }
                     }
@@ -196,7 +190,7 @@ Window {
                         width: 70; height: 38; radius: 8
                         color: bankMa.pressed ? Theme.color("btn.blue.fillPressed") : Theme.color("btn.blue.fill")
                         border.width: 1; border.color: bankMa.pressed ? Theme.color("accent.blueBright") : Theme.color("accent.blue")
-                        Text { anchors.centerIn: parent; text: "BANK"; color: Theme.color("accent.blueBright"); font.family: uiFont; font.pixelSize: 19 }
+                        Text { anchors.centerIn: parent; text: "BANK"; color: Theme.color("accent.blueBright"); font: Theme.typeFont("button") }
                         MouseArea { id: bankMa; anchors.fill: parent
                                     onClicked: { view.refreshBanks(); overviewScreen.bankMgrOpen = true } }
                     }
@@ -204,28 +198,28 @@ Window {
                         width: 72; height: 38; radius: 8
                         color: saveMa.pressed ? Theme.color("btn.neutral.fillPressed") : Theme.color("surface.control")
                         border.width: 1; border.color: saveMa.pressed ? Theme.color("text.secondary") : cBorder
-                        Text { anchors.centerIn: parent; text: "SAVE"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 19 }
+                        Text { anchors.centerIn: parent; text: "SAVE"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { id: saveMa; anchors.fill: parent; onClicked: view.saveSnapshot() }
                     }
                     Rectangle {
                         width: 98; height: 38; radius: 8
                         color: saveAsMa.pressed ? Theme.color("btn.neutral.fillPressed") : Theme.color("surface.control")
                         border.width: 1; border.color: saveAsMa.pressed ? Theme.color("text.secondary") : cBorder
-                        Text { anchors.centerIn: parent; text: "SAVE AS"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 19 }
+                        Text { anchors.centerIn: parent; text: "SAVE AS"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { id: saveAsMa; anchors.fill: parent; onClicked: saveAsModal.open = true }
                     }
                     Rectangle {
                         width: 66; height: 38; radius: 8
                         color: editMa.pressed ? Theme.color("btn.purple.fillPressed") : Theme.color("btn.purple.fill")
                         border.width: 1; border.color: editMa.pressed ? Theme.color("accent.purpleBright") : Theme.color("btn.purple.border")
-                        Text { anchors.centerIn: parent; text: "EDIT"; color: Theme.color("accent.purpleBright"); font.family: uiFont; font.pixelSize: 19 }
+                        Text { anchors.centerIn: parent; text: "EDIT"; color: Theme.color("accent.purpleBright"); font: Theme.typeFont("button") }
                         MouseArea { id: editMa; anchors.fill: parent; onClicked: view.enterEdit() }
                     }
                     Rectangle {
                         width: 66; height: 38; radius: 8
                         color: menuMa.pressed ? Theme.color("btn.neutral.fillPressed") : Theme.color("surface.control")
                         border.width: 1; border.color: menuMa.pressed ? Theme.color("text.secondary") : cBorder
-                        Text { anchors.centerIn: parent; text: "MENU"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 19 }
+                        Text { anchors.centerIn: parent; text: "MENU"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { id: menuMa; anchors.fill: parent; onClicked: { overviewScreen.hubLeaf = "menu"; overviewScreen.hubOpen = true } }
                     }
                 }
@@ -334,11 +328,9 @@ Window {
                             horizontalAlignment: Text.AlignHCenter
                             text: modelData.label
                             color: modelData.isIo ? cGreen : cText
-                            font.family: uiFont
-                            // model-based effects (NAM/IR) get a bigger name line;
-                            // clamp it to one row so name+file always fit the box.
-                            font.pixelSize: modelData.isIo ? 22
-                                          : (modelData.kind === "model" ? 24 : 20)
+                            // node names -> heading tier (was 20-24 by kind; per-kind
+                            // emphasis flattened to one clean size — restore via role if wanted).
+                            font: Theme.typeFont("heading")
                             wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                             maximumLineCount: modelData.kind === "model" ? 1 : 2
                             elide: Text.ElideRight
@@ -354,8 +346,7 @@ Window {
                                   : (modelData.kind === "model" && modelData.model !== "") ? modelData.model
                                   : modelData.sub
                             color: Theme.color("text.onGraph")
-                            font.family: uiFont
-                            font.pixelSize: 13
+                            font: Theme.typeFont("caption")
                             maximumLineCount: 1
                             elide: Text.ElideRight
                         }
@@ -410,11 +401,11 @@ Window {
                             // room left of the LED: cell - leftMargin(12) - led(15) - spacing(10) - pad(8)
                             width: fsCell.width - 45
                             Text {
-                                text: modelData.label; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 20
+                                text: modelData.label; color: Theme.color("text.onLight"); font: Theme.typeFont("heading")
                                 width: Math.min(implicitWidth, parent.width)
                                 elide: Text.ElideRight
                             }
-                            Text { text: modelData.sub; color: modelData.led; font.family: uiFont; font.pixelSize: 15 }
+                            Text { text: modelData.sub; color: modelData.led; font: Theme.typeFont("smallLabel") }
                         }
                     }
                 }
