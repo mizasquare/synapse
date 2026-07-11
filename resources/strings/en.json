@@ -34,5 +34,34 @@
   "bank.boardsHint":  "Boards in this bank — order = footswitch A·B·C·D (first 4)",
   "bank.addBoard":    "Add board — Host Boards ({0})",
   "bank.newTitle":    "New Bank",
-  "bank.renameTitle": "Rename Bank"
+  "bank.renameTitle": "Rename Bank",
+
+  "snapshot.title":      "Snapshots",
+  "snapshot.boardSnaps": "Board Snapshots ({0})",
+  "snapshot.empty":      "No snapshots",
+
+  "focus.overview":    "◄ OVERVIEW",
+  "focus.engaged":     "ENGAGED",
+  "focus.bypass":      "BYPASS",
+  "focus.inputs":      "◄ INPUTS",
+  "focus.outputs":     "OUTPUTS ►",
+  "focus.scrollHint":  "⟷ Scroll",
+  "focus.noMonitor":   "No monitors",
+  "focus.stompAssign": "STOMP FS Assign",
+
+  "tap.title":       "TAP TEMPO",
+  "tap.beatsPerBar": "{0} BEATS / BAR",
+  "tap.hint":        "Tap: any footswitch  ·  Exit: combo (both at once)",
+
+  "tuner.title":     "TUNER",
+  "tuner.ref":       "A 440",
+  "tuner.listening": "Listening…",
+  "tuner.exitHint":  "Exit: any footswitch",
+
+  "saveAs.title":         "Save Snapshot As",
+  "saveAs.prompt":        "Tap a term below to get a name suggestion",
+  "saveAs.enterToSave":   "Enter to save",
+  "saveAs.hintSuggested": "↑ Tap this name to save · tap a term again to re-roll",
+  "saveAs.hintEmpty":     "Tap a term for a suggestion with a random suffix",
+  "saveAs.typeCustom":    "✎ Type it"
 }

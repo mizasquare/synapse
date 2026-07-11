@@ -34,5 +34,34 @@
   "bank.boardsHint":  "이 뱅크의 보드 — 순서 = 풋스위치 A·B·C·D (앞 4개)",
   "bank.addBoard":    "보드 추가 — 호스트 보드 ({0})",
   "bank.newTitle":    "새 뱅크",
-  "bank.renameTitle": "뱅크 이름 변경"
+  "bank.renameTitle": "뱅크 이름 변경",
+
+  "snapshot.title":      "스냅샷",
+  "snapshot.boardSnaps": "보드 스냅샷 ({0})",
+  "snapshot.empty":      "스냅샷 없음",
+
+  "focus.overview":    "◄ OVERVIEW",
+  "focus.engaged":     "ENGAGED",
+  "focus.bypass":      "BYPASS",
+  "focus.inputs":      "◄ INPUTS",
+  "focus.outputs":     "OUTPUTS ►",
+  "focus.scrollHint":  "⟷ 스크롤",
+  "focus.noMonitor":   "모니터 없음",
+  "focus.stompAssign": "STOMP FS 배정",
+
+  "tap.title":       "TAP TEMPO",
+  "tap.beatsPerBar": "{0} BEATS / BAR",
+  "tap.hint":        "탭: 풋스위치 아무거나  ·  종료: 콤보(2개 동시)",
+
+  "tuner.title":     "TUNER",
+  "tuner.ref":       "A 440",
+  "tuner.listening": "듣는 중…",
+  "tuner.exitHint":  "종료: 풋스위치 아무거나",
+
+  "saveAs.title":         "스냅샷 다른 이름으로 저장",
+  "saveAs.prompt":        "아래 용어를 눌러 이름 제안 받기",
+  "saveAs.enterToSave":   "Enter로 저장",
+  "saveAs.hintSuggested": "↑ 이 이름을 누르면 저장 · 용어 다시 누르면 새 제안",
+  "saveAs.hintEmpty":     "용어를 누르면 무작위 접미사가 붙은 제안이 떠요",
+  "saveAs.typeCustom":    "✎ 직접입력"
 }

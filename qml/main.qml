@@ -505,13 +505,13 @@ Window {
                     anchors.fill: parent; anchors.margins: 18; spacing: 12
                     Item {
                         width: parent.width; height: 30
-                        Text { text: "스냅샷"; color: cText; font: Theme.typeFont("overlayTitle")
+                        Text { text: Tr.tr("snapshot.title"); color: cText; font: Theme.typeFont("overlayTitle")
                                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
                         Text { text: "✕"; color: cMuted; font.pixelSize: Theme.typeSize("heading")
                                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                                MouseArea { anchors.fill: parent; onClicked: overviewScreen.snapsOpen = false } }
                     }
-                    Text { text: "보드 스냅샷 (" + view.snapList.length + ")"; color: cDim
+                    Text { text: Tr.trf("snapshot.boardSnaps", [view.snapList.length]); color: cDim
                            font: Theme.typeFont("label") }
                     Flickable {
                         width: parent.width; height: 324; contentHeight: scol.height; clip: true
@@ -545,7 +545,7 @@ Window {
                                 }
                             }
                             Text { visible: view.snapList.length === 0
-                                   text: "스냅샷 없음"; color: cDim
+                                   text: Tr.tr("snapshot.empty"); color: cDim
                                    font: Theme.typeFont("body"); topPadding: 20 }
                         }
                     }
@@ -1058,7 +1058,7 @@ Window {
             Rectangle {
                 width: 124; height: 44; radius: 8
                 color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                Text { anchors.centerIn: parent; text: "◄ OVERVIEW"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
+                Text { anchors.centerIn: parent; text: Tr.tr("focus.overview"); color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                 MouseArea { anchors.fill: parent; onClicked: view.goOverview() }
             }
             Rectangle {
@@ -1083,7 +1083,7 @@ Window {
             color: on ? cGreen : Theme.color("border.default")
             Text {
                 anchors.centerIn: parent
-                text: parent.on ? "ENGAGED" : "BYPASS"
+                text: parent.on ? Tr.tr("focus.engaged") : Tr.tr("focus.bypass")
                 color: parent.on ? Theme.color("bg.screen") : Theme.color("text.mutedAlt")
                 font: Theme.typeFont("toggle")
             }
@@ -1144,8 +1144,8 @@ Window {
             width: parent.width - 24; height: 56
             spacing: 10
             Repeater {
-                model: [ { t: "◄ INPUTS",  list: focusScreen.f ? focusScreen.f.inputs : [] },
-                         { t: "OUTPUTS ►", list: focusScreen.f ? focusScreen.f.outputs : [] } ]
+                model: [ { t: Tr.tr("focus.inputs"),  list: focusScreen.f ? focusScreen.f.inputs : [] },
+                         { t: Tr.tr("focus.outputs"), list: focusScreen.f ? focusScreen.f.outputs : [] } ]
                 Rectangle {
                     width: (routing.width - 10) / 2; height: 56
                     radius: 10; color: cPanel
@@ -1193,7 +1193,7 @@ Window {
                 visible: ctrlrow.width > ctrlflick.width
                 anchors.right: parent.right; anchors.rightMargin: 10
                 anchors.bottom: parent.bottom; anchors.bottomMargin: 6
-                text: "⟷ 스크롤"; color: cDim; font: Theme.typeFont("caption")
+                text: Tr.tr("focus.scrollHint"); color: cDim; font: Theme.typeFont("caption")
             }
         }
 
@@ -1214,7 +1214,7 @@ Window {
                 width: parent.width / 2
                 Text {
                     visible: monrow.children.length <= 1
-                    anchors.centerIn: parent; text: "모니터 없음"
+                    anchors.centerIn: parent; text: Tr.tr("focus.noMonitor")
                     color: cDim; font: Theme.typeFont("label")
                 }
                 Row {
@@ -1241,7 +1241,7 @@ Window {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
                 Text {
-                    text: "STOMP FS 배정"; color: cDim
+                    text: Tr.tr("focus.stompAssign"); color: cDim
                     font: Theme.typeFont("caption")
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
@@ -1299,7 +1299,7 @@ Window {
         // header: title (left) + meter class (right)
         Text {
             x: 16; y: 16
-            text: "TAP TEMPO"
+            text: Tr.tr("tap.title")
             color: cGreen; font: Theme.typeFont("display")
         }
         Text {
@@ -1327,13 +1327,13 @@ Window {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             y: parent.height - 92
-            text: (tapScreen.t && tapScreen.t.bpb ? tapScreen.t.bpb : 4) + " BEATS / BAR"
+            text: Tr.trf("tap.beatsPerBar", [(tapScreen.t && tapScreen.t.bpb ? tapScreen.t.bpb : 4)])
             color: cGreen; font: Theme.typeFont("title")
         }
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom; anchors.bottomMargin: 16
-            text: "탭: 풋스위치 아무거나  ·  종료: 콤보(2개 동시)"
+            text: Tr.tr("tap.hint")
             color: cDim; font: Theme.typeFont("heading")
         }
     }
@@ -1378,12 +1378,12 @@ Window {
 
         // header
         Text {
-            x: 16; y: 16; text: "TUNER"
+            x: 16; y: 16; text: Tr.tr("tuner.title")
             color: cPurple; font: Theme.typeFont("display")
         }
         Text {
             anchors.right: parent.right; anchors.rightMargin: 16; y: 26
-            text: "A 440"
+            text: Tr.tr("tuner.ref")
             color: cMuted; font: Theme.typeFont("title")
         }
 
@@ -1449,7 +1449,7 @@ Window {
             y: 418
             text: tunerScreen.live
                   ? (tunerScreen.strg + "    " + tunerScreen.freq.toFixed(1) + " Hz")
-                  : "듣는 중…"
+                  : Tr.tr("tuner.listening")
             color: tunerScreen.live ? cText : cDim
             font: Theme.typeFont("title")
         }
@@ -1458,7 +1458,7 @@ Window {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom; anchors.bottomMargin: 12
-            text: "종료: 풋스위치 아무거나"
+            text: Tr.tr("tuner.exitHint")
             color: cDim; font: Theme.typeFont("heading")
         }
     }
@@ -1515,7 +1515,7 @@ Window {
                 anchors.margins: 20
                 spacing: 14
 
-                Text { text: "스냅샷 다른 이름으로 저장"; color: cText; font: Theme.typeFont("title") }
+                Text { text: Tr.tr("saveAs.title"); color: cText; font: Theme.typeFont("title") }
 
                 // suggestion box: tap to save (or, when typing, a text field)
                 Rectangle {
@@ -1526,7 +1526,7 @@ Window {
                     Text {
                         visible: !saveAsModal.typing
                         anchors.centerIn: parent
-                        text: saveAsModal.suggestion !== "" ? saveAsModal.suggestion : "아래 용어를 눌러 이름 제안 받기"
+                        text: saveAsModal.suggestion !== "" ? saveAsModal.suggestion : Tr.tr("saveAs.prompt")
                         color: saveAsModal.suggestion !== "" ? cGreen : cDim
                         font: Theme.typeFont("title")
                     }
@@ -1546,9 +1546,9 @@ Window {
                     }
                 }
                 Text {
-                    text: saveAsModal.typing ? "Enter로 저장"
-                        : (saveAsModal.suggestion !== "" ? "↑ 이 이름을 누르면 저장 · 용어 다시 누르면 새 제안"
-                                                         : "용어를 누르면 무작위 접미사가 붙은 제안이 떠요")
+                    text: saveAsModal.typing ? Tr.tr("saveAs.enterToSave")
+                        : (saveAsModal.suggestion !== "" ? Tr.tr("saveAs.hintSuggested")
+                                                         : Tr.tr("saveAs.hintEmpty"))
                     color: cDim; font: Theme.typeFont("label")
                 }
 
@@ -1577,13 +1577,13 @@ Window {
                     Rectangle {
                         width: 156; height: 44; radius: 8
                         color: saveAsModal.typing ? cGreen : Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                        Text { anchors.centerIn: parent; text: "✎ 직접입력"; color: saveAsModal.typing ? Theme.color("bg.screen") : Theme.color("text.onLight"); font: Theme.typeFont("button") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("saveAs.typeCustom"); color: saveAsModal.typing ? Theme.color("bg.screen") : Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { anchors.fill: parent; onClicked: { saveAsModal.typing = true; kb.forceActiveFocus(); } }
                     }
                     Rectangle {
                         width: 120; height: 44; radius: 8
                         color: Theme.color("btn.purple.fill"); border.width: 1; border.color: cBorder
-                        Text { anchors.centerIn: parent; text: "취소"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("action.cancel"); color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { anchors.fill: parent; onClicked: saveAsModal.close() }
                     }
                 }
