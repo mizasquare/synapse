@@ -21,6 +21,8 @@ import subprocess
 
 from PyQt6.QtCore import QObject, QTimer, pyqtProperty as Property, pyqtSignal as Signal, pyqtSlot as Slot
 
+import theme
+
 # SAVE AS naming (tap a stage term -> "term-quirkysuffix", e.g. "Drive-cupcake").
 # The stage terms are the names you actually want (song section / tone); the random
 # suffix just keeps them unique so two "Drive"s don't collide. A keyboard escape
@@ -67,7 +69,12 @@ _GW, _GH = 776.0, 176.0
 _PER_ROW = 4
 _ROW_H = 100.0
 _ROW_PAD = 10.0
-_LED_BLUE, _LED_GREEN, _LED_RED, _LED_OFF = "#3b6fe0", "#5fd0a0", "#e6402e", "#2a3140"
+# LED/cable colors resolve from the shared token source (theme/tokens.json) so the
+# hex baked into payloads QML renders stays in lockstep with the QML-side Theme.
+_LED_BLUE = theme.led_color("active")   # #3b6fe0 — STOMP engaged / non-current board / nav cells
+_LED_GREEN = theme.led_color("on")      # #5fd0a0 — graph cable stroke / current board / snap cells
+_LED_RED = theme.led_color("danger")    # #e6402e
+_LED_OFF = theme.led_color("off")       # #2a3140
 
 
 class QtView(QObject):
