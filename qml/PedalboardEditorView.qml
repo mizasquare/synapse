@@ -655,13 +655,15 @@ Item {
                                 Row {
                                     anchors.fill: parent; anchors.margins: 7; spacing: 8
                                     Column {
-                                        width: parent.width - 30
+                                        // reserve exactly the pins' real width (+spacing) so long
+                                        // io labels like "2ch▸2ch" never spill past the card edge
+                                        width: parent.width - pinsText.width - 8
                                         Text { text: modelData.name; color: cText; font: Theme.typeFont("label")
                                                elide: Text.ElideRight; width: parent.width }
                                         Text { text: modelData.brand; color: cMuted; font: Theme.typeFont("caption")
                                                elide: Text.ElideRight; width: parent.width }
                                     }
-                                    Text { text: modelData.pins; color: cGreen; font: Theme.typeFont("caption")
+                                    Text { id: pinsText; text: modelData.pins; color: cGreen; font: Theme.typeFont("caption")
                                            anchors.verticalCenter: parent.verticalCenter }
                                 }
                                 MouseArea { anchors.fill: parent; onClicked: editor.addEffect(modelData.uri) }
