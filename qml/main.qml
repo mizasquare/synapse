@@ -577,9 +577,9 @@ Window {
                     id: bmHeader
                     anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
                     anchors.margins: 16; height: 30
-                    Text { text: "뱅크 매니저"; color: cText; font.family: uiFont; font.pixelSize: 24
+                    Text { text: "뱅크 매니저"; color: cText; font: Theme.typeFont("overlayTitle")
                            anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
-                    Text { text: "✕"; color: cMuted; font.pixelSize: 24
+                    Text { text: "✕"; color: cMuted; font.pixelSize: Theme.typeSize("heading")
                            anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                            MouseArea { anchors.fill: parent; onClicked: bankMgr.close() } }
                 }
@@ -600,7 +600,7 @@ Window {
                             Rectangle {
                                 width: parent.width; height: 40; radius: 6
                                 color: Theme.color("btn.blue.fill"); border.width: 1; border.color: Theme.color("accent.blue")
-                                Text { anchors.centerIn: parent; text: "+ 새 뱅크"; color: Theme.color("accent.blueBright"); font.family: uiFont; font.pixelSize: 19 }
+                                Text { anchors.centerIn: parent; text: "+ 새 뱅크"; color: Theme.color("accent.blueBright"); font: Theme.typeFont("button") }
                                 MouseArea { anchors.fill: parent
                                     onClicked: { bankName.target = -1; bankName.open = true;
                                                  nameInput.text = view.suggestDateName(); nameInput.forceActiveFocus() } }
@@ -617,9 +617,9 @@ Window {
                                         anchors.right: parent.right; anchors.rightMargin: 8
                                         anchors.verticalCenter: parent.verticalCenter; spacing: 2
                                         Text { text: (modelData.active ? "● " : "") + modelData.title
-                                               color: modelData.active ? cGreen : cText; font.family: uiFont; font.pixelSize: 19
+                                               color: modelData.active ? cGreen : cText; font: Theme.typeFont("body")
                                                elide: Text.ElideRight; width: parent.width }
-                                        Text { text: modelData.pedalboards.length + "개 보드"; color: cDim; font.family: uiFont; font.pixelSize: 14 }
+                                        Text { text: modelData.pedalboards.length + "개 보드"; color: cDim; font: Theme.typeFont("caption") }
                                     }
                                     MouseArea { anchors.fill: parent; onClicked: { bankMgr.sel = index; bankMgr.delArmed = -1 } }
                                 }
@@ -635,7 +635,7 @@ Window {
                         Text { visible: bankMgr.selBank === null; anchors.centerIn: parent
                                text: "왼쪽에서 뱅크를 고르거나\n+ 새 뱅크로 만드세요."
                                horizontalAlignment: Text.AlignHCenter
-                               color: cDim; font.family: uiFont; font.pixelSize: 18 }
+                               color: cDim; font: Theme.typeFont("body") }
 
                         Column {
                             visible: bankMgr.selBank !== null
@@ -645,7 +645,7 @@ Window {
                             Item {
                                 width: parent.width; height: 32
                                 Text { text: bankMgr.selBank ? bankMgr.selBank.title : ""
-                                       color: cText; font.family: uiFont; font.pixelSize: 22
+                                       color: cText; font: Theme.typeFont("heading")
                                        anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
                                        elide: Text.ElideRight; width: 180 }
                                 Row {
@@ -654,16 +654,16 @@ Window {
                                         width: 56; height: 30; radius: 6
                                         visible: bankMgr.selBank && !bankMgr.selBank.active
                                         color: Theme.color("btn.affirm.fill"); border.width: 1; border.color: cGreen
-                                        Text { anchors.centerIn: parent; text: "활성"; color: cGreen; font.family: uiFont; font.pixelSize: 17 }
+                                        Text { anchors.centerIn: parent; text: "활성"; color: cGreen; font: Theme.typeFont("body") }
                                         MouseArea { anchors.fill: parent; onClicked: view.setActiveBank(bankMgr.sel) }
                                     }
                                     Text { visible: bankMgr.selBank && bankMgr.selBank.active
-                                           text: "● 활성"; color: cGreen; font.family: uiFont; font.pixelSize: 16
+                                           text: "● 활성"; color: cGreen; font: Theme.typeFont("label")
                                            anchors.verticalCenter: parent.verticalCenter }
                                     Rectangle {
                                         width: 56; height: 30; radius: 6
                                         color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                                        Text { anchors.centerIn: parent; text: "이름"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 17 }
+                                        Text { anchors.centerIn: parent; text: "이름"; color: Theme.color("text.onLight"); font: Theme.typeFont("body") }
                                         MouseArea { anchors.fill: parent
                                             onClicked: { bankName.target = bankMgr.sel; bankName.open = true;
                                                          nameInput.text = bankMgr.selBank.title; nameInput.forceActiveFocus() } }
@@ -676,7 +676,7 @@ Window {
                                         color: Theme.color("btn.danger.fill"); border.width: 1; border.color: Theme.color("btn.danger.border")
                                         Text { anchors.centerIn: parent
                                                text: bankMgr.delArmed === bankMgr.sel ? "정말?" : "삭제"
-                                               color: Theme.color("btn.danger.text"); font.family: uiFont; font.pixelSize: 17 }
+                                               color: Theme.color("btn.danger.text"); font: Theme.typeFont("body") }
                                         MouseArea { anchors.fill: parent
                                             onClicked: {
                                                 if (!parent.canDel) return;
@@ -689,7 +689,7 @@ Window {
                                 }
                             }
 
-                            Text { text: "이 뱅크의 보드 — 순서 = 풋스위치 A·B·C·D (앞 4개)"; color: cDim; font.family: uiFont; font.pixelSize: 14 }
+                            Text { text: "이 뱅크의 보드 — 순서 = 풋스위치 A·B·C·D (앞 4개)"; color: cDim; font: Theme.typeFont("caption") }
 
                             ListView {
                                 width: parent.width; height: 116; clip: true; spacing: 5
@@ -699,7 +699,7 @@ Window {
                                     color: index < 4 ? Theme.color("surface.controlActive") : Theme.color("surface.controlAlt")
                                     border.width: 1; border.color: cBorder
                                     Text { text: (index < 4 ? ["A","B","C","D"][index] + "  " : "") + modelData.title
-                                           color: index < 4 ? cText : cMuted; font.family: uiFont; font.pixelSize: 17
+                                           color: index < 4 ? cText : cMuted; font: Theme.typeFont("body")
                                            anchors.left: parent.left; anchors.leftMargin: 10
                                            anchors.verticalCenter: parent.verticalCenter
                                            elide: Text.ElideRight; width: parent.width - 178 }
@@ -710,19 +710,19 @@ Window {
                                         anchors.right: parent.right; anchors.rightMargin: 8
                                         anchors.verticalCenter: parent.verticalCenter; spacing: 12
                                         Rectangle { width: 48; height: 34; radius: 5; color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                                            Text { anchors.centerIn: parent; text: "위"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 15 }
+                                            Text { anchors.centerIn: parent; text: "위"; color: Theme.color("text.onLight"); font: Theme.typeFont("smallLabel") }
                                             MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: view.bankMoveBoard(bankMgr.sel, index, -1) } }
                                         Rectangle { width: 48; height: 34; radius: 5; color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                                            Text { anchors.centerIn: parent; text: "아래"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 15 }
+                                            Text { anchors.centerIn: parent; text: "아래"; color: Theme.color("text.onLight"); font: Theme.typeFont("smallLabel") }
                                             MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: view.bankMoveBoard(bankMgr.sel, index, 1) } }
                                         Rectangle { width: 40; height: 34; radius: 5; color: Theme.color("btn.purple.fill"); border.width: 1; border.color: cBorder
-                                            Text { anchors.centerIn: parent; text: "✕"; color: Theme.color("btn.danger.text"); font.pixelSize: 16 }
+                                            Text { anchors.centerIn: parent; text: "✕"; color: Theme.color("btn.danger.text"); font.pixelSize: Theme.typeSize("label") }
                                             MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: view.bankRemoveBoard(bankMgr.sel, index) } }
                                     }
                                 }
                             }
 
-                            Text { text: "보드 추가 — 호스트 보드 (" + view.boardCatalog.length + ")"; color: cDim; font.family: uiFont; font.pixelSize: 14 }
+                            Text { text: "보드 추가 — 호스트 보드 (" + view.boardCatalog.length + ")"; color: cDim; font: Theme.typeFont("caption") }
 
                             ListView {
                                 width: parent.width; height: 126; clip: true; spacing: 5
@@ -730,7 +730,7 @@ Window {
                                 delegate: Rectangle {
                                     width: ListView.view.width; height: 36; radius: 6
                                     color: Theme.color("surface.controlAlt"); border.width: 1; border.color: cBorder
-                                    Text { text: modelData.title; color: cText; font.family: uiFont; font.pixelSize: 17
+                                    Text { text: modelData.title; color: cText; font: Theme.typeFont("body")
                                            anchors.left: parent.left; anchors.leftMargin: 10
                                            anchors.verticalCenter: parent.verticalCenter
                                            elide: Text.ElideRight; width: parent.width - 60 }
@@ -738,7 +738,7 @@ Window {
                                         width: 40; height: 28; radius: 5
                                         anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
                                         color: Theme.color("btn.blue.fill"); border.width: 1; border.color: Theme.color("accent.blue")
-                                        Text { anchors.centerIn: parent; text: "+"; color: Theme.color("accent.blueBright"); font.pixelSize: 20 }
+                                        Text { anchors.centerIn: parent; text: "+"; color: Theme.color("accent.blueBright"); font.pixelSize: Theme.typeSize("heading") }
                                         MouseArea { anchors.fill: parent; onClicked: view.bankAddBoard(bankMgr.sel, modelData.bundle) }
                                     }
                                 }
@@ -780,7 +780,7 @@ Window {
                         Column {
                             anchors.fill: parent; anchors.margins: 18; spacing: 14
                             Text { text: bankName.target < 0 ? "새 뱅크" : "뱅크 이름 변경"
-                                   color: cText; font.family: uiFont; font.pixelSize: 22 }
+                                   color: cText; font: Theme.typeFont("overlayTitle") }
                             Rectangle {
                                 width: parent.width; height: 52; radius: 8; color: Theme.color("surface.inset")
                                 border.width: 1; border.color: cGreen
@@ -788,7 +788,7 @@ Window {
                                     id: nameInput
                                     anchors.fill: parent; anchors.margins: 12
                                     verticalAlignment: TextInput.AlignVCenter
-                                    color: cText; font.family: uiFont; font.pixelSize: 24; clip: true
+                                    color: cText; font: Theme.typeFont("heading"); clip: true
                                     selectByMouse: true
                                     onAccepted: bankName.commit()
                                 }
@@ -796,10 +796,10 @@ Window {
                             Row {
                                 spacing: 10
                                 Rectangle { width: 120; height: 44; radius: 8; color: Theme.color("btn.affirm.fill"); border.width: 1; border.color: cGreen
-                                    Text { anchors.centerIn: parent; text: "저장"; color: cGreen; font.family: uiFont; font.pixelSize: 19 }
+                                    Text { anchors.centerIn: parent; text: "저장"; color: cGreen; font: Theme.typeFont("button") }
                                     MouseArea { anchors.fill: parent; onClicked: bankName.commit() } }
                                 Rectangle { width: 110; height: 44; radius: 8; color: Theme.color("btn.purple.fill"); border.width: 1; border.color: cBorder
-                                    Text { anchors.centerIn: parent; text: "취소"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 19 }
+                                    Text { anchors.centerIn: parent; text: "취소"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                                     MouseArea { anchors.fill: parent; onClicked: bankName.open = false } }
                             }
                         }
@@ -1515,7 +1515,7 @@ Window {
                 anchors.margins: 20
                 spacing: 14
 
-                Text { text: "스냅샷 다른 이름으로 저장"; color: cText; font.family: uiFont; font.pixelSize: 28 }
+                Text { text: "스냅샷 다른 이름으로 저장"; color: cText; font: Theme.typeFont("title") }
 
                 // suggestion box: tap to save (or, when typing, a text field)
                 Rectangle {
@@ -1528,7 +1528,7 @@ Window {
                         anchors.centerIn: parent
                         text: saveAsModal.suggestion !== "" ? saveAsModal.suggestion : "아래 용어를 눌러 이름 제안 받기"
                         color: saveAsModal.suggestion !== "" ? cGreen : cDim
-                        font.family: uiFont; font.pixelSize: 26
+                        font: Theme.typeFont("title")
                     }
                     MouseArea {
                         anchors.fill: parent
@@ -1541,7 +1541,7 @@ Window {
                         visible: saveAsModal.typing
                         anchors.fill: parent; anchors.margins: 14
                         verticalAlignment: TextInput.AlignVCenter
-                        color: cText; font.family: uiFont; font.pixelSize: 26; clip: true
+                        color: cText; font: Theme.typeFont("title"); clip: true
                         onAccepted: if (text.trim().length) { view.saveSnapshotNamed(text); saveAsModal.close(); }
                     }
                 }
@@ -1549,7 +1549,7 @@ Window {
                     text: saveAsModal.typing ? "Enter로 저장"
                         : (saveAsModal.suggestion !== "" ? "↑ 이 이름을 누르면 저장 · 용어 다시 누르면 새 제안"
                                                          : "용어를 누르면 무작위 접미사가 붙은 제안이 떠요")
-                    color: cDim; font.family: uiFont; font.pixelSize: 16
+                    color: cDim; font: Theme.typeFont("label")
                 }
 
                 // stage-term grid (tap -> suggestion)
@@ -1562,7 +1562,7 @@ Window {
                         Rectangle {
                             width: (660 - 40 - 8 * 3) / 4; height: 46; radius: 8
                             color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                            Text { anchors.centerIn: parent; text: modelData; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 20 }
+                            Text { anchors.centerIn: parent; text: modelData; color: Theme.color("text.onLight"); font: Theme.typeFont("heading") }
                             MouseArea {
                                 anchors.fill: parent
                                 onClicked: { saveAsModal.typing = false; saveAsModal.suggestion = view.suggestSnapshotName(modelData); }
@@ -1577,13 +1577,13 @@ Window {
                     Rectangle {
                         width: 156; height: 44; radius: 8
                         color: saveAsModal.typing ? cGreen : Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                        Text { anchors.centerIn: parent; text: "✎ 직접입력"; color: saveAsModal.typing ? Theme.color("bg.screen") : Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 20 }
+                        Text { anchors.centerIn: parent; text: "✎ 직접입력"; color: saveAsModal.typing ? Theme.color("bg.screen") : Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { anchors.fill: parent; onClicked: { saveAsModal.typing = true; kb.forceActiveFocus(); } }
                     }
                     Rectangle {
                         width: 120; height: 44; radius: 8
                         color: Theme.color("btn.purple.fill"); border.width: 1; border.color: cBorder
-                        Text { anchors.centerIn: parent; text: "취소"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 20 }
+                        Text { anchors.centerIn: parent; text: "취소"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { anchors.fill: parent; onClicked: saveAsModal.close() }
                     }
                 }
@@ -1608,7 +1608,7 @@ Window {
             id: toastText
             anchors.centerIn: parent
             text: toast.msg
-            color: cText; font.family: uiFont; font.pixelSize: 22
+            color: cText; font: Theme.typeFont("heading")
         }
         Timer { id: toastTimer; interval: 2600; onTriggered: toast.visible = false }
         Connections {
