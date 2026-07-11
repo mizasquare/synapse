@@ -74,15 +74,13 @@ Window {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: "SYNAPSE"
                 color: cText
-                font.family: uiFont
-                font.pixelSize: 56
+                font: Theme.typeFont("displayLg")
             }
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: "MODEP 대기 중…"
                 color: cMuted
-                font.family: uiFont
-                font.pixelSize: 30
+                font: Theme.typeFont("title")
                 // Pulse while the splash is up; stops when hidden (no idle work).
                 SequentialAnimation on opacity {
                     running: bootingScreen.visible
@@ -124,8 +122,7 @@ Window {
                 anchors.top: parent.top
                 text: view.boardName
                 color: cText
-                font.family: uiFont
-                font.pixelSize: 96            // ~80px glyph @133PPI -> glance @1.5m
+                font: Theme.typeFont("hero")   // ~96px glance @1.5m (board name)
                 elide: Text.ElideRight
                 // Now owns the whole top row; only the snapshot/mode column on the
                 // right is subtracted (buttons moved to the control row below).
@@ -142,8 +139,7 @@ Window {
                     anchors.right: parent.right
                     text: "◆ " + view.snapshotLabel
                     color: cMuted
-                    font.family: uiFont
-                    font.pixelSize: 40
+                    font: Theme.typeFont("display")
                     // long snapshot names grew leftward over the board name
                     width: Math.min(implicitWidth, parent.width)
                     elide: Text.ElideRight
@@ -152,8 +148,7 @@ Window {
                     anchors.right: parent.right
                     text: view.modeLabel
                     color: cGreen
-                    font.family: uiFont
-                    font.pixelSize: 20
+                    font: Theme.typeFont("heading")
                 }
             }
 
@@ -164,8 +159,7 @@ Window {
                 anchors.bottomMargin: 9
                 text: "BPM " + view.bpm
                 color: cMuted
-                font.family: uiFont
-                font.pixelSize: 24
+                font: Theme.typeFont("heading")
             }
             // snapshot save / pedalboard edit actions
             Row {
@@ -180,7 +174,7 @@ Window {
                         width: 92; height: 38; radius: 8
                         color: boardsMa.pressed ? Theme.color("btn.blue.fillPressed") : Theme.color("btn.blue.fill")
                         border.width: 1; border.color: boardsMa.pressed ? Theme.color("accent.blueBright") : Theme.color("accent.blue")
-                        Text { anchors.centerIn: parent; text: "BOARDS"; color: Theme.color("accent.blueBright"); font.family: uiFont; font.pixelSize: 19 }
+                        Text { anchors.centerIn: parent; text: "BOARDS"; color: Theme.color("accent.blueBright"); font: Theme.typeFont("button") }
                         MouseArea { id: boardsMa; anchors.fill: parent
                                     onClicked: { view.refreshBoards(); overviewScreen.boardsOpen = true } }
                     }
@@ -188,7 +182,7 @@ Window {
                         width: 66; height: 38; radius: 8
                         color: snapMa.pressed ? Theme.color("btn.purple.fillPressed") : Theme.color("btn.purple.fill")
                         border.width: 1; border.color: snapMa.pressed ? Theme.color("accent.purpleBright") : Theme.color("btn.purple.border")
-                        Text { anchors.centerIn: parent; text: "SNAP"; color: Theme.color("accent.purpleBright"); font.family: uiFont; font.pixelSize: 19 }
+                        Text { anchors.centerIn: parent; text: "SNAP"; color: Theme.color("accent.purpleBright"); font: Theme.typeFont("button") }
                         MouseArea { id: snapMa; anchors.fill: parent
                                     onClicked: { view.refreshSnaps(); overviewScreen.snapsOpen = true } }
                     }
@@ -196,7 +190,7 @@ Window {
                         width: 70; height: 38; radius: 8
                         color: bankMa.pressed ? Theme.color("btn.blue.fillPressed") : Theme.color("btn.blue.fill")
                         border.width: 1; border.color: bankMa.pressed ? Theme.color("accent.blueBright") : Theme.color("accent.blue")
-                        Text { anchors.centerIn: parent; text: "BANK"; color: Theme.color("accent.blueBright"); font.family: uiFont; font.pixelSize: 19 }
+                        Text { anchors.centerIn: parent; text: "BANK"; color: Theme.color("accent.blueBright"); font: Theme.typeFont("button") }
                         MouseArea { id: bankMa; anchors.fill: parent
                                     onClicked: { view.refreshBanks(); overviewScreen.bankMgrOpen = true } }
                     }
@@ -204,28 +198,28 @@ Window {
                         width: 72; height: 38; radius: 8
                         color: saveMa.pressed ? Theme.color("btn.neutral.fillPressed") : Theme.color("surface.control")
                         border.width: 1; border.color: saveMa.pressed ? Theme.color("text.secondary") : cBorder
-                        Text { anchors.centerIn: parent; text: "SAVE"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 19 }
+                        Text { anchors.centerIn: parent; text: "SAVE"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { id: saveMa; anchors.fill: parent; onClicked: view.saveSnapshot() }
                     }
                     Rectangle {
                         width: 98; height: 38; radius: 8
                         color: saveAsMa.pressed ? Theme.color("btn.neutral.fillPressed") : Theme.color("surface.control")
                         border.width: 1; border.color: saveAsMa.pressed ? Theme.color("text.secondary") : cBorder
-                        Text { anchors.centerIn: parent; text: "SAVE AS"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 19 }
+                        Text { anchors.centerIn: parent; text: "SAVE AS"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { id: saveAsMa; anchors.fill: parent; onClicked: saveAsModal.open = true }
                     }
                     Rectangle {
                         width: 66; height: 38; radius: 8
                         color: editMa.pressed ? Theme.color("btn.purple.fillPressed") : Theme.color("btn.purple.fill")
                         border.width: 1; border.color: editMa.pressed ? Theme.color("accent.purpleBright") : Theme.color("btn.purple.border")
-                        Text { anchors.centerIn: parent; text: "EDIT"; color: Theme.color("accent.purpleBright"); font.family: uiFont; font.pixelSize: 19 }
+                        Text { anchors.centerIn: parent; text: "EDIT"; color: Theme.color("accent.purpleBright"); font: Theme.typeFont("button") }
                         MouseArea { id: editMa; anchors.fill: parent; onClicked: view.enterEdit() }
                     }
                     Rectangle {
                         width: 66; height: 38; radius: 8
                         color: menuMa.pressed ? Theme.color("btn.neutral.fillPressed") : Theme.color("surface.control")
                         border.width: 1; border.color: menuMa.pressed ? Theme.color("text.secondary") : cBorder
-                        Text { anchors.centerIn: parent; text: "MENU"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 19 }
+                        Text { anchors.centerIn: parent; text: "MENU"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { id: menuMa; anchors.fill: parent; onClicked: { overviewScreen.hubLeaf = "menu"; overviewScreen.hubOpen = true } }
                     }
                 }
@@ -334,11 +328,9 @@ Window {
                             horizontalAlignment: Text.AlignHCenter
                             text: modelData.label
                             color: modelData.isIo ? cGreen : cText
-                            font.family: uiFont
-                            // model-based effects (NAM/IR) get a bigger name line;
-                            // clamp it to one row so name+file always fit the box.
-                            font.pixelSize: modelData.isIo ? 22
-                                          : (modelData.kind === "model" ? 24 : 20)
+                            // node names -> heading tier (was 20-24 by kind; per-kind
+                            // emphasis flattened to one clean size — restore via role if wanted).
+                            font: Theme.typeFont("heading")
                             wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                             maximumLineCount: modelData.kind === "model" ? 1 : 2
                             elide: Text.ElideRight
@@ -354,8 +346,7 @@ Window {
                                   : (modelData.kind === "model" && modelData.model !== "") ? modelData.model
                                   : modelData.sub
                             color: Theme.color("text.onGraph")
-                            font.family: uiFont
-                            font.pixelSize: 13
+                            font: Theme.typeFont("caption")
                             maximumLineCount: 1
                             elide: Text.ElideRight
                         }
@@ -410,11 +401,11 @@ Window {
                             // room left of the LED: cell - leftMargin(12) - led(15) - spacing(10) - pad(8)
                             width: fsCell.width - 45
                             Text {
-                                text: modelData.label; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 20
+                                text: modelData.label; color: Theme.color("text.onLight"); font: Theme.typeFont("heading")
                                 width: Math.min(implicitWidth, parent.width)
                                 elide: Text.ElideRight
                             }
-                            Text { text: modelData.sub; color: modelData.led; font.family: uiFont; font.pixelSize: 15 }
+                            Text { text: modelData.sub; color: modelData.led; font: Theme.typeFont("smallLabel") }
                         }
                     }
                 }
@@ -433,14 +424,14 @@ Window {
                     anchors.fill: parent; anchors.margins: 18; spacing: 12
                     Item {
                         width: parent.width; height: 30
-                        Text { text: "보드 전환"; color: cText; font.family: uiFont; font.pixelSize: 24
+                        Text { text: "보드 전환"; color: cText; font: Theme.typeFont("overlayTitle")
                                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: "✕"; color: cMuted; font.pixelSize: 24
+                        Text { text: "✕"; color: cMuted; font.pixelSize: Theme.typeSize("heading")
                                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                                MouseArea { anchors.fill: parent; onClicked: overviewScreen.boardsOpen = false } }
                     }
                     Text { text: "호스트 보드 (" + view.boardList.length + ")"; color: cDim
-                           font.family: uiFont; font.pixelSize: 16 }
+                           font: Theme.typeFont("label") }
                     Flickable {
                         width: parent.width; height: 324; contentHeight: bcol.height; clip: true
                         boundsBehavior: Flickable.StopAtBounds
@@ -458,7 +449,7 @@ Window {
                                             width: parent.width - 228; anchors.verticalCenter: parent.verticalCenter
                                             text: (modelData.current ? "● " : "") + modelData.title
                                             color: modelData.current ? Theme.color("accent.blueBright") : cText
-                                            font.family: uiFont; font.pixelSize: 19; elide: Text.ElideRight
+                                            font: Theme.typeFont("body"); elide: Text.ElideRight
                                         }
                                         // 위/아래: reorder the saved display order (footswitch NAVIGATE
                                         // steps through the same order). Opposite actions side by side,
@@ -469,12 +460,12 @@ Window {
                                             spacing: 12; anchors.verticalCenter: parent.verticalCenter
                                             Rectangle { width: 48; height: 40; radius: 5; color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
                                                 opacity: index === 0 ? 0.35 : 1.0
-                                                Text { anchors.centerIn: parent; text: "위"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 15 }
+                                                Text { anchors.centerIn: parent; text: "위"; color: Theme.color("text.onLight"); font: Theme.typeFont("smallLabel") }
                                                 MouseArea { anchors.fill: parent; anchors.margins: -5; enabled: index > 0
                                                             onClicked: view.moveBoardOrder(modelData.bundle, -1) } }
                                             Rectangle { width: 48; height: 40; radius: 5; color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
                                                 opacity: index === view.boardList.length - 1 ? 0.35 : 1.0
-                                                Text { anchors.centerIn: parent; text: "아래"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 15 }
+                                                Text { anchors.centerIn: parent; text: "아래"; color: Theme.color("text.onLight"); font: Theme.typeFont("smallLabel") }
                                                 MouseArea { anchors.fill: parent; anchors.margins: -5; enabled: index < view.boardList.length - 1
                                                             onClicked: view.moveBoardOrder(modelData.bundle, 1) } }
                                         }
@@ -483,7 +474,7 @@ Window {
                                             color: modelData.current ? "transparent" : Theme.color("btn.blue.fill")
                                             border.width: 1; border.color: modelData.current ? cBorder : Theme.color("accent.blue")
                                             Text { anchors.centerIn: parent; text: modelData.current ? "현재" : "전환"
-                                                   color: modelData.current ? cMuted : Theme.color("accent.blueBright"); font.family: uiFont; font.pixelSize: 17 }
+                                                   color: modelData.current ? cMuted : Theme.color("accent.blueBright"); font: Theme.typeFont("body") }
                                             MouseArea { anchors.fill: parent; enabled: !modelData.current
                                                         onClicked: { view.switchBoard(modelData.bundle); overviewScreen.boardsOpen = false } }
                                         }
@@ -492,7 +483,7 @@ Window {
                             }
                             Text { visible: view.boardList.length === 0
                                    text: "호스트 보드 목록 없음"; color: cDim
-                                   font.family: uiFont; font.pixelSize: 17; topPadding: 20 }
+                                   font: Theme.typeFont("body"); topPadding: 20 }
                         }
                     }
                 }
@@ -514,14 +505,14 @@ Window {
                     anchors.fill: parent; anchors.margins: 18; spacing: 12
                     Item {
                         width: parent.width; height: 30
-                        Text { text: "스냅샷"; color: cText; font.family: uiFont; font.pixelSize: 24
+                        Text { text: "스냅샷"; color: cText; font: Theme.typeFont("overlayTitle")
                                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: "✕"; color: cMuted; font.pixelSize: 24
+                        Text { text: "✕"; color: cMuted; font.pixelSize: Theme.typeSize("heading")
                                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                                MouseArea { anchors.fill: parent; onClicked: overviewScreen.snapsOpen = false } }
                     }
                     Text { text: "보드 스냅샷 (" + view.snapList.length + ")"; color: cDim
-                           font.family: uiFont; font.pixelSize: 16 }
+                           font: Theme.typeFont("label") }
                     Flickable {
                         width: parent.width; height: 324; contentHeight: scol.height; clip: true
                         boundsBehavior: Flickable.StopAtBounds
@@ -539,14 +530,14 @@ Window {
                                             width: parent.width - 110; anchors.verticalCenter: parent.verticalCenter
                                             text: (modelData.current ? "◆ " : "") + modelData.idx + " · " + modelData.name
                                             color: modelData.current ? cPurple : cText
-                                            font.family: uiFont; font.pixelSize: 19; elide: Text.ElideRight
+                                            font: Theme.typeFont("body"); elide: Text.ElideRight
                                         }
                                         Rectangle {
                                             width: 84; height: 34; radius: 7; anchors.verticalCenter: parent.verticalCenter
                                             color: modelData.current ? "transparent" : Theme.color("btn.purple.fill")
                                             border.width: 1; border.color: modelData.current ? cBorder : Theme.color("btn.purple.border")
                                             Text { anchors.centerIn: parent; text: modelData.current ? "현재" : "전환"
-                                                   color: modelData.current ? cMuted : Theme.color("accent.purpleBright"); font.family: uiFont; font.pixelSize: 17 }
+                                                   color: modelData.current ? cMuted : Theme.color("accent.purpleBright"); font: Theme.typeFont("body") }
                                             MouseArea { anchors.fill: parent; enabled: !modelData.current
                                                         onClicked: { view.selectSnapshot(modelData.idx); overviewScreen.snapsOpen = false } }
                                         }
@@ -555,7 +546,7 @@ Window {
                             }
                             Text { visible: view.snapList.length === 0
                                    text: "스냅샷 없음"; color: cDim
-                                   font.family: uiFont; font.pixelSize: 17; topPadding: 20 }
+                                   font: Theme.typeFont("body"); topPadding: 20 }
                         }
                     }
                 }
@@ -586,9 +577,9 @@ Window {
                     id: bmHeader
                     anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
                     anchors.margins: 16; height: 30
-                    Text { text: "뱅크 매니저"; color: cText; font.family: uiFont; font.pixelSize: 24
+                    Text { text: "뱅크 매니저"; color: cText; font: Theme.typeFont("overlayTitle")
                            anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
-                    Text { text: "✕"; color: cMuted; font.pixelSize: 24
+                    Text { text: "✕"; color: cMuted; font.pixelSize: Theme.typeSize("heading")
                            anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                            MouseArea { anchors.fill: parent; onClicked: bankMgr.close() } }
                 }
@@ -609,7 +600,7 @@ Window {
                             Rectangle {
                                 width: parent.width; height: 40; radius: 6
                                 color: Theme.color("btn.blue.fill"); border.width: 1; border.color: Theme.color("accent.blue")
-                                Text { anchors.centerIn: parent; text: "+ 새 뱅크"; color: Theme.color("accent.blueBright"); font.family: uiFont; font.pixelSize: 19 }
+                                Text { anchors.centerIn: parent; text: "+ 새 뱅크"; color: Theme.color("accent.blueBright"); font: Theme.typeFont("button") }
                                 MouseArea { anchors.fill: parent
                                     onClicked: { bankName.target = -1; bankName.open = true;
                                                  nameInput.text = view.suggestDateName(); nameInput.forceActiveFocus() } }
@@ -626,9 +617,9 @@ Window {
                                         anchors.right: parent.right; anchors.rightMargin: 8
                                         anchors.verticalCenter: parent.verticalCenter; spacing: 2
                                         Text { text: (modelData.active ? "● " : "") + modelData.title
-                                               color: modelData.active ? cGreen : cText; font.family: uiFont; font.pixelSize: 19
+                                               color: modelData.active ? cGreen : cText; font: Theme.typeFont("body")
                                                elide: Text.ElideRight; width: parent.width }
-                                        Text { text: modelData.pedalboards.length + "개 보드"; color: cDim; font.family: uiFont; font.pixelSize: 14 }
+                                        Text { text: modelData.pedalboards.length + "개 보드"; color: cDim; font: Theme.typeFont("caption") }
                                     }
                                     MouseArea { anchors.fill: parent; onClicked: { bankMgr.sel = index; bankMgr.delArmed = -1 } }
                                 }
@@ -644,7 +635,7 @@ Window {
                         Text { visible: bankMgr.selBank === null; anchors.centerIn: parent
                                text: "왼쪽에서 뱅크를 고르거나\n+ 새 뱅크로 만드세요."
                                horizontalAlignment: Text.AlignHCenter
-                               color: cDim; font.family: uiFont; font.pixelSize: 18 }
+                               color: cDim; font: Theme.typeFont("body") }
 
                         Column {
                             visible: bankMgr.selBank !== null
@@ -654,7 +645,7 @@ Window {
                             Item {
                                 width: parent.width; height: 32
                                 Text { text: bankMgr.selBank ? bankMgr.selBank.title : ""
-                                       color: cText; font.family: uiFont; font.pixelSize: 22
+                                       color: cText; font: Theme.typeFont("heading")
                                        anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
                                        elide: Text.ElideRight; width: 180 }
                                 Row {
@@ -663,16 +654,16 @@ Window {
                                         width: 56; height: 30; radius: 6
                                         visible: bankMgr.selBank && !bankMgr.selBank.active
                                         color: Theme.color("btn.affirm.fill"); border.width: 1; border.color: cGreen
-                                        Text { anchors.centerIn: parent; text: "활성"; color: cGreen; font.family: uiFont; font.pixelSize: 17 }
+                                        Text { anchors.centerIn: parent; text: "활성"; color: cGreen; font: Theme.typeFont("body") }
                                         MouseArea { anchors.fill: parent; onClicked: view.setActiveBank(bankMgr.sel) }
                                     }
                                     Text { visible: bankMgr.selBank && bankMgr.selBank.active
-                                           text: "● 활성"; color: cGreen; font.family: uiFont; font.pixelSize: 16
+                                           text: "● 활성"; color: cGreen; font: Theme.typeFont("label")
                                            anchors.verticalCenter: parent.verticalCenter }
                                     Rectangle {
                                         width: 56; height: 30; radius: 6
                                         color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                                        Text { anchors.centerIn: parent; text: "이름"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 17 }
+                                        Text { anchors.centerIn: parent; text: "이름"; color: Theme.color("text.onLight"); font: Theme.typeFont("body") }
                                         MouseArea { anchors.fill: parent
                                             onClicked: { bankName.target = bankMgr.sel; bankName.open = true;
                                                          nameInput.text = bankMgr.selBank.title; nameInput.forceActiveFocus() } }
@@ -685,7 +676,7 @@ Window {
                                         color: Theme.color("btn.danger.fill"); border.width: 1; border.color: Theme.color("btn.danger.border")
                                         Text { anchors.centerIn: parent
                                                text: bankMgr.delArmed === bankMgr.sel ? "정말?" : "삭제"
-                                               color: Theme.color("btn.danger.text"); font.family: uiFont; font.pixelSize: 17 }
+                                               color: Theme.color("btn.danger.text"); font: Theme.typeFont("body") }
                                         MouseArea { anchors.fill: parent
                                             onClicked: {
                                                 if (!parent.canDel) return;
@@ -698,7 +689,7 @@ Window {
                                 }
                             }
 
-                            Text { text: "이 뱅크의 보드 — 순서 = 풋스위치 A·B·C·D (앞 4개)"; color: cDim; font.family: uiFont; font.pixelSize: 14 }
+                            Text { text: "이 뱅크의 보드 — 순서 = 풋스위치 A·B·C·D (앞 4개)"; color: cDim; font: Theme.typeFont("caption") }
 
                             ListView {
                                 width: parent.width; height: 116; clip: true; spacing: 5
@@ -708,7 +699,7 @@ Window {
                                     color: index < 4 ? Theme.color("surface.controlActive") : Theme.color("surface.controlAlt")
                                     border.width: 1; border.color: cBorder
                                     Text { text: (index < 4 ? ["A","B","C","D"][index] + "  " : "") + modelData.title
-                                           color: index < 4 ? cText : cMuted; font.family: uiFont; font.pixelSize: 17
+                                           color: index < 4 ? cText : cMuted; font: Theme.typeFont("body")
                                            anchors.left: parent.left; anchors.leftMargin: 10
                                            anchors.verticalCenter: parent.verticalCenter
                                            elide: Text.ElideRight; width: parent.width - 178 }
@@ -719,19 +710,19 @@ Window {
                                         anchors.right: parent.right; anchors.rightMargin: 8
                                         anchors.verticalCenter: parent.verticalCenter; spacing: 12
                                         Rectangle { width: 48; height: 34; radius: 5; color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                                            Text { anchors.centerIn: parent; text: "위"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 15 }
+                                            Text { anchors.centerIn: parent; text: "위"; color: Theme.color("text.onLight"); font: Theme.typeFont("smallLabel") }
                                             MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: view.bankMoveBoard(bankMgr.sel, index, -1) } }
                                         Rectangle { width: 48; height: 34; radius: 5; color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                                            Text { anchors.centerIn: parent; text: "아래"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 15 }
+                                            Text { anchors.centerIn: parent; text: "아래"; color: Theme.color("text.onLight"); font: Theme.typeFont("smallLabel") }
                                             MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: view.bankMoveBoard(bankMgr.sel, index, 1) } }
                                         Rectangle { width: 40; height: 34; radius: 5; color: Theme.color("btn.purple.fill"); border.width: 1; border.color: cBorder
-                                            Text { anchors.centerIn: parent; text: "✕"; color: Theme.color("btn.danger.text"); font.pixelSize: 16 }
+                                            Text { anchors.centerIn: parent; text: "✕"; color: Theme.color("btn.danger.text"); font.pixelSize: Theme.typeSize("label") }
                                             MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: view.bankRemoveBoard(bankMgr.sel, index) } }
                                     }
                                 }
                             }
 
-                            Text { text: "보드 추가 — 호스트 보드 (" + view.boardCatalog.length + ")"; color: cDim; font.family: uiFont; font.pixelSize: 14 }
+                            Text { text: "보드 추가 — 호스트 보드 (" + view.boardCatalog.length + ")"; color: cDim; font: Theme.typeFont("caption") }
 
                             ListView {
                                 width: parent.width; height: 126; clip: true; spacing: 5
@@ -739,7 +730,7 @@ Window {
                                 delegate: Rectangle {
                                     width: ListView.view.width; height: 36; radius: 6
                                     color: Theme.color("surface.controlAlt"); border.width: 1; border.color: cBorder
-                                    Text { text: modelData.title; color: cText; font.family: uiFont; font.pixelSize: 17
+                                    Text { text: modelData.title; color: cText; font: Theme.typeFont("body")
                                            anchors.left: parent.left; anchors.leftMargin: 10
                                            anchors.verticalCenter: parent.verticalCenter
                                            elide: Text.ElideRight; width: parent.width - 60 }
@@ -747,7 +738,7 @@ Window {
                                         width: 40; height: 28; radius: 5
                                         anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
                                         color: Theme.color("btn.blue.fill"); border.width: 1; border.color: Theme.color("accent.blue")
-                                        Text { anchors.centerIn: parent; text: "+"; color: Theme.color("accent.blueBright"); font.pixelSize: 20 }
+                                        Text { anchors.centerIn: parent; text: "+"; color: Theme.color("accent.blueBright"); font.pixelSize: Theme.typeSize("heading") }
                                         MouseArea { anchors.fill: parent; onClicked: view.bankAddBoard(bankMgr.sel, modelData.bundle) }
                                     }
                                 }
@@ -789,7 +780,7 @@ Window {
                         Column {
                             anchors.fill: parent; anchors.margins: 18; spacing: 14
                             Text { text: bankName.target < 0 ? "새 뱅크" : "뱅크 이름 변경"
-                                   color: cText; font.family: uiFont; font.pixelSize: 22 }
+                                   color: cText; font: Theme.typeFont("overlayTitle") }
                             Rectangle {
                                 width: parent.width; height: 52; radius: 8; color: Theme.color("surface.inset")
                                 border.width: 1; border.color: cGreen
@@ -797,7 +788,7 @@ Window {
                                     id: nameInput
                                     anchors.fill: parent; anchors.margins: 12
                                     verticalAlignment: TextInput.AlignVCenter
-                                    color: cText; font.family: uiFont; font.pixelSize: 24; clip: true
+                                    color: cText; font: Theme.typeFont("heading"); clip: true
                                     selectByMouse: true
                                     onAccepted: bankName.commit()
                                 }
@@ -805,10 +796,10 @@ Window {
                             Row {
                                 spacing: 10
                                 Rectangle { width: 120; height: 44; radius: 8; color: Theme.color("btn.affirm.fill"); border.width: 1; border.color: cGreen
-                                    Text { anchors.centerIn: parent; text: "저장"; color: cGreen; font.family: uiFont; font.pixelSize: 19 }
+                                    Text { anchors.centerIn: parent; text: "저장"; color: cGreen; font: Theme.typeFont("button") }
                                     MouseArea { anchors.fill: parent; onClicked: bankName.commit() } }
                                 Rectangle { width: 110; height: 44; radius: 8; color: Theme.color("btn.purple.fill"); border.width: 1; border.color: cBorder
-                                    Text { anchors.centerIn: parent; text: "취소"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 19 }
+                                    Text { anchors.centerIn: parent; text: "취소"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                                     MouseArea { anchors.fill: parent; onClicked: bankName.open = false } }
                             }
                         }
@@ -833,16 +824,16 @@ Window {
                     Item {
                         width: parent.width; height: 30
                         Text { visible: overviewScreen.hubLeaf !== "menu"
-                               text: "< 뒤로"; color: cMuted; font.family: uiFont; font.pixelSize: 20
+                               text: "< 뒤로"; color: cMuted; font: Theme.typeFont("button")
                                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
                                MouseArea { anchors.fill: parent
                                            onClicked: { overviewScreen.hubLeaf = "menu"; overviewScreen.sysConfirm = false } } }
                         Text { text: overviewScreen.hubLeaf === "system" ? "시스템"
                                      : overviewScreen.hubLeaf === "config" ? "설정" : "설정 / 시스템"
-                               color: cText; font.family: uiFont; font.pixelSize: 24
+                               color: cText; font: Theme.typeFont("overlayTitle")
                                anchors.horizontalCenter: parent.horizontalCenter
                                anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: "✕"; color: cMuted; font.pixelSize: 24
+                        Text { text: "✕"; color: cMuted; font.pixelSize: Theme.typeSize("heading")
                                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                                MouseArea { anchors.fill: parent
                                            onClicked: { overviewScreen.hubOpen = false; overviewScreen.sysConfirm = false } } }
@@ -860,10 +851,10 @@ Window {
                                 Column {
                                     anchors.left: parent.left; anchors.leftMargin: 14
                                     anchors.verticalCenter: parent.verticalCenter; spacing: 3
-                                    Text { text: modelData.t; color: cText; font.family: uiFont; font.pixelSize: 20 }
-                                    Text { text: modelData.s; color: cDim;  font.family: uiFont; font.pixelSize: 15 }
+                                    Text { text: modelData.t; color: cText; font: Theme.typeFont("heading") }
+                                    Text { text: modelData.s; color: cDim;  font: Theme.typeFont("smallLabel") }
                                 }
-                                Text { text: ">"; color: cMuted; font.pixelSize: 24
+                                Text { text: ">"; color: cMuted; font.pixelSize: Theme.typeSize("heading")
                                        anchors.right: parent.right; anchors.rightMargin: 16
                                        anchors.verticalCenter: parent.verticalCenter }
                                 MouseArea { anchors.fill: parent
@@ -921,7 +912,7 @@ Window {
 
                         // --- master volume (software) section ---
                         Text { text: "마스터 볼륨"
-                               color: cText; font.family: uiFont; font.pixelSize: 20 }
+                               color: cText; font: Theme.typeFont("heading") }
 
                         // slider row (hand-rolled, house style) — hidden if gain stage unavailable
                         Row {
@@ -959,20 +950,20 @@ Window {
                             Text { text: configLeaf.masterVol + "%"
                                    width: 64; horizontalAlignment: Text.AlignRight
                                    anchors.verticalCenter: parent.verticalCenter
-                                   color: cGreen; font.family: uiFont; font.pixelSize: 22 }
+                                   color: cGreen; font: Theme.typeFont("heading") }
                         }
                         Text { visible: configLeaf.volAvail
                                text: "출력단 소프트웨어 게인(JACK)입니다. 100% = 유니티, 아래로 감쇠.\n보드의 물리 노브가 최종 아날로그 마스터입니다."
-                               color: cDim; font.family: uiFont; font.pixelSize: 15
+                               color: cDim; font: Theme.typeFont("smallLabel")
                                wrapMode: Text.WordWrap; width: parent.width }
                         Text { visible: !configLeaf.volAvail
                                text: "게인 스테이지를 찾을 수 없습니다 (synapse-mastervol 서비스 확인)."
-                               color: cMuted; font.family: uiFont; font.pixelSize: 16
+                               color: cMuted; font: Theme.typeFont("label")
                                wrapMode: Text.WordWrap; width: parent.width }
 
                         // --- time signature (beats per bar) section ---
                         Text { text: "박자표 BEATS / BAR"
-                               color: cText; font.family: uiFont; font.pixelSize: 20 }
+                               color: cText; font: Theme.typeFont("heading") }
                         Row {
                             spacing: 14
                             Rectangle {   // minus
@@ -980,7 +971,7 @@ Window {
                                 color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
                                 Text { text: "−"; anchors.centerIn: parent
                                        color: configLeaf.bpbVal > 2 ? cText : cMuted
-                                       font.family: uiFont; font.pixelSize: 30 }
+                                       font: Theme.typeFont("title") }
                                 MouseArea { anchors.fill: parent
                                             onClicked: if (configLeaf.bpbVal > 2) {
                                                 configLeaf.bpbVal -= 1;
@@ -990,13 +981,13 @@ Window {
                             Text { text: configLeaf.bpbVal
                                    width: 72; horizontalAlignment: Text.AlignHCenter
                                    anchors.verticalCenter: parent.verticalCenter
-                                   color: cGreen; font.family: uiFont; font.pixelSize: 32 }
+                                   color: cGreen; font: Theme.typeFont("title") }
                             Rectangle {   // plus
                                 width: 64; height: 48; radius: 8
                                 color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
                                 Text { text: "＋"; anchors.centerIn: parent
                                        color: configLeaf.bpbVal < 12 ? cText : cMuted
-                                       font.family: uiFont; font.pixelSize: 30 }
+                                       font: Theme.typeFont("title") }
                                 MouseArea { anchors.fill: parent
                                             onClicked: if (configLeaf.bpbVal < 12) {
                                                 configLeaf.bpbVal += 1;
@@ -1005,7 +996,7 @@ Window {
                             }
                         }
                         Text { text: "탭 템포 메트로놈의 마디당 비트 수입니다 (2–12)."
-                               color: cDim; font.family: uiFont; font.pixelSize: 15
+                               color: cDim; font: Theme.typeFont("smallLabel")
                                wrapMode: Text.WordWrap; width: parent.width }
                     }
                     // ---- system (real: shutdown / reboot, 2-tap confirm) ----
@@ -1013,7 +1004,7 @@ Window {
                         visible: overviewScreen.hubLeaf === "system"
                         width: parent.width; spacing: 14
                         Text { text: "장치를 안전하게 종료/재부팅합니다.\n전원을 그냥 뽑으면 SD 카드가 손상될 수 있습니다."
-                               color: cDim; font.family: uiFont; font.pixelSize: 16
+                               color: cDim; font: Theme.typeFont("label")
                                wrapMode: Text.WordWrap; width: parent.width }
                         Row {
                             spacing: 14
@@ -1022,7 +1013,7 @@ Window {
                                 color: Theme.color("btn.danger.fill"); border.width: 1; border.color: Theme.color("btn.danger.border")
                                 Text { anchors.centerIn: parent
                                        text: (overviewScreen.sysConfirm && overviewScreen.sysAction === "shutdown") ? "정말 종료?" : "안전 종료"
-                                       color: Theme.color("btn.danger.text"); font.family: uiFont; font.pixelSize: 23 }
+                                       color: Theme.color("btn.danger.text"); font: Theme.typeFont("button") }
                                 MouseArea { anchors.fill: parent
                                     onClicked: {
                                         if (overviewScreen.sysConfirm && overviewScreen.sysAction === "shutdown") view.systemShutdown();
@@ -1034,7 +1025,7 @@ Window {
                                 color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
                                 Text { anchors.centerIn: parent
                                        text: (overviewScreen.sysConfirm && overviewScreen.sysAction === "reboot") ? "정말 재부팅?" : "재부팅"
-                                       color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 23 }
+                                       color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                                 MouseArea { anchors.fill: parent
                                     onClicked: {
                                         if (overviewScreen.sysConfirm && overviewScreen.sysAction === "reboot") view.systemReboot();
@@ -1044,7 +1035,7 @@ Window {
                         }
                         Text { visible: overviewScreen.sysConfirm
                                text: "한 번 더 누르면 실행됩니다. (취소: 패널 밖을 탭)"
-                               color: cMuted; font.family: uiFont; font.pixelSize: 15 }
+                               color: cMuted; font: Theme.typeFont("smallLabel") }
                     }
                 }
             }
@@ -1067,17 +1058,17 @@ Window {
             Rectangle {
                 width: 124; height: 44; radius: 8
                 color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                Text { anchors.centerIn: parent; text: "◄ OVERVIEW"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 20 }
+                Text { anchors.centerIn: parent; text: "◄ OVERVIEW"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                 MouseArea { anchors.fill: parent; onClicked: view.goOverview() }
             }
             Rectangle {
                 width: 48; height: 44; radius: 8; color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                Text { anchors.centerIn: parent; text: "◄"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 22 }
+                Text { anchors.centerIn: parent; text: "◄"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                 MouseArea { anchors.fill: parent; onClicked: view.focusPrev() }
             }
             Rectangle {
                 width: 48; height: 44; radius: 8; color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                Text { anchors.centerIn: parent; text: "►"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 22 }
+                Text { anchors.centerIn: parent; text: "►"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                 MouseArea { anchors.fill: parent; onClicked: view.focusNext() }
             }
         }
@@ -1094,7 +1085,7 @@ Window {
                 anchors.centerIn: parent
                 text: parent.on ? "ENGAGED" : "BYPASS"
                 color: parent.on ? Theme.color("bg.screen") : Theme.color("text.mutedAlt")
-                font.family: uiFont; font.pixelSize: 18
+                font: Theme.typeFont("toggle")
             }
             MouseArea {
                 anchors.fill: parent
@@ -1114,7 +1105,7 @@ Window {
                 spacing: 3
                 Text {
                     text: focusScreen.f ? (focusScreen.f.name + "  ·  " + focusScreen.f.category) : ""
-                    color: cText; font.family: uiFont; font.pixelSize: 28
+                    color: cText; font: Theme.typeFont("title")
                     width: Math.min(implicitWidth, idcard.width - 32)
                     elide: Text.ElideRight
                 }
@@ -1130,7 +1121,7 @@ Window {
                             Text {
                                 id: pchTxt; anchors.centerIn: parent
                                 text: "▦ " + modelData.label + ": " + (modelData.value || "—") + "  ▾"
-                                color: cGreen; font.family: uiFont; font.pixelSize: 15
+                                color: cGreen; font: Theme.typeFont("smallLabel")
                                 // long IR paths filled the card; keep the filename end visible
                                 width: Math.min(implicitWidth, idcard.width - 64)
                                 elide: Text.ElideMiddle
@@ -1162,10 +1153,10 @@ Window {
                         anchors.left: parent.left; anchors.leftMargin: 14
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 2
-                        Text { text: modelData.t; color: cGreen; font.family: uiFont; font.pixelSize: 15 }
+                        Text { text: modelData.t; color: cGreen; font: Theme.typeFont("smallLabel") }
                         Text {
                             text: (modelData.list || []).join("   ")
-                            color: cText; font.family: uiFont; font.pixelSize: 22
+                            color: cText; font: Theme.typeFont("heading")
                             // 3+ ports used to overflow the card (no clip on it either)
                             width: Math.min(implicitWidth, (routing.width - 10) / 2 - 28)
                             elide: Text.ElideRight
@@ -1202,7 +1193,7 @@ Window {
                 visible: ctrlrow.width > ctrlflick.width
                 anchors.right: parent.right; anchors.rightMargin: 10
                 anchors.bottom: parent.bottom; anchors.bottomMargin: 6
-                text: "⟷ 스크롤"; color: cDim; font.family: uiFont; font.pixelSize: 14
+                text: "⟷ 스크롤"; color: cDim; font: Theme.typeFont("caption")
             }
         }
 
@@ -1224,7 +1215,7 @@ Window {
                 Text {
                     visible: monrow.children.length <= 1
                     anchors.centerIn: parent; text: "모니터 없음"
-                    color: cDim; font.family: uiFont; font.pixelSize: 16
+                    color: cDim; font: Theme.typeFont("label")
                 }
                 Row {
                     id: monrow
@@ -1251,7 +1242,7 @@ Window {
                 spacing: 8
                 Text {
                     text: "STOMP FS 배정"; color: cDim
-                    font.family: uiFont; font.pixelSize: 14
+                    font: Theme.typeFont("caption")
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
                 Row {
@@ -1268,7 +1259,7 @@ Window {
                                 anchors.centerIn: parent
                                 text: ["A", "B", "C", "D"][index]
                                 color: sel ? cGraph : cText
-                                font.family: uiFont; font.pixelSize: 20
+                                font: Theme.typeFont("heading")
                             }
                             MouseArea {
                                 anchors.fill: parent
@@ -1309,12 +1300,12 @@ Window {
         Text {
             x: 16; y: 16
             text: "TAP TEMPO"
-            color: cGreen; font.family: uiFont; font.pixelSize: 44
+            color: cGreen; font: Theme.typeFont("display")
         }
         Text {
             anchors.right: parent.right; anchors.rightMargin: 16; y: 26
             text: tapScreen.t && tapScreen.t.klass ? tapScreen.t.klass : ""
-            color: cMuted; font.family: uiFont; font.pixelSize: 28
+            color: cMuted; font: Theme.typeFont("title")
         }
 
         // big last-set BPM, centred
@@ -1323,12 +1314,12 @@ Window {
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: view.bpm
-                color: cText; font.family: uiFont; font.pixelSize: 200
+                color: cText; font: Theme.typeFont("heroNumeric")
             }
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: "BPM"
-                color: cMuted; font.family: uiFont; font.pixelSize: 38
+                color: cMuted; font: Theme.typeFont("display")
             }
         }
 
@@ -1337,13 +1328,13 @@ Window {
             anchors.horizontalCenter: parent.horizontalCenter
             y: parent.height - 92
             text: (tapScreen.t && tapScreen.t.bpb ? tapScreen.t.bpb : 4) + " BEATS / BAR"
-            color: cGreen; font.family: uiFont; font.pixelSize: 30
+            color: cGreen; font: Theme.typeFont("title")
         }
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom; anchors.bottomMargin: 16
             text: "탭: 풋스위치 아무거나  ·  종료: 콤보(2개 동시)"
-            color: cDim; font.family: uiFont; font.pixelSize: 22
+            color: cDim; font: Theme.typeFont("heading")
         }
     }
 
@@ -1388,12 +1379,12 @@ Window {
         // header
         Text {
             x: 16; y: 16; text: "TUNER"
-            color: cPurple; font.family: uiFont; font.pixelSize: 44
+            color: cPurple; font: Theme.typeFont("display")
         }
         Text {
             anchors.right: parent.right; anchors.rightMargin: 16; y: 26
             text: "A 440"
-            color: cMuted; font.family: uiFont; font.pixelSize: 28
+            color: cMuted; font: Theme.typeFont("title")
         }
 
         // big note name
@@ -1403,7 +1394,7 @@ Window {
             y: 92
             text: tunerScreen.live ? tunerScreen.note : "--"
             color: tunerScreen.stateColor
-            font.family: uiFont; font.pixelSize: 190
+            font: Theme.typeFont("heroNumeric")
         }
 
         // cents readout
@@ -1414,7 +1405,7 @@ Window {
                   ? ((tunerScreen.cents >= 0 ? "+" : "") + tunerScreen.cents.toFixed(1) + "¢")
                   : ""
             color: tunerScreen.stateColor
-            font.family: uiFont; font.pixelSize: 40
+            font: Theme.typeFont("display")
         }
 
         // deviation meter: a needle over a +/-50 cent scale
@@ -1460,7 +1451,7 @@ Window {
                   ? (tunerScreen.strg + "    " + tunerScreen.freq.toFixed(1) + " Hz")
                   : "듣는 중…"
             color: tunerScreen.live ? cText : cDim
-            font.family: uiFont; font.pixelSize: 28
+            font: Theme.typeFont("title")
         }
 
         // footer
@@ -1468,7 +1459,7 @@ Window {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom; anchors.bottomMargin: 12
             text: "종료: 풋스위치 아무거나"
-            color: cDim; font.family: uiFont; font.pixelSize: 22
+            color: cDim; font: Theme.typeFont("heading")
         }
     }
 
@@ -1524,7 +1515,7 @@ Window {
                 anchors.margins: 20
                 spacing: 14
 
-                Text { text: "스냅샷 다른 이름으로 저장"; color: cText; font.family: uiFont; font.pixelSize: 28 }
+                Text { text: "스냅샷 다른 이름으로 저장"; color: cText; font: Theme.typeFont("title") }
 
                 // suggestion box: tap to save (or, when typing, a text field)
                 Rectangle {
@@ -1537,7 +1528,7 @@ Window {
                         anchors.centerIn: parent
                         text: saveAsModal.suggestion !== "" ? saveAsModal.suggestion : "아래 용어를 눌러 이름 제안 받기"
                         color: saveAsModal.suggestion !== "" ? cGreen : cDim
-                        font.family: uiFont; font.pixelSize: 26
+                        font: Theme.typeFont("title")
                     }
                     MouseArea {
                         anchors.fill: parent
@@ -1550,7 +1541,7 @@ Window {
                         visible: saveAsModal.typing
                         anchors.fill: parent; anchors.margins: 14
                         verticalAlignment: TextInput.AlignVCenter
-                        color: cText; font.family: uiFont; font.pixelSize: 26; clip: true
+                        color: cText; font: Theme.typeFont("title"); clip: true
                         onAccepted: if (text.trim().length) { view.saveSnapshotNamed(text); saveAsModal.close(); }
                     }
                 }
@@ -1558,7 +1549,7 @@ Window {
                     text: saveAsModal.typing ? "Enter로 저장"
                         : (saveAsModal.suggestion !== "" ? "↑ 이 이름을 누르면 저장 · 용어 다시 누르면 새 제안"
                                                          : "용어를 누르면 무작위 접미사가 붙은 제안이 떠요")
-                    color: cDim; font.family: uiFont; font.pixelSize: 16
+                    color: cDim; font: Theme.typeFont("label")
                 }
 
                 // stage-term grid (tap -> suggestion)
@@ -1571,7 +1562,7 @@ Window {
                         Rectangle {
                             width: (660 - 40 - 8 * 3) / 4; height: 46; radius: 8
                             color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                            Text { anchors.centerIn: parent; text: modelData; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 20 }
+                            Text { anchors.centerIn: parent; text: modelData; color: Theme.color("text.onLight"); font: Theme.typeFont("heading") }
                             MouseArea {
                                 anchors.fill: parent
                                 onClicked: { saveAsModal.typing = false; saveAsModal.suggestion = view.suggestSnapshotName(modelData); }
@@ -1586,13 +1577,13 @@ Window {
                     Rectangle {
                         width: 156; height: 44; radius: 8
                         color: saveAsModal.typing ? cGreen : Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                        Text { anchors.centerIn: parent; text: "✎ 직접입력"; color: saveAsModal.typing ? Theme.color("bg.screen") : Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 20 }
+                        Text { anchors.centerIn: parent; text: "✎ 직접입력"; color: saveAsModal.typing ? Theme.color("bg.screen") : Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { anchors.fill: parent; onClicked: { saveAsModal.typing = true; kb.forceActiveFocus(); } }
                     }
                     Rectangle {
                         width: 120; height: 44; radius: 8
                         color: Theme.color("btn.purple.fill"); border.width: 1; border.color: cBorder
-                        Text { anchors.centerIn: parent; text: "취소"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 20 }
+                        Text { anchors.centerIn: parent; text: "취소"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { anchors.fill: parent; onClicked: saveAsModal.close() }
                     }
                 }
@@ -1617,7 +1608,7 @@ Window {
             id: toastText
             anchors.centerIn: parent
             text: toast.msg
-            color: cText; font.family: uiFont; font.pixelSize: 22
+            color: cText; font: Theme.typeFont("heading")
         }
         Timer { id: toastTimer; interval: 2600; onTriggered: toast.visible = false }
         Connections {

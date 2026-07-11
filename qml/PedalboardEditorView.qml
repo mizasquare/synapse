@@ -102,7 +102,7 @@ Item {
                         anchors.centerIn: parent
                         text: (editor.advanced ? "ADV" : "QUICK") + (editor.live ? " ⇄" : "")
                         color: editor.advanced ? cOrange : cMuted
-                        font.family: uiFont; font.pixelSize: 15
+                        font: Theme.typeFont("label")
                     }
                     NumberAnimation {
                         id: modeHoldAnim
@@ -124,7 +124,7 @@ Item {
                 Text {
                     text: editor.boardName + (editor.dirty ? " *" : "")
                     color: editor.dirty ? cOrange : cText
-                    font.family: uiFont; font.pixelSize: 14; anchors.verticalCenter: parent.verticalCenter
+                    font: Theme.typeFont("caption"); anchors.verticalCenter: parent.verticalCenter
                     elide: Text.ElideRight; width: 110
                 }
                 // NEW BOARD: start fresh on the empty default (modal: quick/advanced)
@@ -145,7 +145,7 @@ Item {
                 anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
                 text: win.toastText !== "" ? win.toastText : editor.status
                 color: win.toastText !== "" ? cGreen : (editor.advanced ? cOrange : cMuted)
-                font.family: uiFont; font.pixelSize: 14; elide: Text.ElideRight; width: 360
+                font: Theme.typeFont("caption"); elide: Text.ElideRight; width: 360
                 horizontalAlignment: Text.AlignRight
             }
             Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.color("border.subtle") }
@@ -176,9 +176,9 @@ Item {
                                 anchors.centerIn: parent; spacing: 2
                                 Rectangle { width: 8; height: 8; radius: 2; color: modelData.color
                                             anchors.horizontalCenter: parent.horizontalCenter }
-                                Text { text: modelData.abbr; color: cText; font.family: uiFont; font.pixelSize: 14
+                                Text { text: modelData.abbr; color: cText; font: Theme.typeFont("caption")
                                        anchors.horizontalCenter: parent.horizontalCenter }
-                                Text { text: modelData.count; color: cDim; font.family: uiFont; font.pixelSize: 11
+                                Text { text: modelData.count; color: cDim; font: Theme.typeFont("micro")
                                        anchors.horizontalCenter: parent.horizontalCenter }
                             }
                             MouseArea { anchors.fill: parent; onClicked: editor.pickCategory(modelData.key) }
@@ -234,7 +234,7 @@ Item {
                         height: 20; width: chipTxt.width + 14; radius: 10
                         color: modelData.bg; border.width: 1; border.color: modelData.accent
                         Text { id: chipTxt; anchors.centerIn: parent; text: modelData.label
-                               color: modelData.fg; font.family: uiFont; font.pixelSize: 13 }
+                               color: modelData.fg; font: Theme.typeFont("caption") }
                         MouseArea {
                             anchors.fill: parent
                             onClicked: {
@@ -252,31 +252,31 @@ Item {
                     Rectangle {
                         width: 30; height: 30; radius: 15; color: cPanel
                         border.width: 2; border.color: cGreen
-                        Text { anchors.centerIn: parent; text: "IN"; color: cGreen; font.family: uiFont; font.pixelSize: 13 }
+                        Text { anchors.centerIn: parent; text: "IN"; color: cGreen; font: Theme.typeFont("caption") }
                         MouseArea { anchors.fill: parent; onClicked: editor.toggleInMode() }
                     }
                     Text { text: editor.inMode === "stereo" ? "STEREO" : "L-MONO"; color: cGreen
-                           font.family: uiFont; font.pixelSize: 12; anchors.horizontalCenter: parent.horizontalCenter }
+                           font: Theme.typeFont("caption"); anchors.horizontalCenter: parent.horizontalCenter }
                 }
                 Column {
                     x: canvas.width - 36; y: canvas.height / 2 - 24; spacing: 3
                     Rectangle {
                         width: 30; height: 30; radius: 15; color: cPanel
                         border.width: 2; border.color: cOrange
-                        Text { anchors.centerIn: parent; text: "OUT"; color: cOrange; font.family: uiFont; font.pixelSize: 12 }
+                        Text { anchors.centerIn: parent; text: "OUT"; color: cOrange; font: Theme.typeFont("caption") }
                     }
-                    Text { text: "STEREO"; color: cOrange; font.family: uiFont; font.pixelSize: 12
+                    Text { text: "STEREO"; color: cOrange; font: Theme.typeFont("caption")
                            anchors.horizontalCenter: parent.horizontalCenter }
                 }
 
                 // empty hint
                 Column {
                     visible: editor.empty; anchors.centerIn: parent; spacing: 6
-                    Text { text: "＋"; color: cBorder; font.pixelSize: 60; anchors.horizontalCenter: parent.horizontalCenter }
+                    Text { text: "＋"; color: cBorder; font.pixelSize: Theme.typeSize("displayLg"); anchors.horizontalCenter: parent.horizontalCenter }
                     Text { text: "왼쪽 카테고리에서 이펙터를 추가하세요"; color: cMuted
-                           font.family: uiFont; font.pixelSize: 18; anchors.horizontalCenter: parent.horizontalCenter }
+                           font: Theme.typeFont("body"); anchors.horizontalCenter: parent.horizontalCenter }
                     Text { text: "가로 순서대로 직렬 연결 · 모노/스테레오 채널은 자동 협상"; color: cDim
-                           font.family: uiFont; font.pixelSize: 14; anchors.horizontalCenter: parent.horizontalCenter }
+                           font: Theme.typeFont("caption"); anchors.horizontalCenter: parent.horizontalCenter }
                 }
 
                 // nodes
@@ -310,16 +310,16 @@ Item {
                                 width: parent.width; height: 30; leftPadding: 7; rightPadding: 7; spacing: 6
                                 Rectangle { width: 14; height: 14; radius: 7; color: modelData.dot
                                             anchors.verticalCenter: parent.verticalCenter }
-                                Text { text: modelData.name; color: cText; font.family: uiFont; font.pixelSize: 15
+                                Text { text: modelData.name; color: cText; font: Theme.typeFont("label")
                                        elide: Text.ElideRight; width: parent.width - 30
                                        anchors.verticalCenter: parent.verticalCenter }
                             }
                             Row {
                                 width: parent.width; height: 20; spacing: 7
-                                Text { text: modelData.bucket; color: cDim; font.family: uiFont; font.pixelSize: 12
+                                Text { text: modelData.bucket; color: cDim; font: Theme.typeFont("caption")
                                        anchors.verticalCenter: parent.verticalCenter; leftPadding: 8 }
                                 Text { visible: modelData.hasBadge; text: modelData.badge; color: modelData.badgeColor
-                                       font.family: uiFont; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
+                                       font: Theme.typeFont("caption"); anchors.verticalCenter: parent.verticalCenter }
                             }
                         }
 
@@ -390,7 +390,7 @@ Item {
                     Rectangle {
                         x: modelData.x - 9; y: modelData.y - 9; width: 18; height: 18; radius: 9
                         color: Theme.color("chip.merge.bg"); border.width: 1; border.color: cGreen
-                        Text { anchors.centerIn: parent; text: "+"; color: Theme.color("chip.fgGreen"); font.family: uiFont; font.pixelSize: 14 }
+                        Text { anchors.centerIn: parent; text: "+"; color: Theme.color("chip.fgGreen"); font: Theme.typeFont("caption") }
                     }
                 }
                 // feedback tags
@@ -399,7 +399,7 @@ Item {
                     Rectangle {
                         x: modelData.x - width / 2; y: modelData.y - 9; height: 18; width: fbTxt.width + 12; radius: 9
                         color: Theme.color("chip.out.bg"); border.width: 1; border.color: Theme.color("state.feedback")
-                        Text { id: fbTxt; anchors.centerIn: parent; text: "FB"; color: Theme.color("chip.fgAmber"); font.family: uiFont; font.pixelSize: 12 }
+                        Text { id: fbTxt; anchors.centerIn: parent; text: "FB"; color: Theme.color("chip.fgAmber"); font: Theme.typeFont("caption") }
                     }
                 }
                 // selected-cable delete
@@ -407,7 +407,7 @@ Item {
                     visible: editor.gWireDel
                     x: editor.gWireDelX - 14; y: editor.gWireDelY - 14; width: 28; height: 28; radius: 14
                     color: Theme.color("delete.bg"); border.width: 1; border.color: Theme.color("accent.midi"); z: 20
-                    Text { anchors.centerIn: parent; text: "X"; color: Theme.color("delete.glyph"); font.family: uiFont; font.pixelSize: 15 }
+                    Text { anchors.centerIn: parent; text: "X"; color: Theme.color("delete.glyph"); font: Theme.typeFont("label") }
                     MouseArea { anchors.fill: parent; onClicked: editor.removeSelectedWire() }
                 }
 
@@ -426,9 +426,9 @@ Item {
                         color: cPanel; border.width: 2; border.color: modelData.color
                         Column {
                             anchors.centerIn: parent; spacing: 2
-                            Text { text: modelData.label; color: modelData.color; font.family: uiFont; font.pixelSize: 13
+                            Text { text: modelData.label; color: modelData.color; font: Theme.typeFont("caption")
                                    anchors.horizontalCenter: parent.horizontalCenter }
-                            Text { text: modelData.sub; color: modelData.color; opacity: 0.7; font.family: uiFont; font.pixelSize: 11
+                            Text { text: modelData.sub; color: modelData.color; opacity: 0.7; font: Theme.typeFont("micro")
                                    anchors.horizontalCenter: parent.horizontalCenter }
                         }
                         MouseArea { anchors.fill: parent; onClicked: if (modelData.label === "IN") editor.toggleInMode() }
@@ -456,7 +456,7 @@ Item {
                         x: modelData.x - 6.5; y: modelData.y - 6.5; width: 13; height: 13; radius: 6.5
                         color: modelData.color; border.width: 2; border.color: cGraph
                         Text { anchors.centerIn: parent; visible: modelData.ch !== ""; text: modelData.ch
-                               color: cGraph; font.family: uiFont; font.pixelSize: 8 }
+                               color: cGraph; font: Theme.typeFont("micro") }
                     }
                 }
 
@@ -480,13 +480,13 @@ Item {
                                     anchors.verticalCenter: parent.verticalCenter
                                     MouseArea { anchors.fill: parent; onClicked: editor.toggleBypass(modelData.id) }
                                 }
-                                Text { text: modelData.name; color: cText; font.family: uiFont; font.pixelSize: 15
+                                Text { text: modelData.name; color: cText; font: Theme.typeFont("label")
                                        elide: Text.ElideRight; width: parent.width - 30
                                        anchors.verticalCenter: parent.verticalCenter }
                             }
                             Row {
                                 width: parent.width; height: 18; leftPadding: 8
-                                Text { text: modelData.bucket; color: cDim; font.family: uiFont; font.pixelSize: 12 }
+                                Text { text: modelData.bucket; color: cDim; font: Theme.typeFont("caption") }
                             }
                         }
 
@@ -542,11 +542,11 @@ Item {
                 // empty hint
                 Column {
                     visible: editor.empty; anchors.centerIn: parent; spacing: 6
-                    Text { text: "⌗"; color: cBorder; font.pixelSize: 52; anchors.horizontalCenter: parent.horizontalCenter }
+                    Text { text: "⌗"; color: cBorder; font.pixelSize: Theme.typeSize("displayLg"); anchors.horizontalCenter: parent.horizontalCenter }
                     Text { text: "이펙터를 추가하고 · 노드의 좌/우 변을 터치해 연결"; color: cMuted
-                           font.family: uiFont; font.pixelSize: 18; anchors.horizontalCenter: parent.horizontalCenter }
+                           font: Theme.typeFont("body"); anchors.horizontalCenter: parent.horizontalCenter }
                     Text { text: "변 터치 → 부채꼴 포트 메뉴(AUDIO·L·R·MIDI·CV) → 대상 노드 변 터치"; color: cDim
-                           font.family: uiFont; font.pixelSize: 14; anchors.horizontalCenter: parent.horizontalCenter }
+                           font: Theme.typeFont("caption"); anchors.horizontalCenter: parent.horizontalCenter }
                 }
 
                 // targeting hint bar
@@ -556,7 +556,7 @@ Item {
                     height: 32; width: tgtTxt.width + 24; radius: 16; z: 46
                     color: Theme.color("surface.hintBlue"); border.width: 1; border.color: cBlue
                     Text { id: tgtTxt; anchors.centerIn: parent; text: editor.targetHint
-                           color: Theme.color("accent.pale"); font.family: uiFont; font.pixelSize: 14 }
+                           color: Theme.color("accent.pale"); font: Theme.typeFont("caption") }
                 }
 
                 // radial port menu
@@ -564,14 +564,14 @@ Item {
                     visible: editor.radActive; anchors.fill: parent; z: 56
                     Text {
                         x: editor.radCx; y: editor.radCy - 88
-                        text: editor.radTitle; color: cMuted; font.family: uiFont; font.pixelSize: 13
+                        text: editor.radTitle; color: cMuted; font: Theme.typeFont("caption")
                         transform: Translate { x: -tt.width / 2 }
-                        TextMetrics { id: tt; text: editor.radTitle; font.family: uiFont; font.pixelSize: 13 }
+                        TextMetrics { id: tt; text: editor.radTitle; font: Theme.typeFont("caption") }
                     }
                     Rectangle {
                         x: editor.radCx - 15; y: editor.radCy - 15; width: 30; height: 30; radius: 15
                         color: Theme.color("delete.bg"); border.width: 1; border.color: Theme.color("accent.midi")
-                        Text { anchors.centerIn: parent; text: "X"; color: Theme.color("delete.glyph"); font.family: uiFont; font.pixelSize: 13 }
+                        Text { anchors.centerIn: parent; text: "X"; color: Theme.color("delete.glyph"); font: Theme.typeFont("caption") }
                         MouseArea { anchors.fill: parent; onClicked: editor.cancelConn() }
                     }
                     Repeater {
@@ -581,7 +581,7 @@ Item {
                             height: 34; width: Math.max(36, riTxt.width + 20); radius: 17
                             color: Theme.color("surface.card"); border.width: 1; border.color: modelData.color
                             Text { id: riTxt; anchors.centerIn: parent; text: modelData.label
-                                   color: Theme.color("accent.pale"); font.family: uiFont; font.pixelSize: 14 }
+                                   color: Theme.color("accent.pale"); font: Theme.typeFont("caption") }
                             MouseArea { anchors.fill: parent; onClicked: editor.commitRadialOpt(modelData.idx) }
                         }
                     }
@@ -603,7 +603,7 @@ Item {
                 color: win.trashHot ? Theme.color("trash.hot") : Theme.color("trash.idle")
                 border.width: 1; border.color: win.trashHot ? Theme.color("accent.midi") : cBorder
                 Text { anchors.centerIn: parent; text: "DEL"; color: win.trashHot ? Theme.color("accent.midi") : cDim
-                       font.family: uiFont; font.pixelSize: 14 }
+                       font: Theme.typeFont("caption") }
             }
 
             // fly-in ghost: a new node sails in from the palette side to its landing slot
@@ -616,7 +616,7 @@ Item {
                     width: parent.width; height: 30; leftPadding: 7; rightPadding: 7; spacing: 6
                     Rectangle { width: 14; height: 14; radius: 7; color: flyGhost.accent
                                 anchors.verticalCenter: parent.verticalCenter }
-                    Text { id: flyName; text: ""; color: cText; font.family: uiFont; font.pixelSize: 15
+                    Text { id: flyName; text: ""; color: cText; font: Theme.typeFont("label")
                            elide: Text.ElideRight; width: parent.width - 30
                            anchors.verticalCenter: parent.verticalCenter }
                 }
@@ -639,9 +639,9 @@ Item {
                 Item {
                     width: parent.width; height: 32
                     Text { anchors.left: parent.left; anchors.leftMargin: 10; anchors.verticalCenter: parent.verticalCenter
-                           text: editor.flyTitle; color: editor.flyColor; font.family: uiFont; font.pixelSize: 18 }
+                           text: editor.flyTitle; color: editor.flyColor; font: Theme.typeFont("body") }
                     Text { anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
-                           text: "✕"; color: cMuted; font.pixelSize: 18
+                           text: "✕"; color: cMuted; font.pixelSize: Theme.typeSize("body")
                            MouseArea { anchors.fill: parent; onClicked: editor.closeFly() } }
                 }
                 Flickable {
@@ -655,13 +655,16 @@ Item {
                                 Row {
                                     anchors.fill: parent; anchors.margins: 7; spacing: 8
                                     Column {
-                                        width: parent.width - 30
-                                        Text { text: modelData.name; color: cText; font.family: uiFont; font.pixelSize: 15
+                                        width: parent.width - 52
+                                        Text { text: modelData.name; color: cText; font: Theme.typeFont("label")
                                                elide: Text.ElideRight; width: parent.width }
-                                        Text { text: modelData.brand; color: cMuted; font.family: uiFont; font.pixelSize: 12
+                                        Text { text: modelData.brand; color: cMuted; font: Theme.typeFont("caption")
                                                elide: Text.ElideRight; width: parent.width }
                                     }
-                                    Text { text: modelData.pins; color: cGreen; font.family: uiFont; font.pixelSize: 14
+                                    // I/O signature badge (e.g. "M▸2ch"); micro so the longest
+                                    // ("2ch▸2ch") fits the reserved right column without overflow.
+                                    Text { text: modelData.pins; color: cGreen; font: Theme.typeFont("micro")
+                                           width: 44; horizontalAlignment: Text.AlignRight
                                            anchors.verticalCenter: parent.verticalCenter }
                                 }
                                 MouseArea { anchors.fill: parent; onClicked: editor.addEffect(modelData.uri) }
@@ -687,13 +690,13 @@ Item {
                     Column {
                         anchors.left: parent.left; anchors.leftMargin: 10; anchors.verticalCenter: parent.verticalCenter
                         width: parent.width - 40
-                        Text { text: editor.inspName; color: cText; font.family: uiFont; font.pixelSize: 17
+                        Text { text: editor.inspName; color: cText; font: Theme.typeFont("body")
                                elide: Text.ElideRight; width: parent.width }
-                        Text { text: editor.inspSub; color: cMuted; font.family: uiFont; font.pixelSize: 13
+                        Text { text: editor.inspSub; color: cMuted; font: Theme.typeFont("caption")
                                elide: Text.ElideRight; width: parent.width }
                     }
                     Text { anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
-                           text: "✕"; color: cMuted; font.pixelSize: 18
+                           text: "✕"; color: cMuted; font.pixelSize: Theme.typeSize("body")
                            MouseArea { anchors.fill: parent; onClicked: editor.closeInspector() } }
                 }
                 Column {
@@ -705,7 +708,7 @@ Item {
                             color: editor.inspBypassed ? "transparent" : Theme.alpha("accent.green", 0.12)
                             border.width: 1; border.color: editor.inspBypassed ? cDim : cGreen
                             Text { id: bypTxt; anchors.centerIn: parent; text: editor.inspBypassed ? "BYPASSED" : "ACTIVE"
-                                   color: editor.inspBypassed ? cMuted : cGreen; font.family: uiFont; font.pixelSize: 14 }
+                                   color: editor.inspBypassed ? cMuted : cGreen; font: Theme.typeFont("caption") }
                             MouseArea { anchors.fill: parent; onClicked: editor.toggleSelectedBypass() }
                         }
                         WideBtn { label: "리셋"; accent: cBorder; onTap: editor.resetParams() }
@@ -713,7 +716,7 @@ Item {
                                   onTap: editor.connectFromSelected() }
                     }
                     Text { x: 10; text: editor.inspMeta; color: cDim
-                           font.family: uiFont; font.pixelSize: 12 }
+                           font: Theme.typeFont("caption") }
                 }
                 // patch params (NAM model / IR / cabsim) — live nodes only; tap to pick a file
                 Column {
@@ -731,7 +734,7 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: parent.width - 16
                                 text: "▦ " + modelData.label + ": " + (modelData.value || "—") + "  ▾"
-                                color: cGreen; font.family: uiFont; font.pixelSize: 13; elide: Text.ElideMiddle
+                                color: cGreen; font: Theme.typeFont("caption"); elide: Text.ElideMiddle
                             }
                             MouseArea {
                                 anchors.fill: parent
@@ -771,7 +774,7 @@ Item {
                                         id: prTxt; anchors.centerIn: parent
                                         width: Math.min(implicitWidth, parent.width - 12)
                                         text: modelData.label; color: cBlue
-                                        font.family: uiFont; font.pixelSize: 13; elide: Text.ElideRight
+                                        font: Theme.typeFont("caption"); elide: Text.ElideRight
                                     }
                                     MouseArea { anchors.fill: parent; onClicked: editor.selectPreset(modelData.uri) }
                                 }
@@ -845,13 +848,13 @@ Item {
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     color: cElev; border.width: 1; border.color: cBorder
                                     Text { id: enumTxt; anchors.centerIn: parent; text: kcol.liveVal
-                                           color: cPurple; font.family: uiFont; font.pixelSize: 15 }
+                                           color: cPurple; font: Theme.typeFont("label") }
                                     MouseArea { anchors.fill: parent; onClicked: editor.cycleEnum(modelData.sym) }
                                 }
-                                Text { text: modelData.label; color: cMuted; font.family: uiFont; font.pixelSize: 13
+                                Text { text: modelData.label; color: cMuted; font: Theme.typeFont("caption")
                                        anchors.horizontalCenter: parent.horizontalCenter
                                        elide: Text.ElideRight; width: 90; horizontalAlignment: Text.AlignHCenter }
-                                Text { text: kcol.liveVal; color: cText; font.family: uiFont; font.pixelSize: 14
+                                Text { text: kcol.liveVal; color: cText; font: Theme.typeFont("caption")
                                        anchors.horizontalCenter: parent.horizontalCenter }
                             }
                         }
@@ -876,22 +879,22 @@ Item {
                 Column {
                     anchors.fill: parent; anchors.margins: 16; spacing: 11
                     Text { text: win.namingMode === "saveas" ? "다른 이름으로 저장" : "이름을 정해 저장"
-                           color: cText; font.family: uiFont; font.pixelSize: 18 }
+                           color: cText; font: Theme.typeFont("body") }
                     Rectangle {
                         width: parent.width; height: 34; radius: 5; color: cElev; border.width: 1
                         border.color: nameField.activeFocus ? cBlue : cBorder
                         TextInput {
                             id: nameField; anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
                             verticalAlignment: TextInput.AlignVCenter; clip: true; selectByMouse: true
-                            color: cText; font.family: uiFont; font.pixelSize: 16
+                            color: cText; font: Theme.typeFont("label")
                             onAccepted: if (text.trim().length) { editor.saveBoardNamed(text); win.namingMode = ""; win.liveBoardsOpen = false }
                         }
                         Text { visible: nameField.text === ""; anchors.fill: parent; anchors.leftMargin: 8
                                verticalAlignment: Text.AlignVCenter; text: "이름 입력 또는 아래 용어로 추천"
-                               color: cDim; font.family: uiFont; font.pixelSize: 15 }
+                               color: cDim; font: Theme.typeFont("label") }
                     }
                     Text { text: "용어를 눌러 이름 추천 (다시 누르면 새 제안)"; color: cDim
-                           font.family: uiFont; font.pixelSize: 13 }
+                           font: Theme.typeFont("caption") }
                     Flow {
                         width: parent.width; spacing: 6
                         Repeater {
@@ -900,7 +903,7 @@ Item {
                                 height: 26; width: termTxt.width + 16; radius: 13
                                 color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
                                 Text { id: termTxt; anchors.centerIn: parent; text: modelData
-                                       color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 14 }
+                                       color: Theme.color("text.onLight"); font: Theme.typeFont("caption") }
                                 MouseArea { anchors.fill: parent; onClicked: nameField.text = editor.suggestName(modelData) }
                             }
                         }
@@ -931,9 +934,9 @@ Item {
                     anchors.fill: parent; anchors.margins: 14; spacing: 10
                     Item {
                         width: parent.width; height: 24
-                        Text { text: "보드 전환 (라이브)"; color: cText; font.family: uiFont; font.pixelSize: 18
+                        Text { text: "보드 전환 (라이브)"; color: cText; font: Theme.typeFont("body")
                                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: "✕"; color: cMuted; font.pixelSize: 18
+                        Text { text: "✕"; color: cMuted; font.pixelSize: Theme.typeSize("body")
                                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                                MouseArea { anchors.fill: parent; onClicked: win.liveBoardsOpen = false } }
                     }
@@ -947,7 +950,7 @@ Item {
                                   onTap: win.namingMode = "saveas" }
                     }
                     Text { text: "호스트 보드 (" + editor.liveBoardList.length + ")  ·  현재 편집 미저장 시 전환 전 확인"
-                           color: cDim; font.family: uiFont; font.pixelSize: 13 }
+                           color: cDim; font: Theme.typeFont("caption") }
                     Flickable {
                         width: parent.width; height: 268; contentHeight: liveCol.height; clip: true
                         Column {
@@ -964,7 +967,7 @@ Item {
                                             width: parent.width - 96; anchors.verticalCenter: parent.verticalCenter
                                             text: (modelData.current ? "● " : "") + modelData.title
                                             color: modelData.current ? cBlue : cText
-                                            font.family: uiFont; font.pixelSize: 15; elide: Text.ElideRight
+                                            font: Theme.typeFont("label"); elide: Text.ElideRight
                                         }
                                         Pill { label: modelData.current ? "현재" : "전환"
                                                accent: modelData.current ? cBorder : cBlue
@@ -978,7 +981,7 @@ Item {
                             }
                             Text { visible: editor.liveBoardList.length === 0
                                    text: "호스트 보드 목록 없음"; color: cDim
-                                   font.family: uiFont; font.pixelSize: 14; topPadding: 18 }
+                                   font: Theme.typeFont("caption"); topPadding: 18 }
                         }
                     }
                 }
@@ -996,11 +999,11 @@ Item {
                 MouseArea { anchors.fill: parent }
                 Column {
                     anchors.fill: parent; anchors.margins: 16; spacing: 12
-                    Text { text: "미저장 변경을 폐기할까요?"; color: cText; font.family: uiFont; font.pixelSize: 18 }
+                    Text { text: "미저장 변경을 폐기할까요?"; color: cText; font: Theme.typeFont("body") }
                     Text {
                         width: parent.width; wrapMode: Text.WordWrap
                         text: "저장하지 않은 라이브 편집이 사라지고 '" + win.pendingSwitchTitle + "'(으)로 전환합니다."
-                        color: cMuted; font.family: uiFont; font.pixelSize: 14
+                        color: cMuted; font: Theme.typeFont("caption")
                     }
                     Row {
                         anchors.right: parent.right; spacing: 8
@@ -1031,9 +1034,9 @@ Item {
                     anchors.fill: parent; anchors.margins: 14; spacing: 10
                     Item {
                         width: parent.width; height: 24
-                        Text { text: "스냅샷"; color: cText; font.family: uiFont; font.pixelSize: 18
+                        Text { text: "스냅샷"; color: cText; font: Theme.typeFont("body")
                                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: "✕"; color: cMuted; font.pixelSize: 18
+                        Text { text: "✕"; color: cMuted; font.pixelSize: Theme.typeSize("body")
                                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                                MouseArea { anchors.fill: parent; onClicked: win.snapsOpen = false } }
                     }
@@ -1045,7 +1048,7 @@ Item {
                                   onTap: win.snapNaming = true }
                     }
                     Text { text: "스냅샷 (" + editor.snapList.length + ")  ·  탭하면 그 세팅으로 전환"
-                           color: cDim; font.family: uiFont; font.pixelSize: 13 }
+                           color: cDim; font: Theme.typeFont("caption") }
                     Flickable {
                         width: parent.width; height: 268; contentHeight: snapCol.height; clip: true
                         Column {
@@ -1062,7 +1065,7 @@ Item {
                                             width: parent.width - 96; anchors.verticalCenter: parent.verticalCenter
                                             text: (modelData.current ? "● " : "") + modelData.name
                                             color: modelData.current ? cPurple : cText
-                                            font.family: uiFont; font.pixelSize: 15; elide: Text.ElideRight
+                                            font: Theme.typeFont("label"); elide: Text.ElideRight
                                         }
                                         Pill { label: modelData.current ? "현재" : "전환"
                                                accent: modelData.current ? cBorder : cPurple
@@ -1073,7 +1076,7 @@ Item {
                             }
                             Text { visible: editor.snapList.length === 0
                                    text: "스냅샷 없음"; color: cDim
-                                   font.family: uiFont; font.pixelSize: 14; topPadding: 18 }
+                                   font: Theme.typeFont("caption"); topPadding: 18 }
                         }
                     }
                 }
@@ -1092,18 +1095,18 @@ Item {
                 MouseArea { anchors.fill: parent }
                 Column {
                     anchors.fill: parent; anchors.margins: 16; spacing: 12
-                    Text { text: "새 스냅샷 이름"; color: cText; font.family: uiFont; font.pixelSize: 18 }
+                    Text { text: "새 스냅샷 이름"; color: cText; font: Theme.typeFont("body") }
                     Rectangle {
                         width: parent.width; height: 40; radius: 6; color: cElev; border.width: 1; border.color: cBorder
                         TextInput {
                             id: snapNameField; anchors.fill: parent; anchors.leftMargin: 8
                             verticalAlignment: Text.AlignVCenter; color: cText
-                            font.family: uiFont; font.pixelSize: 16; clip: true
+                            font: Theme.typeFont("label"); clip: true
                             onAccepted: if (text.trim().length) { editor.saveSnapshotNamed(text); win.snapNaming = false; win.snapsOpen = false }
                         }
                         Text { visible: snapNameField.text === ""; anchors.fill: parent; anchors.leftMargin: 8
                                verticalAlignment: Text.AlignVCenter; text: "이름 입력 또는 아래 용어로 추천"
-                               color: cDim; font.family: uiFont; font.pixelSize: 15 }
+                               color: cDim; font: Theme.typeFont("label") }
                     }
                     Flow {
                         width: parent.width; spacing: 6
@@ -1113,7 +1116,7 @@ Item {
                                 height: 26; width: stTxt.width + 16; radius: 13
                                 color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
                                 Text { id: stTxt; anchors.centerIn: parent; text: modelData
-                                       color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 14 }
+                                       color: Theme.color("text.onLight"); font: Theme.typeFont("caption") }
                                 MouseArea { anchors.fill: parent; onClicked: snapNameField.text = editor.suggestSnapshotName(modelData) }
                             }
                         }
@@ -1141,10 +1144,10 @@ Item {
                 MouseArea { anchors.fill: parent }
                 Column {
                     anchors.fill: parent; anchors.margins: 16; spacing: 12
-                    Text { text: "새 보드"; color: cText; font.family: uiFont; font.pixelSize: 18 }
+                    Text { text: "새 보드"; color: cText; font: Theme.typeFont("body") }
                     Text { width: parent.width; wrapMode: Text.WordWrap
                            text: "빈 보드에서 시작합니다. 저장 시 이름을 정해 새 보드로 저장돼요(기존 보드 안전). 퀵=직렬 빌드, 어드밴스드=자유 그래프."
-                           color: cMuted; font.family: uiFont; font.pixelSize: 14 }
+                           color: cMuted; font: Theme.typeFont("caption") }
                     Row {
                         anchors.right: parent.right; spacing: 8
                         WideBtn { label: "취소"; accent: cBorder; onTap: win.newBoardOpen = false }
@@ -1313,7 +1316,7 @@ Item {
         color: "transparent"; border.width: 1; border.color: dim ? Theme.color("border.subtle") : accent
         anchors.verticalCenter: parent.verticalCenter
         Text { id: pillTxt; anchors.centerIn: parent; text: label; color: dim ? Theme.color("text.disabled") : Theme.color("accent.pale")
-               font.family: uiFont; font.pixelSize: 13 }
+               font: Theme.typeFont("caption") }
         MouseArea { anchors.fill: parent; onClicked: parent.tap() }
     }
 
@@ -1326,7 +1329,7 @@ Item {
         color: Theme.color("surface.card"); border.width: 1; border.color: dim ? Theme.color("border.subtle") : accent
         opacity: dim ? 0.45 : 1.0
         Text { id: wbTxt; anchors.centerIn: parent; text: label; color: dim ? cDim : cText
-               font.family: uiFont; font.pixelSize: 14 }
+               font: Theme.typeFont("caption") }
         MouseArea { anchors.fill: parent; onClicked: parent.tap() }
     }
 
@@ -1335,6 +1338,6 @@ Item {
         property string t: ""
         spacing: 5
         Rectangle { width: 9; height: 9; radius: 4.5; color: c; anchors.verticalCenter: parent.verticalCenter }
-        Text { text: t; color: cMuted; font.family: uiFont; font.pixelSize: 12 }
+        Text { text: t; color: cMuted; font: Theme.typeFont("caption") }
     }
 }

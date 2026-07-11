@@ -49,12 +49,12 @@ Rectangle {
                 Text {
                     width: parent.width - 60
                     text: root.titleLabel + " 선택  (" + root.files.length + ")"
-                    color: root.colAccent; font.family: root.fontFamily; font.pixelSize: 22
+                    color: root.colAccent; font.family: root.fontFamily; font.pixelSize: Theme.typeSize("heading")
                     elide: Text.ElideRight
                 }
                 Rectangle {
                     width: 52; height: 36; radius: 8; color: Theme.color("border.default")
-                    Text { anchors.centerIn: parent; text: "✕"; color: root.colText; font.family: root.fontFamily; font.pixelSize: 20 }
+                    Text { anchors.centerIn: parent; text: "✕"; color: root.colText; font.family: root.fontFamily; font.pixelSize: Theme.typeSize("heading") }
                     MouseArea { anchors.fill: parent; onClicked: root.visible = false }
                 }
             }
@@ -75,7 +75,7 @@ Rectangle {
                             anchors.verticalCenter: parent.verticalCenter
                             width: parent.width - 20
                             text: modelData.label; color: isCur ? root.colAccent : root.colText
-                            font.family: root.fontFamily; font.pixelSize: 18; elide: Text.ElideMiddle
+                            font.family: root.fontFamily; font.pixelSize: Theme.typeSize("body"); elide: Text.ElideMiddle
                         }
                         Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.color("border.subtle") }
                         MouseArea {
