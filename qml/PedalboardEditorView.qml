@@ -1138,11 +1138,15 @@ Item {
             MouseArea { anchors.fill: parent; onClicked: win.newBoardOpen = false }
             Rectangle { anchors.fill: parent; color: Theme.color("overlay.scrim"); opacity: 0.6 }
             Rectangle {
-                width: 440; height: 196; radius: 10; anchors.centerIn: parent
+                // Height hugs the content (Column) so there's no empty band below the
+                // buttons — and it adapts as the body text wraps to more/fewer lines
+                // across languages. Width trimmed 440->400 to match.
+                width: 400; height: nbCol.height + 32; radius: 10; anchors.centerIn: parent
                 color: cPanel; border.width: 1; border.color: cBlue
                 MouseArea { anchors.fill: parent }
                 Column {
-                    anchors.fill: parent; anchors.margins: 16; spacing: 12
+                    id: nbCol
+                    x: 16; y: 16; width: parent.width - 32; spacing: 12
                     Text { text: Tr.tr("editor.newBoard"); color: cText; font: Theme.typeFont("body") }
                     Text { width: parent.width; wrapMode: Text.WordWrap
                            text: Tr.tr("editor.newBoardBody")
