@@ -71,9 +71,12 @@ C* Click·오버뷰 렌더·손감각 1차, [`qt-roadmap-DONE.md`](qt-roadmap-DO
         완만한 10단 scale 위 semantic 역할(button/title/smallLabel…), "버튼만 키우기"가 한 줄. 6화면 그룹
         각 Pi 육안검증 통과. 앱 전 QML raw pixelSize 0·uiFont 0, 글리프는 typeSize(family-less). **→ 테마
         토큰화(색+폰트) 전체 완료.** 굵기 축은 신설·전부 Normal(도입 시 시각변화 0, 향후 역할별 튜닝 가능).
-      - [ ] **문자열 중앙화(i18n)**: 사용자 노출 리터럴 → `resources/strings/<lang>.json` + `tr("key")` 인다이렉션.
-        (현재 `qsTr()`/`tr()` 0건, 리터럴이 QML에 직접 하드코딩.) 별건, 미착수.
-      - **열린 결정**: 런타임 언어/테마 전환 UI를 config에 둘지, 빌드 고정할지(후순위). (중)
+      - **문자열 중앙화(i18n)**: ✅ **완료** 2026-07-12 (6그룹, `9273691`~`06c47d2`). 사용자 노출 리터럴 →
+        `resources/strings/{en,ko}.json` + `strings.py`(Python)·`Tr`(QML) 인다이렉션. **영어 1순위 이주**
+        (mod/LV2 플러그인명이 태생적 영어 → 화면 일관성). 참조 키 173개 en=ko 동수·누락 0, 이중소스(색과 동일)
+        해소. 설계·진행 = [`string-i18n-plan.md`](string-i18n-plan.md). **→ i18n/테마 토큰화 묶음 전체 완료.**
+      - **열린 결정(잔여)**: 런타임 언어 전환 UI. 인프라는 준비됨(`Tr.setLang`/`strings.set_lang`, ko.json 동결
+        스냅샷 유지) — ⚙MENU 토글은 한 줄로 붙일 수 있으나 단독 사용자·영어 기본이라 후순위. (중)
 
 ## ⑤ 미관
 

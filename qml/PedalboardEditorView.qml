@@ -76,7 +76,7 @@ Item {
             Row {
                 anchors.left: parent.left; anchors.leftMargin: 10; anchors.verticalCenter: parent.verticalCenter
                 spacing: 7
-                Pill { label: "◄ 나가기"; accent: cMuted; onTap: win.exitRequested() }
+                Pill { label: Tr.tr("editor.exit"); accent: cMuted; onTap: win.exitRequested() }
                 // ADV/QUICK indicator — long-press (gauge fills) to toggle modes in
                 // live (M6d-3): an instant tap next to other header buttons could
                 // re-layout the whole graph by accident. QUICK only engages for a
@@ -100,7 +100,7 @@ Item {
                     Text {
                         id: modeTxt
                         anchors.centerIn: parent
-                        text: (editor.advanced ? "ADV" : "QUICK") + (editor.live ? " ⇄" : "")
+                        text: (editor.advanced ? Tr.tr("editor.adv") : Tr.tr("editor.quick")) + (editor.live ? " ⇄" : "")
                         color: editor.advanced ? cOrange : cMuted
                         font: Theme.typeFont("label")
                     }
@@ -119,7 +119,7 @@ Item {
                         onCanceled: { modeHoldAnim.stop(); modeTag.holdProgress = 0 }
                     }
                 }
-                Pill { label: "BOARD"; accent: cBlue
+                Pill { label: Tr.tr("editor.board"); accent: cBlue
                        onTap: { editor.refreshBoards(); win.liveBoardsOpen = true } }
                 Text {
                     text: editor.boardName + (editor.dirty ? " *" : "")
@@ -128,17 +128,17 @@ Item {
                     elide: Text.ElideRight; width: 110
                 }
                 // NEW BOARD: start fresh on the empty default (modal: quick/advanced)
-                Pill { label: "NEW"; accent: cBlue; visible: editor.live
+                Pill { label: Tr.tr("editor.new"); accent: cBlue; visible: editor.live
                        onTap: win.newBoardOpen = true }
                 // live in-place SAVE — via doSave() so a scratch NEW board routes to
                 // save-as (naming) instead of overwriting the shared default.
-                Pill { label: editor.dirty ? "SAVE *" : "SAVE"; accent: cGreen
+                Pill { label: Tr.tr("editor.saveBtn") + (editor.dirty ? " *" : ""); accent: cGreen
                        visible: editor.live; dim: !(editor.dirty || !editor.boardSaved)
                        onTap: win.doSave() }
                 // live snapshot manager (change / save / save-as)
-                Pill { label: "SNAP"; accent: cPurple; visible: editor.live
+                Pill { label: Tr.tr("editor.snap"); accent: cPurple; visible: editor.live
                        onTap: win.snapsOpen = true }
-                Pill { label: "SHUF"; accent: cGreen; visible: !editor.live; dim: editor.advanced
+                Pill { label: Tr.tr("editor.shuf"); accent: cGreen; visible: !editor.live; dim: editor.advanced
                        onTap: if (!editor.advanced) editor.demoScramble() }
             }
             Text {
@@ -252,10 +252,10 @@ Item {
                     Rectangle {
                         width: 30; height: 30; radius: 15; color: cPanel
                         border.width: 2; border.color: cGreen
-                        Text { anchors.centerIn: parent; text: "IN"; color: cGreen; font: Theme.typeFont("caption") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("editor.in"); color: cGreen; font: Theme.typeFont("caption") }
                         MouseArea { anchors.fill: parent; onClicked: editor.toggleInMode() }
                     }
-                    Text { text: editor.inMode === "stereo" ? "STEREO" : "L-MONO"; color: cGreen
+                    Text { text: editor.inMode === "stereo" ? Tr.tr("editor.stereo") : Tr.tr("editor.lmono"); color: cGreen
                            font: Theme.typeFont("caption"); anchors.horizontalCenter: parent.horizontalCenter }
                 }
                 Column {
@@ -263,9 +263,9 @@ Item {
                     Rectangle {
                         width: 30; height: 30; radius: 15; color: cPanel
                         border.width: 2; border.color: cOrange
-                        Text { anchors.centerIn: parent; text: "OUT"; color: cOrange; font: Theme.typeFont("caption") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("editor.out"); color: cOrange; font: Theme.typeFont("caption") }
                     }
-                    Text { text: "STEREO"; color: cOrange; font: Theme.typeFont("caption")
+                    Text { text: Tr.tr("editor.stereo"); color: cOrange; font: Theme.typeFont("caption")
                            anchors.horizontalCenter: parent.horizontalCenter }
                 }
 
@@ -273,9 +273,9 @@ Item {
                 Column {
                     visible: editor.empty; anchors.centerIn: parent; spacing: 6
                     Text { text: "＋"; color: cBorder; font.pixelSize: Theme.typeSize("displayLg"); anchors.horizontalCenter: parent.horizontalCenter }
-                    Text { text: "왼쪽 카테고리에서 이펙터를 추가하세요"; color: cMuted
+                    Text { text: Tr.tr("editor.emptyHint1"); color: cMuted
                            font: Theme.typeFont("body"); anchors.horizontalCenter: parent.horizontalCenter }
-                    Text { text: "가로 순서대로 직렬 연결 · 모노/스테레오 채널은 자동 협상"; color: cDim
+                    Text { text: Tr.tr("editor.emptyHint2"); color: cDim
                            font: Theme.typeFont("caption"); anchors.horizontalCenter: parent.horizontalCenter }
                 }
 
@@ -399,7 +399,7 @@ Item {
                     Rectangle {
                         x: modelData.x - width / 2; y: modelData.y - 9; height: 18; width: fbTxt.width + 12; radius: 9
                         color: Theme.color("chip.out.bg"); border.width: 1; border.color: Theme.color("state.feedback")
-                        Text { id: fbTxt; anchors.centerIn: parent; text: "FB"; color: Theme.color("chip.fgAmber"); font: Theme.typeFont("caption") }
+                        Text { id: fbTxt; anchors.centerIn: parent; text: Tr.tr("editor.fb"); color: Theme.color("chip.fgAmber"); font: Theme.typeFont("caption") }
                     }
                 }
                 // selected-cable delete
@@ -543,9 +543,9 @@ Item {
                 Column {
                     visible: editor.empty; anchors.centerIn: parent; spacing: 6
                     Text { text: "⌗"; color: cBorder; font.pixelSize: Theme.typeSize("displayLg"); anchors.horizontalCenter: parent.horizontalCenter }
-                    Text { text: "이펙터를 추가하고 · 노드의 좌/우 변을 터치해 연결"; color: cMuted
+                    Text { text: Tr.tr("editor.canvasHint1"); color: cMuted
                            font: Theme.typeFont("body"); anchors.horizontalCenter: parent.horizontalCenter }
-                    Text { text: "변 터치 → 부채꼴 포트 메뉴(AUDIO·L·R·MIDI·CV) → 대상 노드 변 터치"; color: cDim
+                    Text { text: Tr.tr("editor.canvasHint2"); color: cDim
                            font: Theme.typeFont("caption"); anchors.horizontalCenter: parent.horizontalCenter }
                 }
 
@@ -602,7 +602,7 @@ Item {
                 x: canvas.width - 52; y: canvas.height - 52; width: 40; height: 40; radius: 8
                 color: win.trashHot ? Theme.color("trash.hot") : Theme.color("trash.idle")
                 border.width: 1; border.color: win.trashHot ? Theme.color("accent.midi") : cBorder
-                Text { anchors.centerIn: parent; text: "DEL"; color: win.trashHot ? Theme.color("accent.midi") : cDim
+                Text { anchors.centerIn: parent; text: Tr.tr("editor.del"); color: win.trashHot ? Theme.color("accent.midi") : cDim
                        font: Theme.typeFont("caption") }
             }
 
@@ -706,12 +706,12 @@ Item {
                             height: 30; width: bypTxt.width + 22; radius: 5
                             color: editor.inspBypassed ? "transparent" : Theme.alpha("accent.green", 0.12)
                             border.width: 1; border.color: editor.inspBypassed ? cDim : cGreen
-                            Text { id: bypTxt; anchors.centerIn: parent; text: editor.inspBypassed ? "BYPASSED" : "ACTIVE"
+                            Text { id: bypTxt; anchors.centerIn: parent; text: editor.inspBypassed ? Tr.tr("inspector.bypassed") : Tr.tr("inspector.active")
                                    color: editor.inspBypassed ? cMuted : cGreen; font: Theme.typeFont("caption") }
                             MouseArea { anchors.fill: parent; onClicked: editor.toggleSelectedBypass() }
                         }
-                        WideBtn { label: "리셋"; accent: cBorder; onTap: editor.resetParams() }
-                        WideBtn { label: "연결 →"; accent: cBlue; visible: editor.inspCanConnect
+                        WideBtn { label: Tr.tr("editor.reset"); accent: cBorder; onTap: editor.resetParams() }
+                        WideBtn { label: Tr.tr("editor.connect"); accent: cBlue; visible: editor.inspCanConnect
                                   onTap: editor.connectFromSelected() }
                     }
                     Text { x: 10; text: editor.inspMeta; color: cDim
@@ -877,7 +877,7 @@ Item {
                 MouseArea { anchors.fill: parent }
                 Column {
                     anchors.fill: parent; anchors.margins: 16; spacing: 11
-                    Text { text: win.namingMode === "saveas" ? "다른 이름으로 저장" : "이름을 정해 저장"
+                    Text { text: win.namingMode === "saveas" ? Tr.tr("editor.saveAs") : Tr.tr("editor.saveNamedTitle")
                            color: cText; font: Theme.typeFont("body") }
                     Rectangle {
                         width: parent.width; height: 34; radius: 5; color: cElev; border.width: 1
@@ -889,10 +889,10 @@ Item {
                             onAccepted: if (text.trim().length) { editor.saveBoardNamed(text); win.namingMode = ""; win.liveBoardsOpen = false }
                         }
                         Text { visible: nameField.text === ""; anchors.fill: parent; anchors.leftMargin: 8
-                               verticalAlignment: Text.AlignVCenter; text: "이름 입력 또는 아래 용어로 추천"
+                               verticalAlignment: Text.AlignVCenter; text: Tr.tr("editor.namePlaceholder")
                                color: cDim; font: Theme.typeFont("label") }
                     }
-                    Text { text: "용어를 눌러 이름 추천 (다시 누르면 새 제안)"; color: cDim
+                    Text { text: Tr.tr("editor.nameHint"); color: cDim
                            font: Theme.typeFont("caption") }
                     Flow {
                         width: parent.width; spacing: 6
@@ -909,8 +909,8 @@ Item {
                     }
                     Row {
                         anchors.right: parent.right; spacing: 8
-                        WideBtn { label: "취소"; accent: cBorder; onTap: win.namingMode = "" }
-                        WideBtn { label: "저장"; accent: cGreen; dim: nameField.text.trim().length === 0
+                        WideBtn { label: Tr.tr("action.cancel"); accent: cBorder; onTap: win.namingMode = "" }
+                        WideBtn { label: Tr.tr("action.save"); accent: cGreen; dim: nameField.text.trim().length === 0
                                   onTap: if (nameField.text.trim().length) { editor.saveBoardNamed(nameField.text); win.namingMode = ""; win.liveBoardsOpen = false } }
                     }
                 }
@@ -933,7 +933,7 @@ Item {
                     anchors.fill: parent; anchors.margins: 14; spacing: 10
                     Item {
                         width: parent.width; height: 24
-                        Text { text: "보드 전환 (라이브)"; color: cText; font: Theme.typeFont("body")
+                        Text { text: Tr.tr("editor.boardSwitchLive"); color: cText; font: Theme.typeFont("body")
                                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
                         Text { text: "✕"; color: cMuted; font.pixelSize: Theme.typeSize("body")
                                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
@@ -942,13 +942,13 @@ Item {
                     // save actions for the live (current) board
                     Flow {
                         width: parent.width; spacing: 8
-                        WideBtn { label: editor.dirty ? "저장 *" : "저장"; accent: cGreen
+                        WideBtn { label: Tr.tr("action.save") + (editor.dirty ? " *" : ""); accent: cGreen
                                   dim: !(editor.dirty || !editor.boardSaved)
                                   onTap: win.doSave() }
-                        WideBtn { label: "다른 이름으로 저장"; accent: cGreen
+                        WideBtn { label: Tr.tr("editor.saveAs"); accent: cGreen
                                   onTap: win.namingMode = "saveas" }
                     }
-                    Text { text: "호스트 보드 (" + editor.liveBoardList.length + ")  ·  현재 편집 미저장 시 전환 전 확인"
+                    Text { text: Tr.trf("editor.hostBoardsHint", [editor.liveBoardList.length])
                            color: cDim; font: Theme.typeFont("caption") }
                     Flickable {
                         width: parent.width; height: 268; contentHeight: liveCol.height; clip: true
@@ -968,7 +968,7 @@ Item {
                                             color: modelData.current ? cBlue : cText
                                             font: Theme.typeFont("label"); elide: Text.ElideRight
                                         }
-                                        Pill { label: modelData.current ? "현재" : "전환"
+                                        Pill { label: modelData.current ? Tr.tr("common.current") : Tr.tr("common.switch")
                                                accent: modelData.current ? cBorder : cBlue
                                                dim: modelData.current
                                                // clean switch -> boardSwitched closes the overlay;
@@ -979,7 +979,7 @@ Item {
                                 }
                             }
                             Text { visible: editor.liveBoardList.length === 0
-                                   text: "호스트 보드 목록 없음"; color: cDim
+                                   text: Tr.tr("boardSwitch.empty"); color: cDim
                                    font: Theme.typeFont("caption"); topPadding: 18 }
                         }
                     }
@@ -998,16 +998,16 @@ Item {
                 MouseArea { anchors.fill: parent }
                 Column {
                     anchors.fill: parent; anchors.margins: 16; spacing: 12
-                    Text { text: "미저장 변경을 폐기할까요?"; color: cText; font: Theme.typeFont("body") }
+                    Text { text: Tr.tr("editor.discardTitle"); color: cText; font: Theme.typeFont("body") }
                     Text {
                         width: parent.width; wrapMode: Text.WordWrap
-                        text: "저장하지 않은 라이브 편집이 사라지고 '" + win.pendingSwitchTitle + "'(으)로 전환합니다."
+                        text: Tr.trf("editor.discardBody", [win.pendingSwitchTitle])
                         color: cMuted; font: Theme.typeFont("caption")
                     }
                     Row {
                         anchors.right: parent.right; spacing: 8
-                        WideBtn { label: "취소"; accent: cBorder; onTap: win.pendingSwitchBundle = "" }
-                        WideBtn { label: "폐기하고 전환"; accent: cOrange
+                        WideBtn { label: Tr.tr("action.cancel"); accent: cBorder; onTap: win.pendingSwitchBundle = "" }
+                        WideBtn { label: Tr.tr("editor.discardSwitch"); accent: cOrange
                                   // clear the dialog; the overlay closes via onBoardSwitched on success
                                   // (a failed switch keeps the overlay + shows a failure toast).
                                   onTap: { editor.confirmedLiveBoardSwitch(win.pendingSwitchBundle)
@@ -1033,7 +1033,7 @@ Item {
                     anchors.fill: parent; anchors.margins: 14; spacing: 10
                     Item {
                         width: parent.width; height: 24
-                        Text { text: "스냅샷"; color: cText; font: Theme.typeFont("body")
+                        Text { text: Tr.tr("snapshot.title"); color: cText; font: Theme.typeFont("body")
                                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
                         Text { text: "✕"; color: cMuted; font.pixelSize: Theme.typeSize("body")
                                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
@@ -1041,12 +1041,12 @@ Item {
                     }
                     Flow {
                         width: parent.width; spacing: 8
-                        WideBtn { label: editor.dirty ? "현재 스냅샷 저장 *" : "현재 스냅샷 저장"; accent: cPurple
+                        WideBtn { label: Tr.tr("editor.saveSnap") + (editor.dirty ? " *" : ""); accent: cPurple
                                   onTap: editor.saveSnapshot() }
-                        WideBtn { label: "새 스냅샷으로 저장"; accent: cPurple
+                        WideBtn { label: Tr.tr("editor.saveSnapNew"); accent: cPurple
                                   onTap: win.snapNaming = true }
                     }
-                    Text { text: "스냅샷 (" + editor.snapList.length + ")  ·  탭하면 그 세팅으로 전환"
+                    Text { text: Tr.trf("editor.snapListHint", [editor.snapList.length])
                            color: cDim; font: Theme.typeFont("caption") }
                     Flickable {
                         width: parent.width; height: 268; contentHeight: snapCol.height; clip: true
@@ -1066,7 +1066,7 @@ Item {
                                             color: modelData.current ? cPurple : cText
                                             font: Theme.typeFont("label"); elide: Text.ElideRight
                                         }
-                                        Pill { label: modelData.current ? "현재" : "전환"
+                                        Pill { label: modelData.current ? Tr.tr("common.current") : Tr.tr("common.switch")
                                                accent: modelData.current ? cBorder : cPurple
                                                dim: modelData.current
                                                onTap: if (!modelData.current) editor.selectSnapshot(modelData.idx) }
@@ -1074,7 +1074,7 @@ Item {
                                 }
                             }
                             Text { visible: editor.snapList.length === 0
-                                   text: "스냅샷 없음"; color: cDim
+                                   text: Tr.tr("snapshot.empty"); color: cDim
                                    font: Theme.typeFont("caption"); topPadding: 18 }
                         }
                     }
@@ -1094,7 +1094,7 @@ Item {
                 MouseArea { anchors.fill: parent }
                 Column {
                     anchors.fill: parent; anchors.margins: 16; spacing: 12
-                    Text { text: "새 스냅샷 이름"; color: cText; font: Theme.typeFont("body") }
+                    Text { text: Tr.tr("editor.newSnapName"); color: cText; font: Theme.typeFont("body") }
                     Rectangle {
                         width: parent.width; height: 40; radius: 6; color: cElev; border.width: 1; border.color: cBorder
                         TextInput {
@@ -1104,7 +1104,7 @@ Item {
                             onAccepted: if (text.trim().length) { editor.saveSnapshotNamed(text); win.snapNaming = false; win.snapsOpen = false }
                         }
                         Text { visible: snapNameField.text === ""; anchors.fill: parent; anchors.leftMargin: 8
-                               verticalAlignment: Text.AlignVCenter; text: "이름 입력 또는 아래 용어로 추천"
+                               verticalAlignment: Text.AlignVCenter; text: Tr.tr("editor.namePlaceholder")
                                color: cDim; font: Theme.typeFont("label") }
                     }
                     Flow {
@@ -1122,8 +1122,8 @@ Item {
                     }
                     Row {
                         anchors.right: parent.right; spacing: 8
-                        WideBtn { label: "취소"; accent: cBorder; onTap: win.snapNaming = false }
-                        WideBtn { label: "저장"; accent: cPurple; dim: snapNameField.text.trim().length === 0
+                        WideBtn { label: Tr.tr("action.cancel"); accent: cBorder; onTap: win.snapNaming = false }
+                        WideBtn { label: Tr.tr("action.save"); accent: cPurple; dim: snapNameField.text.trim().length === 0
                                   onTap: if (snapNameField.text.trim().length) { editor.saveSnapshotNamed(snapNameField.text); win.snapNaming = false; win.snapsOpen = false } }
                     }
                 }
@@ -1138,21 +1138,25 @@ Item {
             MouseArea { anchors.fill: parent; onClicked: win.newBoardOpen = false }
             Rectangle { anchors.fill: parent; color: Theme.color("overlay.scrim"); opacity: 0.6 }
             Rectangle {
-                width: 440; height: 196; radius: 10; anchors.centerIn: parent
+                // Height hugs the content (Column) so there's no empty band below the
+                // buttons — and it adapts as the body text wraps to more/fewer lines
+                // across languages. Width trimmed 440->400 to match.
+                width: 400; height: nbCol.height + 32; radius: 10; anchors.centerIn: parent
                 color: cPanel; border.width: 1; border.color: cBlue
                 MouseArea { anchors.fill: parent }
                 Column {
-                    anchors.fill: parent; anchors.margins: 16; spacing: 12
-                    Text { text: "새 보드"; color: cText; font: Theme.typeFont("body") }
+                    id: nbCol
+                    x: 16; y: 16; width: parent.width - 32; spacing: 12
+                    Text { text: Tr.tr("editor.newBoard"); color: cText; font: Theme.typeFont("body") }
                     Text { width: parent.width; wrapMode: Text.WordWrap
-                           text: "빈 보드에서 시작합니다. 저장 시 이름을 정해 새 보드로 저장돼요(기존 보드 안전). 퀵=직렬 빌드, 어드밴스드=자유 그래프."
+                           text: Tr.tr("editor.newBoardBody")
                            color: cMuted; font: Theme.typeFont("caption") }
                     Row {
                         anchors.right: parent.right; spacing: 8
-                        WideBtn { label: "취소"; accent: cBorder; onTap: win.newBoardOpen = false }
-                        WideBtn { label: "퀵"; accent: cGreen
+                        WideBtn { label: Tr.tr("action.cancel"); accent: cBorder; onTap: win.newBoardOpen = false }
+                        WideBtn { label: Tr.tr("editor.quickBtn"); accent: cGreen
                                   onTap: { win.newBoardOpen = false; editor.requestNewLiveBoard("quick") } }
-                        WideBtn { label: "어드밴스드"; accent: cOrange
+                        WideBtn { label: Tr.tr("editor.advBtn"); accent: cOrange
                                   onTap: { win.newBoardOpen = false; editor.requestNewLiveBoard("advanced") } }
                     }
                 }

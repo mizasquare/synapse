@@ -36,6 +36,7 @@ from presenter import Presenter
 from qtscheduler import QtScheduler
 from qtview import QtView
 from theme_qml import ThemeProvider
+from strings_qml import I18nProvider
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 logging.basicConfig(level=logging.INFO)
@@ -239,6 +240,12 @@ def main():
     # function's scope for the life of the event loop. See docs/theme-tokenization-plan.md.
     theme_provider = ThemeProvider(ui_font)
     ctx.setContextProperty("Theme", theme_provider)
+    # User-facing strings from resources/strings/<lang>.json — the same files
+    # strings.py resolves on the Python side (editor_bridge/qtview/presenter bake
+    # text into payloads). English is the default language. `i18n_provider` is kept
+    # alive by this function's scope. See docs/string-i18n-plan.md.
+    i18n_provider = I18nProvider()
+    ctx.setContextProperty("Tr", i18n_provider)
     engine.load(QUrl.fromLocalFile(os.path.join(BASE, "qml", "main.qml")))
     if not engine.rootObjects():
         print("[qt_main] QML failed to load")

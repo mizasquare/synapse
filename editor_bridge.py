@@ -33,6 +33,7 @@ import unicodedata
 import configs
 import plugincatalog
 import theme
+import strings
 
 from PyQt6.QtCore import (QObject, pyqtProperty as Property,
                           pyqtSignal as Signal, pyqtSlot as Slot)
@@ -115,7 +116,7 @@ def fmt(c, v):
         scale = c.get('scale') or []
         return scale[i] if 0 <= i < len(scale) else str(int(round(v)))
     if c['w'] == 'toggle':
-        return 'ON' if v >= 0.5 else 'OFF'
+        return strings.tr('value.on') if v >= 0.5 else strings.tr('value.off')
     av = abs(v)
     if av >= 100:
         num = str(int(round(v)))
@@ -528,7 +529,7 @@ class EditorBridge(QObject):
         # first live add reuses a seeded id and cables jump to the wrong node
         self._uid = max([self._uid] + [n['id'] for n in gnodes])
         if missing:
-            self.toast.emit('카탈로그 누락 %d개 생략: %s' % (len(missing), ', '.join(missing[:3])))
+            self.toast.emit(strings.trf('toast.catalogMissing', len(missing), ', '.join(missing[:3])))
 
         wires, have = [], set()
         for c in pb.connections:
@@ -1166,16 +1167,17 @@ class EditorBridge(QObject):
             self._nodes_view = self._build_nodes_view(self._roles)
             chain = [abbr(self.by_uri[n['uri']]['bucket']) for n in sorted(self.nodes, key=lambda n: n['x'])
                      if self.by_uri[n['uri']]['ai'] > 0 and self.by_uri[n['uri']]['ao'] > 0]
-            self._status = 'IN %s  ▸  %s  ▸  OUT STEREO' % (
-                'STEREO' if self.in_mode == 'stereo' else 'L-MONO', '▸'.join(chain) if chain else '—')
+            self._status = strings.trf('status.wireInOut',
+                strings.tr('editor.stereo') if self.in_mode == 'stereo' else strings.tr('editor.lmono'),
+                '▸'.join(chain) if chain else '—')
         else:
             self._rebuild_adv_geometry()
             self._g_nodes = self._build_g_nodes()
             cn = self.conn
             if cn:
-                self._status = '연결 대상 선택 중…' if cn.get('stage') == 'target' else '포트 선택 중…'
+                self._status = strings.tr('status.pickTarget') if cn.get('stage') == 'target' else strings.tr('status.pickPort')
             else:
-                self._status = '%d nodes · %d cables · MANUAL · type-matched' % (len(self.gnodes), len(self.gwires))
+                self._status = strings.trf('status.manual', len(self.gnodes), len(self.gwires))
         self._build_inspector()
         self.changed.emit()
         self.wiresChanged.emit()
@@ -1284,7 +1286,7 @@ class EditorBridge(QObject):
     def radTitle(self):
         if not self.radActive:
             return ''
-        return '보낼 포트' if self.conn.get('stage') == 'srcPick' else '받을 포트'
+        return strings.tr('hint.sendPort') if self.conn.get('stage') == 'srcPick' else strings.tr('hint.recvPort')
 
     @Property(bool, notify=changed)
     def targeting(self):
@@ -1294,8 +1296,8 @@ class EditorBridge(QObject):
     def targetHint(self):
         if not self.targeting:
             return ''
-        return ('▸ 신호를 받을 노드의 입력(좌변)을 터치' if self.conn['srcSide'] == 'out'
-                else '◂ 신호를 보낼 노드의 출력(우변)을 터치')
+        return (strings.tr('hint.touchInput') if self.conn['srcSide'] == 'out'
+                else strings.tr('hint.touchOutput'))
 
     @Property(bool, notify=wiresChanged)
     def gWireDel(self):
@@ -1377,7 +1379,7 @@ class EditorBridge(QObject):
         be = self._backend()
         cur = self._norm_bundle(be.get_current_pedalboard()) if be else ''
         if self._norm_bundle(bundle) == cur:
-            self.toast.emit('이미 현재 보드')
+            self.toast.emit(strings.tr('toast.alreadyCurrent'))
             return False
         if self._dirty:
             self.confirmBoardSwitch.emit(bundle, title or bundle)
@@ -1408,7 +1410,7 @@ class EditorBridge(QObject):
             return
         if self._dirty:
             self._pending_new = kind or 'advanced'
-            self.confirmBoardSwitch.emit(configs.DEFAULT_PEDALBOARD, '새 빈 보드')
+            self.confirmBoardSwitch.emit(configs.DEFAULT_PEDALBOARD, strings.tr('editor.newEmptyBoard'))
         else:
             self._do_new_live_board(kind)
 
@@ -1428,8 +1430,8 @@ class EditorBridge(QObject):
             self._lq_wires = set()
             self._rebuild()
         self.boardsChanged.emit()    # boardSaved flipped -> SAVE becomes save-as
-        self.toast.emit('새 %s 보드 — 빌드 후 SAVE로 이름 저장'
-                        % ('퀵' if kind == 'quick' else '어드밴스드'))
+        self.toast.emit(strings.trf('toast.newBoard',
+                        strings.tr('editor.quickBtn') if kind == 'quick' else strings.tr('editor.advBtn')))
 
     def _doLiveBoardSwitch(self, bundle):
         """Perform the live switch through the presenter. On failure (host graph
@@ -1440,11 +1442,11 @@ class EditorBridge(QObject):
             return False
         pb = self.presenter.editor_switch_pedalboard(bundle)
         if pb is None:
-            self.toast.emit('전환 실패 — 보드 유지됨')
+            self.toast.emit(strings.tr('toast.switchFail'))
             return False
         self._seed_from_pedalboard(pb)   # reseeds gnodes/gwires, clears _dirty
         self.refreshBoards()             # refresh current-board highlight
-        self.toast.emit('보드 전환됨')
+        self.toast.emit(strings.tr('toast.switched'))
         self.boardSwitched.emit()        # tell QML to close the switcher overlay (both paths)
         return True
 
@@ -1502,7 +1504,7 @@ class EditorBridge(QObject):
             return
         self._seed_from_pedalboard(pb)   # refresh node vals (also clears _dirty baseline)
         self.snapsChanged.emit()
-        self.toast.emit('스냅샷 · %s' % self.currentSnapshotName)
+        self.toast.emit(strings.trf('toast.snapshot', self.currentSnapshotName))
 
     @Slot(str)
     def selectPreset(self, uri):
@@ -1531,7 +1533,7 @@ class EditorBridge(QObject):
         modified on preset_load), unlike selectSnapshot where the loaded values
         ARE the saved state."""
         if err is not None:
-            self.toast.emit('프리셋 적용 실패 · %s' % label)
+            self.toast.emit(strings.trf('toast.presetFail', label))
             return
         if not (self._live_flag and self.presenter):
             return
@@ -1543,7 +1545,7 @@ class EditorBridge(QObject):
         self.sel = self._gid_by_inst.get(inst, -1)   # reopen the same inspector
         self._rebuild()
         self._touch()                    # preset apply = unsaved edit
-        self.toast.emit('프리셋 · %s' % label)
+        self.toast.emit(strings.trf('toast.preset', label))
 
     @Slot()
     def saveSnapshot(self):
@@ -1557,9 +1559,9 @@ class EditorBridge(QObject):
             self._dirty = False          # the board was persisted too
             self.snapsChanged.emit()
             self.boardsChanged.emit()
-            self.toast.emit('스냅샷 저장됨 · %s' % self.currentSnapshotName)
+            self.toast.emit(strings.trf('toast.snapSaved', self.currentSnapshotName))
         else:
-            self.toast.emit('스냅샷 저장 실패')
+            self.toast.emit(strings.tr('toast.snapSaveFail'))
 
     @Slot(str)
     def saveSnapshotNamed(self, name):
@@ -1573,7 +1575,7 @@ class EditorBridge(QObject):
         self._dirty = False
         self.snapsChanged.emit()
         self.boardsChanged.emit()
-        self.toast.emit('새 스냅샷 · %s' % name)
+        self.toast.emit(strings.trf('toast.newSnap', name))
 
     @Slot(str, result=str)
     def suggestSnapshotName(self, term):
@@ -1720,7 +1722,7 @@ class EditorBridge(QObject):
         host fetch. _on_add_done confirms or removes the ghost when the add returns."""
         be = self._backend()
         if not be:
-            self.toast.emit('백엔드 없음 — 추가 불가')
+            self.toast.emit(strings.tr('toast.noBackend'))
             return
         p = self.by_uri[uri]
         inst = self._mint_instance(uri)
@@ -1758,7 +1760,7 @@ class EditorBridge(QObject):
             self._inst_by_gid.pop(gid, None)
             if self.sel == gid:
                 self.sel = -1
-            self.toast.emit('추가 실패: %s' % err)
+            self.toast.emit(strings.trf('toast.addFail', err))
             self._rebuild()
             return
         if node is not None:
@@ -1777,12 +1779,12 @@ class EditorBridge(QObject):
             return
         if self.mode == 'advanced':
             if not self._live_quick_enabled:
-                self.toast.emit('라이브 퀵 비활성')
+                self.toast.emit(strings.tr('toast.liveQuickOff'))
                 return
             if self._project_to_quick():
                 self.modeFlash.emit('quick')        # -> QUICK: "smart"
             else:
-                self.toast.emit('이 보드는 QUICK 표현 불가 — 어드밴스드 유지')
+                self.toast.emit(strings.tr('toast.notQuickRepr'))
         else:
             pb = self._live_pb()
             if pb is not None:
@@ -1853,7 +1855,7 @@ class EditorBridge(QObject):
         for (f, t) in to_add:
             ef, et = self._endpoint_from_port_key(f), self._endpoint_from_port_key(t)
             if not ef or not et:
-                self.toast.emit('포트 해석 실패 — 일부 배선 보류')
+                self.toast.emit(strings.tr('toast.portResolveFail'))
                 continue
             adds.append((f, t, ef, et))
         for (f, t, ef, et) in adds:                     # connect-first
@@ -1896,7 +1898,7 @@ class EditorBridge(QObject):
             if be and inst:
                 err = be.remove_effect(inst)
                 if err is not None:
-                    self.toast.emit('삭제 실패: %s' % err)
+                    self.toast.emit(strings.trf('toast.deleteFail', err))
                     self._rebuild()
                     return
                 self._gid_by_inst.pop(inst, None)
@@ -1949,7 +1951,7 @@ class EditorBridge(QObject):
                 if be and inst:
                     err = be.remove_effect(inst)
                     if err is not None:
-                        self.toast.emit('삭제 실패: %s' % err)
+                        self.toast.emit(strings.trf('toast.deleteFail', err))
                         self._rebuild()
                         return
                     self._gid_by_inst.pop(inst, None)
@@ -2231,11 +2233,11 @@ class EditorBridge(QObject):
                 ep_f = self._endpoint_from_port_key(frm)
                 ep_t = self._endpoint_from_port_key(to)
                 if not ep_f or not ep_t:
-                    self.toast.emit('포트 해석 실패 (오디오만 지원)')
+                    self.toast.emit(strings.tr('toast.portAudioOnly'))
                     continue
                 err = be.connect(ep_f, ep_t)
                 if err is not None:
-                    self.toast.emit('연결 실패: %s' % err)
+                    self.toast.emit(strings.trf('toast.connectFail', err))
                     continue
             self.gwires.append({'id': self._new_wid(), 'frm': frm, 'to': to})
             added = True
@@ -2262,7 +2264,7 @@ class EditorBridge(QObject):
             if be and ep_f and ep_t:
                 err = be.disconnect(ep_f, ep_t)
                 if err is not None:
-                    self.toast.emit('해제 실패: %s' % err)
+                    self.toast.emit(strings.trf('toast.disconnectFail', err))
                     return
             self._touch()
         else:
@@ -2291,7 +2293,7 @@ class EditorBridge(QObject):
             # defense-in-depth: never in-place save over the shared default — QML
             # routes here via doSave() which opens the naming panel; guard the
             # direct path too.
-            self.toast.emit('새 보드 — 다른 이름으로 저장하세요')
+            self.toast.emit(strings.tr('toast.newBoardSaveAs'))
             return
         ok = self.presenter.save_snapshot() if self.presenter else False
         if ok:
@@ -2303,9 +2305,9 @@ class EditorBridge(QObject):
             self.refreshBoards()
             self.snapsChanged.emit()
             self.boardsChanged.emit()
-            self.toast.emit('저장됨 · %s' % self.board_name)
+            self.toast.emit(strings.trf('toast.saved', self.board_name))
         else:
-            self.toast.emit('저장 실패')
+            self.toast.emit(strings.tr('toast.saveFail'))
 
     @Slot(str)
     def saveBoardNamed(self, name):
@@ -2320,9 +2322,9 @@ class EditorBridge(QObject):
             self._scratch_default = False   # now a real named bundle, not scratch
             self.refreshBoards()         # the new bundle is now current
             self.boardsChanged.emit()
-            self.toast.emit('새 보드로 저장됨 · %s' % self.board_name)
+            self.toast.emit(strings.trf('toast.savedAsNew', self.board_name))
         else:
-            self.toast.emit('저장 실패')
+            self.toast.emit(strings.tr('toast.saveFail'))
 
     # ------------------------------------------------------------- demo (dev)
     @Slot()
@@ -2336,5 +2338,5 @@ class EditorBridge(QObject):
         self._relayout_quick(saved)
         after = self.arcs_from_layout(self.nodes)
         self._rebuild()
-        self.toast.emit('웹UI 좌표 흩뜨림 → 퀵 재오픈: 라우팅 %s' %
-                        ('보존됨 ✓ (체인 동일)' if saved == after else '깨짐 ✗'))
+        self.toast.emit(strings.trf('toast.webuiScatter',
+                        strings.tr('toast.routingPreserved') if saved == after else strings.tr('toast.routingBroken')))

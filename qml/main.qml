@@ -78,7 +78,7 @@ Window {
             }
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "MODEP 대기 중…"
+                text: Tr.tr("boot.waiting")
                 color: cMuted
                 font: Theme.typeFont("title")
                 // Pulse while the splash is up; stops when hidden (no idle work).
@@ -174,7 +174,7 @@ Window {
                         width: 92; height: 38; radius: 8
                         color: boardsMa.pressed ? Theme.color("btn.blue.fillPressed") : Theme.color("btn.blue.fill")
                         border.width: 1; border.color: boardsMa.pressed ? Theme.color("accent.blueBright") : Theme.color("accent.blue")
-                        Text { anchors.centerIn: parent; text: "BOARDS"; color: Theme.color("accent.blueBright"); font: Theme.typeFont("button") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("chrome.boards"); color: Theme.color("accent.blueBright"); font: Theme.typeFont("button") }
                         MouseArea { id: boardsMa; anchors.fill: parent
                                     onClicked: { view.refreshBoards(); overviewScreen.boardsOpen = true } }
                     }
@@ -182,7 +182,7 @@ Window {
                         width: 66; height: 38; radius: 8
                         color: snapMa.pressed ? Theme.color("btn.purple.fillPressed") : Theme.color("btn.purple.fill")
                         border.width: 1; border.color: snapMa.pressed ? Theme.color("accent.purpleBright") : Theme.color("btn.purple.border")
-                        Text { anchors.centerIn: parent; text: "SNAP"; color: Theme.color("accent.purpleBright"); font: Theme.typeFont("button") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("chrome.snap"); color: Theme.color("accent.purpleBright"); font: Theme.typeFont("button") }
                         MouseArea { id: snapMa; anchors.fill: parent
                                     onClicked: { view.refreshSnaps(); overviewScreen.snapsOpen = true } }
                     }
@@ -190,7 +190,7 @@ Window {
                         width: 70; height: 38; radius: 8
                         color: bankMa.pressed ? Theme.color("btn.blue.fillPressed") : Theme.color("btn.blue.fill")
                         border.width: 1; border.color: bankMa.pressed ? Theme.color("accent.blueBright") : Theme.color("accent.blue")
-                        Text { anchors.centerIn: parent; text: "BANK"; color: Theme.color("accent.blueBright"); font: Theme.typeFont("button") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("chrome.bank"); color: Theme.color("accent.blueBright"); font: Theme.typeFont("button") }
                         MouseArea { id: bankMa; anchors.fill: parent
                                     onClicked: { view.refreshBanks(); overviewScreen.bankMgrOpen = true } }
                     }
@@ -198,28 +198,28 @@ Window {
                         width: 72; height: 38; radius: 8
                         color: saveMa.pressed ? Theme.color("btn.neutral.fillPressed") : Theme.color("surface.control")
                         border.width: 1; border.color: saveMa.pressed ? Theme.color("text.secondary") : cBorder
-                        Text { anchors.centerIn: parent; text: "SAVE"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("chrome.save"); color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { id: saveMa; anchors.fill: parent; onClicked: view.saveSnapshot() }
                     }
                     Rectangle {
                         width: 98; height: 38; radius: 8
                         color: saveAsMa.pressed ? Theme.color("btn.neutral.fillPressed") : Theme.color("surface.control")
                         border.width: 1; border.color: saveAsMa.pressed ? Theme.color("text.secondary") : cBorder
-                        Text { anchors.centerIn: parent; text: "SAVE AS"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("chrome.saveAs"); color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { id: saveAsMa; anchors.fill: parent; onClicked: saveAsModal.open = true }
                     }
                     Rectangle {
                         width: 66; height: 38; radius: 8
                         color: editMa.pressed ? Theme.color("btn.purple.fillPressed") : Theme.color("btn.purple.fill")
                         border.width: 1; border.color: editMa.pressed ? Theme.color("accent.purpleBright") : Theme.color("btn.purple.border")
-                        Text { anchors.centerIn: parent; text: "EDIT"; color: Theme.color("accent.purpleBright"); font: Theme.typeFont("button") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("chrome.edit"); color: Theme.color("accent.purpleBright"); font: Theme.typeFont("button") }
                         MouseArea { id: editMa; anchors.fill: parent; onClicked: view.enterEdit() }
                     }
                     Rectangle {
                         width: 66; height: 38; radius: 8
                         color: menuMa.pressed ? Theme.color("btn.neutral.fillPressed") : Theme.color("surface.control")
                         border.width: 1; border.color: menuMa.pressed ? Theme.color("text.secondary") : cBorder
-                        Text { anchors.centerIn: parent; text: "MENU"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("chrome.menu"); color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { id: menuMa; anchors.fill: parent; onClicked: { overviewScreen.hubLeaf = "menu"; overviewScreen.hubOpen = true } }
                     }
                 }
@@ -424,13 +424,13 @@ Window {
                     anchors.fill: parent; anchors.margins: 18; spacing: 12
                     Item {
                         width: parent.width; height: 30
-                        Text { text: "보드 전환"; color: cText; font: Theme.typeFont("overlayTitle")
+                        Text { text: Tr.tr("boardSwitch.title"); color: cText; font: Theme.typeFont("overlayTitle")
                                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
                         Text { text: "✕"; color: cMuted; font.pixelSize: Theme.typeSize("heading")
                                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                                MouseArea { anchors.fill: parent; onClicked: overviewScreen.boardsOpen = false } }
                     }
-                    Text { text: "호스트 보드 (" + view.boardList.length + ")"; color: cDim
+                    Text { text: Tr.trf("boardSwitch.hostBoards", [view.boardList.length]); color: cDim
                            font: Theme.typeFont("label") }
                     Flickable {
                         width: parent.width; height: 324; contentHeight: bcol.height; clip: true
@@ -460,12 +460,12 @@ Window {
                                             spacing: 12; anchors.verticalCenter: parent.verticalCenter
                                             Rectangle { width: 48; height: 40; radius: 5; color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
                                                 opacity: index === 0 ? 0.35 : 1.0
-                                                Text { anchors.centerIn: parent; text: "위"; color: Theme.color("text.onLight"); font: Theme.typeFont("smallLabel") }
+                                                Text { anchors.centerIn: parent; text: Tr.tr("common.up"); color: Theme.color("text.onLight"); font: Theme.typeFont("smallLabel") }
                                                 MouseArea { anchors.fill: parent; anchors.margins: -5; enabled: index > 0
                                                             onClicked: view.moveBoardOrder(modelData.bundle, -1) } }
                                             Rectangle { width: 48; height: 40; radius: 5; color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
                                                 opacity: index === view.boardList.length - 1 ? 0.35 : 1.0
-                                                Text { anchors.centerIn: parent; text: "아래"; color: Theme.color("text.onLight"); font: Theme.typeFont("smallLabel") }
+                                                Text { anchors.centerIn: parent; text: Tr.tr("common.down"); color: Theme.color("text.onLight"); font: Theme.typeFont("smallLabel") }
                                                 MouseArea { anchors.fill: parent; anchors.margins: -5; enabled: index < view.boardList.length - 1
                                                             onClicked: view.moveBoardOrder(modelData.bundle, 1) } }
                                         }
@@ -473,7 +473,7 @@ Window {
                                             width: 84; height: 34; radius: 7; anchors.verticalCenter: parent.verticalCenter
                                             color: modelData.current ? "transparent" : Theme.color("btn.blue.fill")
                                             border.width: 1; border.color: modelData.current ? cBorder : Theme.color("accent.blue")
-                                            Text { anchors.centerIn: parent; text: modelData.current ? "현재" : "전환"
+                                            Text { anchors.centerIn: parent; text: modelData.current ? Tr.tr("common.current") : Tr.tr("common.switch")
                                                    color: modelData.current ? cMuted : Theme.color("accent.blueBright"); font: Theme.typeFont("body") }
                                             MouseArea { anchors.fill: parent; enabled: !modelData.current
                                                         onClicked: { view.switchBoard(modelData.bundle); overviewScreen.boardsOpen = false } }
@@ -482,7 +482,7 @@ Window {
                                 }
                             }
                             Text { visible: view.boardList.length === 0
-                                   text: "호스트 보드 목록 없음"; color: cDim
+                                   text: Tr.tr("boardSwitch.empty"); color: cDim
                                    font: Theme.typeFont("body"); topPadding: 20 }
                         }
                     }
@@ -505,13 +505,13 @@ Window {
                     anchors.fill: parent; anchors.margins: 18; spacing: 12
                     Item {
                         width: parent.width; height: 30
-                        Text { text: "스냅샷"; color: cText; font: Theme.typeFont("overlayTitle")
+                        Text { text: Tr.tr("snapshot.title"); color: cText; font: Theme.typeFont("overlayTitle")
                                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
                         Text { text: "✕"; color: cMuted; font.pixelSize: Theme.typeSize("heading")
                                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                                MouseArea { anchors.fill: parent; onClicked: overviewScreen.snapsOpen = false } }
                     }
-                    Text { text: "보드 스냅샷 (" + view.snapList.length + ")"; color: cDim
+                    Text { text: Tr.trf("snapshot.boardSnaps", [view.snapList.length]); color: cDim
                            font: Theme.typeFont("label") }
                     Flickable {
                         width: parent.width; height: 324; contentHeight: scol.height; clip: true
@@ -536,7 +536,7 @@ Window {
                                             width: 84; height: 34; radius: 7; anchors.verticalCenter: parent.verticalCenter
                                             color: modelData.current ? "transparent" : Theme.color("btn.purple.fill")
                                             border.width: 1; border.color: modelData.current ? cBorder : Theme.color("btn.purple.border")
-                                            Text { anchors.centerIn: parent; text: modelData.current ? "현재" : "전환"
+                                            Text { anchors.centerIn: parent; text: modelData.current ? Tr.tr("common.current") : Tr.tr("common.switch")
                                                    color: modelData.current ? cMuted : Theme.color("accent.purpleBright"); font: Theme.typeFont("body") }
                                             MouseArea { anchors.fill: parent; enabled: !modelData.current
                                                         onClicked: { view.selectSnapshot(modelData.idx); overviewScreen.snapsOpen = false } }
@@ -545,7 +545,7 @@ Window {
                                 }
                             }
                             Text { visible: view.snapList.length === 0
-                                   text: "스냅샷 없음"; color: cDim
+                                   text: Tr.tr("snapshot.empty"); color: cDim
                                    font: Theme.typeFont("body"); topPadding: 20 }
                         }
                     }
@@ -577,7 +577,7 @@ Window {
                     id: bmHeader
                     anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
                     anchors.margins: 16; height: 30
-                    Text { text: "뱅크 매니저"; color: cText; font: Theme.typeFont("overlayTitle")
+                    Text { text: Tr.tr("bank.manager"); color: cText; font: Theme.typeFont("overlayTitle")
                            anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter }
                     Text { text: "✕"; color: cMuted; font.pixelSize: Theme.typeSize("heading")
                            anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
@@ -600,7 +600,7 @@ Window {
                             Rectangle {
                                 width: parent.width; height: 40; radius: 6
                                 color: Theme.color("btn.blue.fill"); border.width: 1; border.color: Theme.color("accent.blue")
-                                Text { anchors.centerIn: parent; text: "+ 새 뱅크"; color: Theme.color("accent.blueBright"); font: Theme.typeFont("button") }
+                                Text { anchors.centerIn: parent; text: Tr.tr("bank.new"); color: Theme.color("accent.blueBright"); font: Theme.typeFont("button") }
                                 MouseArea { anchors.fill: parent
                                     onClicked: { bankName.target = -1; bankName.open = true;
                                                  nameInput.text = view.suggestDateName(); nameInput.forceActiveFocus() } }
@@ -619,7 +619,7 @@ Window {
                                         Text { text: (modelData.active ? "● " : "") + modelData.title
                                                color: modelData.active ? cGreen : cText; font: Theme.typeFont("body")
                                                elide: Text.ElideRight; width: parent.width }
-                                        Text { text: modelData.pedalboards.length + "개 보드"; color: cDim; font: Theme.typeFont("caption") }
+                                        Text { text: Tr.trf("bank.boardCount", [modelData.pedalboards.length]); color: cDim; font: Theme.typeFont("caption") }
                                     }
                                     MouseArea { anchors.fill: parent; onClicked: { bankMgr.sel = index; bankMgr.delArmed = -1 } }
                                 }
@@ -633,7 +633,7 @@ Window {
                         color: Theme.color("bg.screen"); border.width: 1; border.color: cBorder
 
                         Text { visible: bankMgr.selBank === null; anchors.centerIn: parent
-                               text: "왼쪽에서 뱅크를 고르거나\n+ 새 뱅크로 만드세요."
+                               text: Tr.tr("bank.emptyHint")
                                horizontalAlignment: Text.AlignHCenter
                                color: cDim; font: Theme.typeFont("body") }
 
@@ -651,19 +651,19 @@ Window {
                                 Row {
                                     anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 6
                                     Rectangle {
-                                        width: 56; height: 30; radius: 6
+                                        width: 84; height: 30; radius: 6
                                         visible: bankMgr.selBank && !bankMgr.selBank.active
                                         color: Theme.color("btn.affirm.fill"); border.width: 1; border.color: cGreen
-                                        Text { anchors.centerIn: parent; text: "활성"; color: cGreen; font: Theme.typeFont("body") }
+                                        Text { anchors.centerIn: parent; text: Tr.tr("bank.activate"); color: cGreen; font: Theme.typeFont("body") }
                                         MouseArea { anchors.fill: parent; onClicked: view.setActiveBank(bankMgr.sel) }
                                     }
                                     Text { visible: bankMgr.selBank && bankMgr.selBank.active
-                                           text: "● 활성"; color: cGreen; font: Theme.typeFont("label")
+                                           text: "● " + Tr.tr("bank.active"); color: cGreen; font: Theme.typeFont("label")
                                            anchors.verticalCenter: parent.verticalCenter }
                                     Rectangle {
-                                        width: 56; height: 30; radius: 6
+                                        width: 76; height: 30; radius: 6
                                         color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                                        Text { anchors.centerIn: parent; text: "이름"; color: Theme.color("text.onLight"); font: Theme.typeFont("body") }
+                                        Text { anchors.centerIn: parent; text: Tr.tr("bank.rename"); color: Theme.color("text.onLight"); font: Theme.typeFont("body") }
                                         MouseArea { anchors.fill: parent
                                             onClicked: { bankName.target = bankMgr.sel; bankName.open = true;
                                                          nameInput.text = bankMgr.selBank.title; nameInput.forceActiveFocus() } }
@@ -675,7 +675,7 @@ Window {
                                         opacity: canDel ? 1.0 : 0.4
                                         color: Theme.color("btn.danger.fill"); border.width: 1; border.color: Theme.color("btn.danger.border")
                                         Text { anchors.centerIn: parent
-                                               text: bankMgr.delArmed === bankMgr.sel ? "정말?" : "삭제"
+                                               text: bankMgr.delArmed === bankMgr.sel ? Tr.tr("common.confirm") : Tr.tr("common.delete")
                                                color: Theme.color("btn.danger.text"); font: Theme.typeFont("body") }
                                         MouseArea { anchors.fill: parent
                                             onClicked: {
@@ -689,7 +689,7 @@ Window {
                                 }
                             }
 
-                            Text { text: "이 뱅크의 보드 — 순서 = 풋스위치 A·B·C·D (앞 4개)"; color: cDim; font: Theme.typeFont("caption") }
+                            Text { text: Tr.tr("bank.boardsHint"); color: cDim; font: Theme.typeFont("caption") }
 
                             ListView {
                                 width: parent.width; height: 116; clip: true; spacing: 5
@@ -710,10 +710,10 @@ Window {
                                         anchors.right: parent.right; anchors.rightMargin: 8
                                         anchors.verticalCenter: parent.verticalCenter; spacing: 12
                                         Rectangle { width: 48; height: 34; radius: 5; color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                                            Text { anchors.centerIn: parent; text: "위"; color: Theme.color("text.onLight"); font: Theme.typeFont("smallLabel") }
+                                            Text { anchors.centerIn: parent; text: Tr.tr("common.up"); color: Theme.color("text.onLight"); font: Theme.typeFont("smallLabel") }
                                             MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: view.bankMoveBoard(bankMgr.sel, index, -1) } }
                                         Rectangle { width: 48; height: 34; radius: 5; color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                                            Text { anchors.centerIn: parent; text: "아래"; color: Theme.color("text.onLight"); font: Theme.typeFont("smallLabel") }
+                                            Text { anchors.centerIn: parent; text: Tr.tr("common.down"); color: Theme.color("text.onLight"); font: Theme.typeFont("smallLabel") }
                                             MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: view.bankMoveBoard(bankMgr.sel, index, 1) } }
                                         Rectangle { width: 40; height: 34; radius: 5; color: Theme.color("btn.purple.fill"); border.width: 1; border.color: cBorder
                                             Text { anchors.centerIn: parent; text: "✕"; color: Theme.color("btn.danger.text"); font.pixelSize: Theme.typeSize("label") }
@@ -722,7 +722,7 @@ Window {
                                 }
                             }
 
-                            Text { text: "보드 추가 — 호스트 보드 (" + view.boardCatalog.length + ")"; color: cDim; font: Theme.typeFont("caption") }
+                            Text { text: Tr.trf("bank.addBoard", [view.boardCatalog.length]); color: cDim; font: Theme.typeFont("caption") }
 
                             ListView {
                                 width: parent.width; height: 126; clip: true; spacing: 5
@@ -779,7 +779,7 @@ Window {
                         MouseArea { anchors.fill: parent }
                         Column {
                             anchors.fill: parent; anchors.margins: 18; spacing: 14
-                            Text { text: bankName.target < 0 ? "새 뱅크" : "뱅크 이름 변경"
+                            Text { text: bankName.target < 0 ? Tr.tr("bank.newTitle") : Tr.tr("bank.renameTitle")
                                    color: cText; font: Theme.typeFont("overlayTitle") }
                             Rectangle {
                                 width: parent.width; height: 52; radius: 8; color: Theme.color("surface.inset")
@@ -796,10 +796,10 @@ Window {
                             Row {
                                 spacing: 10
                                 Rectangle { width: 120; height: 44; radius: 8; color: Theme.color("btn.affirm.fill"); border.width: 1; border.color: cGreen
-                                    Text { anchors.centerIn: parent; text: "저장"; color: cGreen; font: Theme.typeFont("button") }
+                                    Text { anchors.centerIn: parent; text: Tr.tr("action.save"); color: cGreen; font: Theme.typeFont("button") }
                                     MouseArea { anchors.fill: parent; onClicked: bankName.commit() } }
                                 Rectangle { width: 110; height: 44; radius: 8; color: Theme.color("btn.purple.fill"); border.width: 1; border.color: cBorder
-                                    Text { anchors.centerIn: parent; text: "취소"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
+                                    Text { anchors.centerIn: parent; text: Tr.tr("action.cancel"); color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                                     MouseArea { anchors.fill: parent; onClicked: bankName.open = false } }
                             }
                         }
@@ -824,12 +824,12 @@ Window {
                     Item {
                         width: parent.width; height: 30
                         Text { visible: overviewScreen.hubLeaf !== "menu"
-                               text: "< 뒤로"; color: cMuted; font: Theme.typeFont("button")
+                               text: Tr.tr("menu.back"); color: cMuted; font: Theme.typeFont("button")
                                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
                                MouseArea { anchors.fill: parent
                                            onClicked: { overviewScreen.hubLeaf = "menu"; overviewScreen.sysConfirm = false } } }
-                        Text { text: overviewScreen.hubLeaf === "system" ? "시스템"
-                                     : overviewScreen.hubLeaf === "config" ? "설정" : "설정 / 시스템"
+                        Text { text: overviewScreen.hubLeaf === "system" ? Tr.tr("menu.titleSystem")
+                                     : overviewScreen.hubLeaf === "config" ? Tr.tr("menu.titleConfig") : Tr.tr("menu.titleHub")
                                color: cText; font: Theme.typeFont("overlayTitle")
                                anchors.horizontalCenter: parent.horizontalCenter
                                anchors.verticalCenter: parent.verticalCenter }
@@ -843,8 +843,8 @@ Window {
                         visible: overviewScreen.hubLeaf === "menu"
                         width: parent.width; spacing: 10
                         Repeater {
-                            model: [ {k:"config", t:"설정 (CONFIG)",   s:"마스터 볼륨 · 박자표"},
-                                     {k:"system", t:"시스템 (SYSTEM)",  s:"안전 종료 · 재부팅"} ]
+                            model: [ {k:"config", t:Tr.tr("menu.configItem"), s:Tr.tr("menu.configItemSub")},
+                                     {k:"system", t:Tr.tr("menu.systemItem"), s:Tr.tr("menu.systemItemSub")} ]
                             Rectangle {
                                 width: parent.width; height: 64; radius: 8
                                 color: Theme.color("surface.card"); border.width: 1; border.color: cBorder
@@ -911,7 +911,7 @@ Window {
                         }
 
                         // --- master volume (software) section ---
-                        Text { text: "마스터 볼륨"
+                        Text { text: Tr.tr("config.masterVol")
                                color: cText; font: Theme.typeFont("heading") }
 
                         // slider row (hand-rolled, house style) — hidden if gain stage unavailable
@@ -953,16 +953,16 @@ Window {
                                    color: cGreen; font: Theme.typeFont("heading") }
                         }
                         Text { visible: configLeaf.volAvail
-                               text: "출력단 소프트웨어 게인(JACK)입니다. 100% = 유니티, 아래로 감쇠.\n보드의 물리 노브가 최종 아날로그 마스터입니다."
+                               text: Tr.tr("config.volHelp")
                                color: cDim; font: Theme.typeFont("smallLabel")
                                wrapMode: Text.WordWrap; width: parent.width }
                         Text { visible: !configLeaf.volAvail
-                               text: "게인 스테이지를 찾을 수 없습니다 (synapse-mastervol 서비스 확인)."
+                               text: Tr.tr("config.volMissing")
                                color: cMuted; font: Theme.typeFont("label")
                                wrapMode: Text.WordWrap; width: parent.width }
 
                         // --- time signature (beats per bar) section ---
-                        Text { text: "박자표 BEATS / BAR"
+                        Text { text: Tr.tr("config.timeSig")
                                color: cText; font: Theme.typeFont("heading") }
                         Row {
                             spacing: 14
@@ -995,7 +995,7 @@ Window {
                                             } }
                             }
                         }
-                        Text { text: "탭 템포 메트로놈의 마디당 비트 수입니다 (2–12)."
+                        Text { text: Tr.tr("config.bpbHelp")
                                color: cDim; font: Theme.typeFont("smallLabel")
                                wrapMode: Text.WordWrap; width: parent.width }
                     }
@@ -1003,7 +1003,7 @@ Window {
                     Column {
                         visible: overviewScreen.hubLeaf === "system"
                         width: parent.width; spacing: 14
-                        Text { text: "장치를 안전하게 종료/재부팅합니다.\n전원을 그냥 뽑으면 SD 카드가 손상될 수 있습니다."
+                        Text { text: Tr.tr("system.warn")
                                color: cDim; font: Theme.typeFont("label")
                                wrapMode: Text.WordWrap; width: parent.width }
                         Row {
@@ -1012,7 +1012,7 @@ Window {
                                 width: 220; height: 70; radius: 8
                                 color: Theme.color("btn.danger.fill"); border.width: 1; border.color: Theme.color("btn.danger.border")
                                 Text { anchors.centerIn: parent
-                                       text: (overviewScreen.sysConfirm && overviewScreen.sysAction === "shutdown") ? "정말 종료?" : "안전 종료"
+                                       text: (overviewScreen.sysConfirm && overviewScreen.sysAction === "shutdown") ? Tr.tr("system.confirmShutdown") : Tr.tr("system.shutdown")
                                        color: Theme.color("btn.danger.text"); font: Theme.typeFont("button") }
                                 MouseArea { anchors.fill: parent
                                     onClicked: {
@@ -1024,7 +1024,7 @@ Window {
                                 width: 220; height: 70; radius: 8
                                 color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
                                 Text { anchors.centerIn: parent
-                                       text: (overviewScreen.sysConfirm && overviewScreen.sysAction === "reboot") ? "정말 재부팅?" : "재부팅"
+                                       text: (overviewScreen.sysConfirm && overviewScreen.sysAction === "reboot") ? Tr.tr("system.confirmReboot") : Tr.tr("system.reboot")
                                        color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                                 MouseArea { anchors.fill: parent
                                     onClicked: {
@@ -1034,7 +1034,7 @@ Window {
                             }
                         }
                         Text { visible: overviewScreen.sysConfirm
-                               text: "한 번 더 누르면 실행됩니다. (취소: 패널 밖을 탭)"
+                               text: Tr.tr("system.confirmHint")
                                color: cMuted; font: Theme.typeFont("smallLabel") }
                     }
                 }
@@ -1058,7 +1058,7 @@ Window {
             Rectangle {
                 width: 124; height: 44; radius: 8
                 color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                Text { anchors.centerIn: parent; text: "◄ OVERVIEW"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
+                Text { anchors.centerIn: parent; text: Tr.tr("focus.overview"); color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                 MouseArea { anchors.fill: parent; onClicked: view.goOverview() }
             }
             Rectangle {
@@ -1083,7 +1083,7 @@ Window {
             color: on ? cGreen : Theme.color("border.default")
             Text {
                 anchors.centerIn: parent
-                text: parent.on ? "ENGAGED" : "BYPASS"
+                text: parent.on ? Tr.tr("focus.engaged") : Tr.tr("focus.bypass")
                 color: parent.on ? Theme.color("bg.screen") : Theme.color("text.mutedAlt")
                 font: Theme.typeFont("toggle")
             }
@@ -1144,8 +1144,8 @@ Window {
             width: parent.width - 24; height: 56
             spacing: 10
             Repeater {
-                model: [ { t: "◄ INPUTS",  list: focusScreen.f ? focusScreen.f.inputs : [] },
-                         { t: "OUTPUTS ►", list: focusScreen.f ? focusScreen.f.outputs : [] } ]
+                model: [ { t: Tr.tr("focus.inputs"),  list: focusScreen.f ? focusScreen.f.inputs : [] },
+                         { t: Tr.tr("focus.outputs"), list: focusScreen.f ? focusScreen.f.outputs : [] } ]
                 Rectangle {
                     width: (routing.width - 10) / 2; height: 56
                     radius: 10; color: cPanel
@@ -1193,7 +1193,7 @@ Window {
                 visible: ctrlrow.width > ctrlflick.width
                 anchors.right: parent.right; anchors.rightMargin: 10
                 anchors.bottom: parent.bottom; anchors.bottomMargin: 6
-                text: "⟷ 스크롤"; color: cDim; font: Theme.typeFont("caption")
+                text: Tr.tr("focus.scrollHint"); color: cDim; font: Theme.typeFont("caption")
             }
         }
 
@@ -1214,7 +1214,7 @@ Window {
                 width: parent.width / 2
                 Text {
                     visible: monrow.children.length <= 1
-                    anchors.centerIn: parent; text: "모니터 없음"
+                    anchors.centerIn: parent; text: Tr.tr("focus.noMonitor")
                     color: cDim; font: Theme.typeFont("label")
                 }
                 Row {
@@ -1241,7 +1241,7 @@ Window {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
                 Text {
-                    text: "STOMP FS 배정"; color: cDim
+                    text: Tr.tr("focus.stompAssign"); color: cDim
                     font: Theme.typeFont("caption")
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
@@ -1299,7 +1299,7 @@ Window {
         // header: title (left) + meter class (right)
         Text {
             x: 16; y: 16
-            text: "TAP TEMPO"
+            text: Tr.tr("tap.title")
             color: cGreen; font: Theme.typeFont("display")
         }
         Text {
@@ -1327,13 +1327,13 @@ Window {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             y: parent.height - 92
-            text: (tapScreen.t && tapScreen.t.bpb ? tapScreen.t.bpb : 4) + " BEATS / BAR"
+            text: Tr.trf("tap.beatsPerBar", [(tapScreen.t && tapScreen.t.bpb ? tapScreen.t.bpb : 4)])
             color: cGreen; font: Theme.typeFont("title")
         }
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom; anchors.bottomMargin: 16
-            text: "탭: 풋스위치 아무거나  ·  종료: 콤보(2개 동시)"
+            text: Tr.tr("tap.hint")
             color: cDim; font: Theme.typeFont("heading")
         }
     }
@@ -1378,12 +1378,12 @@ Window {
 
         // header
         Text {
-            x: 16; y: 16; text: "TUNER"
+            x: 16; y: 16; text: Tr.tr("tuner.title")
             color: cPurple; font: Theme.typeFont("display")
         }
         Text {
             anchors.right: parent.right; anchors.rightMargin: 16; y: 26
-            text: "A 440"
+            text: Tr.tr("tuner.ref")
             color: cMuted; font: Theme.typeFont("title")
         }
 
@@ -1449,7 +1449,7 @@ Window {
             y: 418
             text: tunerScreen.live
                   ? (tunerScreen.strg + "    " + tunerScreen.freq.toFixed(1) + " Hz")
-                  : "듣는 중…"
+                  : Tr.tr("tuner.listening")
             color: tunerScreen.live ? cText : cDim
             font: Theme.typeFont("title")
         }
@@ -1458,7 +1458,7 @@ Window {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom; anchors.bottomMargin: 12
-            text: "종료: 풋스위치 아무거나"
+            text: Tr.tr("tuner.exitHint")
             color: cDim; font: Theme.typeFont("heading")
         }
     }
@@ -1515,7 +1515,7 @@ Window {
                 anchors.margins: 20
                 spacing: 14
 
-                Text { text: "스냅샷 다른 이름으로 저장"; color: cText; font: Theme.typeFont("title") }
+                Text { text: Tr.tr("saveAs.title"); color: cText; font: Theme.typeFont("title") }
 
                 // suggestion box: tap to save (or, when typing, a text field)
                 Rectangle {
@@ -1526,7 +1526,7 @@ Window {
                     Text {
                         visible: !saveAsModal.typing
                         anchors.centerIn: parent
-                        text: saveAsModal.suggestion !== "" ? saveAsModal.suggestion : "아래 용어를 눌러 이름 제안 받기"
+                        text: saveAsModal.suggestion !== "" ? saveAsModal.suggestion : Tr.tr("saveAs.prompt")
                         color: saveAsModal.suggestion !== "" ? cGreen : cDim
                         font: Theme.typeFont("title")
                     }
@@ -1546,9 +1546,9 @@ Window {
                     }
                 }
                 Text {
-                    text: saveAsModal.typing ? "Enter로 저장"
-                        : (saveAsModal.suggestion !== "" ? "↑ 이 이름을 누르면 저장 · 용어 다시 누르면 새 제안"
-                                                         : "용어를 누르면 무작위 접미사가 붙은 제안이 떠요")
+                    text: saveAsModal.typing ? Tr.tr("saveAs.enterToSave")
+                        : (saveAsModal.suggestion !== "" ? Tr.tr("saveAs.hintSuggested")
+                                                         : Tr.tr("saveAs.hintEmpty"))
                     color: cDim; font: Theme.typeFont("label")
                 }
 
@@ -1577,13 +1577,13 @@ Window {
                     Rectangle {
                         width: 156; height: 44; radius: 8
                         color: saveAsModal.typing ? cGreen : Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                        Text { anchors.centerIn: parent; text: "✎ 직접입력"; color: saveAsModal.typing ? Theme.color("bg.screen") : Theme.color("text.onLight"); font: Theme.typeFont("button") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("saveAs.typeCustom"); color: saveAsModal.typing ? Theme.color("bg.screen") : Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { anchors.fill: parent; onClicked: { saveAsModal.typing = true; kb.forceActiveFocus(); } }
                     }
                     Rectangle {
                         width: 120; height: 44; radius: 8
                         color: Theme.color("btn.purple.fill"); border.width: 1; border.color: cBorder
-                        Text { anchors.centerIn: parent; text: "취소"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
+                        Text { anchors.centerIn: parent; text: Tr.tr("action.cancel"); color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                         MouseArea { anchors.fill: parent; onClicked: saveAsModal.close() }
                     }
                 }
