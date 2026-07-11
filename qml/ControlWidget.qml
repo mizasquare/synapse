@@ -50,14 +50,14 @@ Item {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: root.m ? root.m.name : ""; color: root.cMuted
-            font.family: uiFont; font.pixelSize: 16
+            font: Theme.typeFont("controlName")
         }
         Text {  // live value -- knobs only (toggle/trigger/enum show state in the body)
             visible: root.isKnob
             anchors.horizontalCenter: parent.horizontalCenter
             text: root.isKnob ? (root.liveVal.toFixed(root.m.kind === "knob_int" ? 0 : 2)
                                  + (root.m.unit ? (" " + root.m.unit) : "")) : ""
-            color: root.cGreen; font.family: uiFont; font.pixelSize: 16
+            color: root.cGreen; font: Theme.typeFont("label")
         }
     }
 
@@ -104,7 +104,7 @@ Item {
             Text {
                 anchors.centerIn: parent; text: tgl.on ? "ON" : "OFF"
                 // dark text on the green ON fill; muted grey when OFF
-                color: tgl.on ? Theme.color("bg.screen") : Theme.color("text.mutedAlt"); font.family: uiFont; font.pixelSize: 16
+                color: tgl.on ? Theme.color("bg.screen") : Theme.color("text.mutedAlt"); font: Theme.typeFont("toggle")
             }
             MouseArea {
                 anchors.fill: parent
@@ -125,7 +125,7 @@ Item {
             color: ma.pressed ? root.cGreen : root.cElev
             border.width: 2; border.color: root.cGreen
             Text { anchors.centerIn: parent; text: "↻"
-                   color: ma.pressed ? Theme.color("bg.screen") : root.cGreen; font.family: uiFont; font.pixelSize: 30 }
+                   color: ma.pressed ? Theme.color("bg.screen") : root.cGreen; font: Theme.typeFont("title") }
             MouseArea {
                 id: ma; anchors.fill: parent
                 onPressed:  if (root.m) view.setParameter(root.instance, root.m.symbol, root.m.max)
@@ -152,10 +152,10 @@ Item {
                 return root.m.display
             }
             Text { anchors.centerIn: parent; text: enr.label
-                   color: root.cText; font.family: uiFont; font.pixelSize: 18 }
+                   color: root.cText; font: Theme.typeFont("body") }
             Text { anchors.bottom: parent.bottom; anchors.bottomMargin: 4
                    anchors.horizontalCenter: parent.horizontalCenter; text: "▾"
-                   color: root.cMuted; font.family: uiFont; font.pixelSize: 14 }
+                   color: root.cMuted; font: Theme.typeFont("caption") }
             MouseArea {
                 anchors.fill: parent
                 onClicked: {

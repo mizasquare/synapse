@@ -1058,17 +1058,17 @@ Window {
             Rectangle {
                 width: 124; height: 44; radius: 8
                 color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                Text { anchors.centerIn: parent; text: "◄ OVERVIEW"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 20 }
+                Text { anchors.centerIn: parent; text: "◄ OVERVIEW"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                 MouseArea { anchors.fill: parent; onClicked: view.goOverview() }
             }
             Rectangle {
                 width: 48; height: 44; radius: 8; color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                Text { anchors.centerIn: parent; text: "◄"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 22 }
+                Text { anchors.centerIn: parent; text: "◄"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                 MouseArea { anchors.fill: parent; onClicked: view.focusPrev() }
             }
             Rectangle {
                 width: 48; height: 44; radius: 8; color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
-                Text { anchors.centerIn: parent; text: "►"; color: Theme.color("text.onLight"); font.family: uiFont; font.pixelSize: 22 }
+                Text { anchors.centerIn: parent; text: "►"; color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                 MouseArea { anchors.fill: parent; onClicked: view.focusNext() }
             }
         }
@@ -1085,7 +1085,7 @@ Window {
                 anchors.centerIn: parent
                 text: parent.on ? "ENGAGED" : "BYPASS"
                 color: parent.on ? Theme.color("bg.screen") : Theme.color("text.mutedAlt")
-                font.family: uiFont; font.pixelSize: 18
+                font: Theme.typeFont("toggle")
             }
             MouseArea {
                 anchors.fill: parent
@@ -1105,7 +1105,7 @@ Window {
                 spacing: 3
                 Text {
                     text: focusScreen.f ? (focusScreen.f.name + "  ·  " + focusScreen.f.category) : ""
-                    color: cText; font.family: uiFont; font.pixelSize: 28
+                    color: cText; font: Theme.typeFont("title")
                     width: Math.min(implicitWidth, idcard.width - 32)
                     elide: Text.ElideRight
                 }
@@ -1121,7 +1121,7 @@ Window {
                             Text {
                                 id: pchTxt; anchors.centerIn: parent
                                 text: "▦ " + modelData.label + ": " + (modelData.value || "—") + "  ▾"
-                                color: cGreen; font.family: uiFont; font.pixelSize: 15
+                                color: cGreen; font: Theme.typeFont("smallLabel")
                                 // long IR paths filled the card; keep the filename end visible
                                 width: Math.min(implicitWidth, idcard.width - 64)
                                 elide: Text.ElideMiddle
@@ -1153,10 +1153,10 @@ Window {
                         anchors.left: parent.left; anchors.leftMargin: 14
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 2
-                        Text { text: modelData.t; color: cGreen; font.family: uiFont; font.pixelSize: 15 }
+                        Text { text: modelData.t; color: cGreen; font: Theme.typeFont("smallLabel") }
                         Text {
                             text: (modelData.list || []).join("   ")
-                            color: cText; font.family: uiFont; font.pixelSize: 22
+                            color: cText; font: Theme.typeFont("heading")
                             // 3+ ports used to overflow the card (no clip on it either)
                             width: Math.min(implicitWidth, (routing.width - 10) / 2 - 28)
                             elide: Text.ElideRight
