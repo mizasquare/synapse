@@ -48,7 +48,7 @@ Rectangle {
                 width: parent.width
                 Text {
                     width: parent.width - 60
-                    text: root.titleLabel + " 선택  (" + root.files.length + ")"
+                    text: Tr.trf("patchPicker.title", [root.titleLabel, root.files.length])
                     color: root.colAccent; font.family: root.fontFamily; font.pixelSize: Theme.typeSize("heading")
                     elide: Text.ElideRight
                 }

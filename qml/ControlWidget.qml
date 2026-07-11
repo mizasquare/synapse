@@ -102,7 +102,7 @@ Item {
             property bool on: root.m ? root.m.value >= 0.5 : false
             color: on ? root.cGreen : root.cBorder
             Text {
-                anchors.centerIn: parent; text: tgl.on ? "ON" : "OFF"
+                anchors.centerIn: parent; text: tgl.on ? Tr.tr("value.on") : Tr.tr("value.off")
                 // dark text on the green ON fill; muted grey when OFF
                 color: tgl.on ? Theme.color("bg.screen") : Theme.color("text.mutedAlt"); font: Theme.typeFont("toggle")
             }
