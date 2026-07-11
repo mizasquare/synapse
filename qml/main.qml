@@ -824,12 +824,12 @@ Window {
                     Item {
                         width: parent.width; height: 30
                         Text { visible: overviewScreen.hubLeaf !== "menu"
-                               text: "< 뒤로"; color: cMuted; font: Theme.typeFont("button")
+                               text: Tr.tr("menu.back"); color: cMuted; font: Theme.typeFont("button")
                                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
                                MouseArea { anchors.fill: parent
                                            onClicked: { overviewScreen.hubLeaf = "menu"; overviewScreen.sysConfirm = false } } }
-                        Text { text: overviewScreen.hubLeaf === "system" ? "시스템"
-                                     : overviewScreen.hubLeaf === "config" ? "설정" : "설정 / 시스템"
+                        Text { text: overviewScreen.hubLeaf === "system" ? Tr.tr("menu.titleSystem")
+                                     : overviewScreen.hubLeaf === "config" ? Tr.tr("menu.titleConfig") : Tr.tr("menu.titleHub")
                                color: cText; font: Theme.typeFont("overlayTitle")
                                anchors.horizontalCenter: parent.horizontalCenter
                                anchors.verticalCenter: parent.verticalCenter }
@@ -843,8 +843,8 @@ Window {
                         visible: overviewScreen.hubLeaf === "menu"
                         width: parent.width; spacing: 10
                         Repeater {
-                            model: [ {k:"config", t:"설정 (CONFIG)",   s:"마스터 볼륨 · 박자표"},
-                                     {k:"system", t:"시스템 (SYSTEM)",  s:"안전 종료 · 재부팅"} ]
+                            model: [ {k:"config", t:Tr.tr("menu.configItem"), s:Tr.tr("menu.configItemSub")},
+                                     {k:"system", t:Tr.tr("menu.systemItem"), s:Tr.tr("menu.systemItemSub")} ]
                             Rectangle {
                                 width: parent.width; height: 64; radius: 8
                                 color: Theme.color("surface.card"); border.width: 1; border.color: cBorder
@@ -911,7 +911,7 @@ Window {
                         }
 
                         // --- master volume (software) section ---
-                        Text { text: "마스터 볼륨"
+                        Text { text: Tr.tr("config.masterVol")
                                color: cText; font: Theme.typeFont("heading") }
 
                         // slider row (hand-rolled, house style) — hidden if gain stage unavailable
@@ -953,16 +953,16 @@ Window {
                                    color: cGreen; font: Theme.typeFont("heading") }
                         }
                         Text { visible: configLeaf.volAvail
-                               text: "출력단 소프트웨어 게인(JACK)입니다. 100% = 유니티, 아래로 감쇠.\n보드의 물리 노브가 최종 아날로그 마스터입니다."
+                               text: Tr.tr("config.volHelp")
                                color: cDim; font: Theme.typeFont("smallLabel")
                                wrapMode: Text.WordWrap; width: parent.width }
                         Text { visible: !configLeaf.volAvail
-                               text: "게인 스테이지를 찾을 수 없습니다 (synapse-mastervol 서비스 확인)."
+                               text: Tr.tr("config.volMissing")
                                color: cMuted; font: Theme.typeFont("label")
                                wrapMode: Text.WordWrap; width: parent.width }
 
                         // --- time signature (beats per bar) section ---
-                        Text { text: "박자표 BEATS / BAR"
+                        Text { text: Tr.tr("config.timeSig")
                                color: cText; font: Theme.typeFont("heading") }
                         Row {
                             spacing: 14
@@ -995,7 +995,7 @@ Window {
                                             } }
                             }
                         }
-                        Text { text: "탭 템포 메트로놈의 마디당 비트 수입니다 (2–12)."
+                        Text { text: Tr.tr("config.bpbHelp")
                                color: cDim; font: Theme.typeFont("smallLabel")
                                wrapMode: Text.WordWrap; width: parent.width }
                     }
@@ -1003,7 +1003,7 @@ Window {
                     Column {
                         visible: overviewScreen.hubLeaf === "system"
                         width: parent.width; spacing: 14
-                        Text { text: "장치를 안전하게 종료/재부팅합니다.\n전원을 그냥 뽑으면 SD 카드가 손상될 수 있습니다."
+                        Text { text: Tr.tr("system.warn")
                                color: cDim; font: Theme.typeFont("label")
                                wrapMode: Text.WordWrap; width: parent.width }
                         Row {
@@ -1012,7 +1012,7 @@ Window {
                                 width: 220; height: 70; radius: 8
                                 color: Theme.color("btn.danger.fill"); border.width: 1; border.color: Theme.color("btn.danger.border")
                                 Text { anchors.centerIn: parent
-                                       text: (overviewScreen.sysConfirm && overviewScreen.sysAction === "shutdown") ? "정말 종료?" : "안전 종료"
+                                       text: (overviewScreen.sysConfirm && overviewScreen.sysAction === "shutdown") ? Tr.tr("system.confirmShutdown") : Tr.tr("system.shutdown")
                                        color: Theme.color("btn.danger.text"); font: Theme.typeFont("button") }
                                 MouseArea { anchors.fill: parent
                                     onClicked: {
@@ -1024,7 +1024,7 @@ Window {
                                 width: 220; height: 70; radius: 8
                                 color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
                                 Text { anchors.centerIn: parent
-                                       text: (overviewScreen.sysConfirm && overviewScreen.sysAction === "reboot") ? "정말 재부팅?" : "재부팅"
+                                       text: (overviewScreen.sysConfirm && overviewScreen.sysAction === "reboot") ? Tr.tr("system.confirmReboot") : Tr.tr("system.reboot")
                                        color: Theme.color("text.onLight"); font: Theme.typeFont("button") }
                                 MouseArea { anchors.fill: parent
                                     onClicked: {
@@ -1034,7 +1034,7 @@ Window {
                             }
                         }
                         Text { visible: overviewScreen.sysConfirm
-                               text: "한 번 더 누르면 실행됩니다. (취소: 패널 밖을 탭)"
+                               text: Tr.tr("system.confirmHint")
                                color: cMuted; font: Theme.typeFont("smallLabel") }
                     }
                 }

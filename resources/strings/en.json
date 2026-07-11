@@ -63,5 +63,27 @@
   "saveAs.enterToSave":   "Enter to save",
   "saveAs.hintSuggested": "↑ Tap this name to save · tap a term again to re-roll",
   "saveAs.hintEmpty":     "Tap a term for a suggestion with a random suffix",
-  "saveAs.typeCustom":    "✎ Type it"
+  "saveAs.typeCustom":    "✎ Type it",
+
+  "menu.back":           "< Back",
+  "menu.titleSystem":    "System",
+  "menu.titleConfig":    "Config",
+  "menu.titleHub":       "Settings / System",
+  "menu.configItem":     "Configuration",
+  "menu.configItemSub":  "Master volume · Time signature",
+  "menu.systemItem":     "System",
+  "menu.systemItemSub":  "Safe shutdown · Reboot",
+
+  "config.masterVol":  "Master Volume",
+  "config.volHelp":    "Software output gain (JACK). 100% = unity, below attenuates.\nThe board's physical knob is the final analog master.",
+  "config.volMissing": "Gain stage not found (check the synapse-mastervol service).",
+  "config.timeSig":    "Time Signature · Beats / Bar",
+  "config.bpbHelp":    "Beats per bar for the tap-tempo metronome (2–12).",
+
+  "system.warn":            "Safely shut down / reboot the device.\nPulling power directly can corrupt the SD card.",
+  "system.shutdown":        "Safe Shutdown",
+  "system.confirmShutdown": "Really shut down?",
+  "system.reboot":          "Reboot",
+  "system.confirmReboot":   "Really reboot?",
+  "system.confirmHint":     "Tap once more to run. (Cancel: tap outside the panel)"
 }
