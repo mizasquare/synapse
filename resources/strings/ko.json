@@ -9,5 +9,30 @@
   "chrome.save":   "SAVE",
   "chrome.saveAs": "SAVE AS",
   "chrome.edit":   "EDIT",
-  "chrome.menu":   "MENU"
+  "chrome.menu":   "MENU",
+
+  "common.up":      "위",
+  "common.down":    "아래",
+  "common.current": "현재",
+  "common.switch":  "전환",
+  "common.delete":  "삭제",
+  "common.confirm": "정말?",
+  "action.save":    "저장",
+  "action.cancel":  "취소",
+
+  "boardSwitch.title":      "보드 전환",
+  "boardSwitch.hostBoards": "호스트 보드 ({0})",
+  "boardSwitch.empty":      "호스트 보드 목록 없음",
+
+  "bank.manager":     "뱅크 매니저",
+  "bank.new":         "+ 새 뱅크",
+  "bank.boardCount":  "{0}개 보드",
+  "bank.emptyHint":   "왼쪽에서 뱅크를 고르거나\n+ 새 뱅크로 만드세요.",
+  "bank.activate":    "활성",
+  "bank.active":      "활성",
+  "bank.rename":      "이름",
+  "bank.boardsHint":  "이 뱅크의 보드 — 순서 = 풋스위치 A·B·C·D (앞 4개)",
+  "bank.addBoard":    "보드 추가 — 호스트 보드 ({0})",
+  "bank.newTitle":    "새 뱅크",
+  "bank.renameTitle": "뱅크 이름 변경"
 }
