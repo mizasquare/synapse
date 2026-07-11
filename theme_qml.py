@@ -54,6 +54,10 @@ class ThemeProvider(QObject):
     def led(self, kind):
         return theme.led_color(kind)
 
+    @pyqtSlot(str, result="QVariant")
+    def fx(self, name):
+        return theme.fx(name)
+
     # --- type hierarchy: a ready QFont for `font: Theme.typeFont("role")` ---
     @pyqtSlot(str, result="QVariant")
     def typeFont(self, role):

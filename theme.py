@@ -23,6 +23,7 @@ C = {k: v for k, v in _raw["color"].items() if not k.startswith("_")}
 
 SCALE = dict(_raw["scale"])     # tier name -> pixel size (int)
 TYPE = dict(_raw["type"])       # role name -> {scale, weight, noFamily?}
+FX = dict(_raw.get("fx", {}))   # effect-palette arrays (mode-transition particles)
 
 _MISSING = "#ff00ff"            # loud magenta: an unmapped token should be obvious
 
@@ -56,6 +57,11 @@ def bucket_abbr(bucket):
 def led_color(kind):
     """Hex for a footswitch/graph LED role ('active'|'on'|'danger'|'off')."""
     return _resolve(_raw["led"], kind, "led.off")
+
+
+def fx(name):
+    """A mode-FX particle palette as a list of hex ('hot'|'cool'). Empty if unknown."""
+    return list(FX.get(name, []))
 
 
 def alpha(name_or_hex, a):
