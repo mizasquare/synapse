@@ -150,7 +150,8 @@ class AppState:
     pick_fx: int = 0
     moving: bool = False      # picked-up node: ENC0 shifts slot, click drops
     move_from: int = 0        # original index (ENC0-hold cancel restores it)
-    inserting: bool = False   # picker opened via Insert -> commit splices net-new (vs replace)
+    add: str = ""             # parked on a [+] pseudo-cell: ""=off, "head", "tail"
+    ins_at: int = -1          # picker opened to INSERT: splice index (-1 = replace at st.node)
     tuner: bool = False
     tcents: int = 6
     tnote: str = "A"
@@ -199,18 +200,44 @@ def mode_of(st):
     if st.depth == -1: return "glance"
     if st.sys_focus:   return "sysfocus"
     if st.moving:      return "moving"
+    if st.add or not st.board:               # parked on a [+] cell (an empty chain IS one)
+        return "adding"
     return "chain"
+
+
+# ---- the chain's cursor axis (nodes + the [+] cells) ------------------------
+# The chain is variable-length, so "add an effect" needs a place to stand: a [+]
+# pseudo-cell at the head and (when the chain is non-empty) one at the tail. They
+# are cells you scroll onto, not nodes — st.add parks on one, and only then is
+# st.node meaningless. An empty chain is just the head [+], which is what turns
+# "0 nodes" from a crash into an ordinary state (it used to index st.board[0]).
+def cells(st):
+    """The cursor axis left-to-right: "head", 0..n-1, "tail" (head only if empty)."""
+    if not st.board:
+        return ["head"]
+    return ["head"] + list(range(len(st.board))) + ["tail"]
+
+
+def cpos(st):
+    """Index of the focused cell in cells(st)."""
+    if st.add == "head" or not st.board:
+        return 0
+    if st.add == "tail":
+        return len(st.board) + 1
+    return st.node + 1
 
 
 def menu_items(st):
     """The slot menu's (icon, label, action) rows for the focused node — a pure
     query of state, shared by the menu mode's dispatch and its view."""
     n = st.board[st.node]
-    if n["empty"]:
-        return [("+", "Place FX", "place"), ("<", "Back", "back")]
     return [("O" if not n["bypass"] else "*", "Enable" if n["bypass"] else "Bypass", "bypass"),
             ("<>", "Move", "move"), ("~", "Replace", "replace"),
-            ("+", "Insert", "insert"), ("X", "Remove", "remove"), ("<", "Back", "back")]
+            # [사용자] "뒤에 붙는다"는 절대규칙은 직관적이지 않다 -> 방향을 명시적으로 고른다.
+            # 모달로 되묻지 않고 두 항목으로 편 이유: 클릭 수가 늘지 않고 새 상태도 안 생긴다.
+            # 어휘는 [+] 셀의 "ADD FX"와 통일("Insert"는 내부 용어로만 남는다).
+            ("[+", "Add Before", "ins_before"), ("+]", "Add After", "ins_after"),
+            ("X", "Remove", "remove"), ("<", "Back", "back")]
 
 
 class AppController:
@@ -274,7 +301,7 @@ class AppController:
 
     def adjust(self, d):
         n = self._cur()
-        if n["empty"]:
+        if not n["knobs"]:
             return
         kb = n["knobs"][self.st.knob]          # read current value from the cache
         mult = d * self._rotmag                # [D] accel: 1 detent=1 step, fast spin=coarse
@@ -302,11 +329,15 @@ class AppController:
             self.backend.remove(st.node)
             self._sync_board()
             st.menu_open, st.knob, st.dirty = False, 0, True
-        elif act in ("place", "replace"):
-            st.menu_open, st.inserting = False, False
+            st.node = min(st.node, len(st.board) - 1)   # the chain shrank under the cursor
+            if not st.board:                            # removed the last one -> park on [+]
+                st.add, st.node = "head", 0
+        elif act == "replace":
+            st.menu_open, st.ins_at = False, -1
             self.enter("pick")
-        elif act == "insert":                  # net-new: picker commit splices after this node
-            st.menu_open, st.inserting = False, True
+        elif act in ("ins_before", "ins_after"):        # net-new: splice, side chosen explicitly
+            st.menu_open = False
+            st.ins_at = st.node if act == "ins_before" else st.node + 1
             self.enter("pick")
         elif act == "move":                    # back to chain, pick up this node
             st.menu_open = False
@@ -596,13 +627,14 @@ class PickMode(Mode):
                 st.pick, st.pick_fx = "fx", 0
             else:
                 plug = st.wl[st.pick_cat]["plugins"][st.pick_fx]   # for the toast
-                if st.inserting:               # splice a NEW node after the focused one
-                    c.backend.insert(st.node + 1, st.pick_cat, st.pick_fx)
+                if st.ins_at >= 0:             # net-new: splice at the chosen index
+                    at = min(st.ins_at, len(st.board))
+                    c.backend.insert(at, st.pick_cat, st.pick_fx)
                     c._sync_board()
-                    st.node = min(st.node + 1, len(st.board) - 1)   # focus the new node
-                    st.pick, st.knob, st.dirty, st.inserting = "", 0, True, False
+                    st.node, st.add = at, ""   # land on the new node (leaves any [+] cell)
+                    st.pick, st.knob, st.dirty, st.ins_at = "", 0, True, -1
                     c._toast(plug["display"] + " inserted")
-                else:                          # replace / fill-empty at the focused slot
+                else:                          # replace the focused node in place
                     c.backend.place(st.node, st.pick_cat, st.pick_fx)
                     c._sync_board()
                     st.pick, st.knob, st.dirty = "", 0, True
@@ -610,7 +642,7 @@ class PickMode(Mode):
     def exit(self, c):                     # ENC0-hold = back one strip (base on_hold)
         c.st.pick = "cat" if c.st.pick == "fx" else ""
         if not c.st.pick:                  # fully backed out of the picker -> cancel insert
-            c.st.inserting = False
+            c.st.ins_at = -1               # (st.add survives: back to the [+] cell we came from)
 
 
 class MovingMode(Mode):
@@ -701,30 +733,56 @@ class ChainMode(NavMode):
         st = c.st
         if enc == 0:
             nn = st.node + d
-            if nn < 0:                     # scroll left past start -> PARK at SYS (guard,
-                st.sys_focus = True        # not enter): a fast spin stops here, E0 click enters
-                return
-            st.node = min(nn, len(st.board) - 1)
-            st.knob = 0
+            if nn < 0:                     # off the left end of the nodes -> the head [+]
+                st.add, st.knob = "head", 0
+            elif nn >= len(st.board):      # off the right end -> the tail [+] (before OUT)
+                st.add, st.knob = "tail", 0
+            else:
+                st.node, st.knob = nn, 0
         else:
             n = c._cur()
             if st.locked:
                 c.adjust(d)
-            elif not n["empty"]:
+            elif n["knobs"]:
                 st.knob = (st.knob + d) % len(n["knobs"])
     def on_click(self, c, enc):
         st = c.st
         if enc == 0:
             c.enter("menu")
-        elif not c._cur()["empty"]:
+        elif c._cur()["knobs"]:
             st.locked = not st.locked
+
+
+class AddMode(NavMode):
+    """Parked on a [+] cell: the chain's add affordance (and the ONLY thing an
+    empty chain shows). ENC0 click opens the picker to splice a net-new node at
+    this end; rotating rolls back onto the chain — or, past the head, on to the
+    SYS park (decision M's edge detent, now one cell further left)."""
+    def on_rotate(self, c, enc, d):
+        st = c.st
+        if enc != 0:
+            return
+        if st.add == "tail":
+            if d < 0:                      # back onto the last node (right = wall)
+                st.add, st.node, st.knob = "", len(st.board) - 1, 0
+            return
+        if d > 0:                          # head: roll right onto node 0 (none if empty)
+            if st.board:
+                st.add, st.node, st.knob = "", 0, 0
+        else:                              # head, further left -> park at SYS (guard, not enter)
+            st.sys_focus, st.add = True, ""
+    def on_click(self, c, enc):
+        st = c.st
+        if enc == 0:                       # commit: pick an FX to splice at this end
+            st.ins_at = 0 if st.add != "tail" else len(st.board)
+            c.enter("pick")
 
 
 MODES = {
     "tuner": TunerMode(), "confirm": ConfirmMode(), "naming": NamingMode(),
     "sub": SubMode(), "pick": PickMode(), "sys": SysMode(), "menu": MenuMode(),
     "glance": GlanceMode(), "sysfocus": SysFocusMode(), "moving": MovingMode(),
-    "chain": ChainMode(),
+    "adding": AddMode(), "chain": ChainMode(),
 }
 
 
@@ -809,14 +867,16 @@ def rails(st):
         return ("solid", "off")
     if m == "moving":                        # E0 shifts the picked-up node
         return ("solid", "off")
+    if m == "adding":                        # parked on a [+]: E0 still walks the chain axis
+        return ((cpos(st), len(cells(st))), "off")   # E1 dead — no node under the cursor
     n = st.board[st.node]                    # chain home
     if st.locked:                            # E1 owns one value: no list to place
         z1 = "solid"
-    elif n["empty"] or not n["knobs"]:
+    elif not n["knobs"]:
         z1 = "off"
     else:                                    # browsing knobs IS a list — and once the
         z1 = (st.knob, len(n["knobs"]))      # grid scrolls, the thumb is the only cue
-    return ((st.node, len(st.board)), z1)
+    return ((cpos(st), len(cells(st))), z1)  # E0 axis = the strip: [+] head, nodes, [+] tail
 
 
 def _frame(st):
@@ -855,25 +915,37 @@ def _chain(st):
     s.T("-14.2", 18, 1, 8)
     s.T("OUT", 54, 1, 8)
     s.T("-4.3", 74, 1, 8)
-    s.T("%d/%d" % (st.node + 1, len(st.board)), 101, 1, 6)
+    adding = mode_of(st) == "adding"
+    s.T("+/%d" % len(st.board) if adding
+        else "%d/%d" % (st.node + 1, len(st.board)), 101, 1, 6)
     if st.dirty:
         s.d.ellipse([121, 2, 126, 7], fill=1)
     step, cw, ty, ch = 25, 23, 13, 24
     wy = ty + ch // 2
-    cells = []
-    for j in range(5):
-        idx = st.node - 2 + j
-        if idx < 0 or idx >= len(st.board):
-            continue
-        n = st.board[idx]
+    if st.moving:                              # carrying a node: the [+] cells aren't drop
+        axis, fp = list(range(len(st.board))), st.node   # targets, so don't show them
+    else:
+        axis, fp = cells(st), cpos(st)
+    start = _window(len(axis), fp, 5)
+    drawn = []
+    for j in range(min(5, len(axis) - start)):
+        p = start + j
+        cell = axis[p]
         x = 5 + j * step                       # +3px: node strip clears the left rail
-        cells.append((idx, x, x + cw - 1))
-        sel = idx == st.node
+        drawn.append((p, x, x + cw - 1))
+        sel = p == fp
+        if cell in ("head", "tail"):           # the [+] pseudo-cells: add an FX here
+            cy = ty
+            if sel:
+                s.box(x, cy, cw, ch, fill=True)
+                s.T("+", x + 8, cy + 7, 12, fill=0)
+            else:
+                s.dashed(x, cy, cw, ch, on=2, off=2)
+                s.T("+", x + 8, cy + 7, 12)
+            continue
+        n = st.board[cell]
         cy = ty - 5 if (st.moving and sel) else ty   # lift the picked-up node
-        if n["empty"]:
-            s.dashed(x, cy, cw, ch, on=2, off=2)
-            s.T("+", x + 8, cy + 8, 12, fill=1)
-        elif sel:
+        if sel:
             s.box(x, cy, cw, ch, fill=True)
             s.T(n["abbr"], x + 3, cy + 9, 12, fill=0)
         elif n["bypass"]:
@@ -882,17 +954,28 @@ def _chain(st):
         else:
             s.box(x, cy, cw, ch)
             s.T(n["abbr"], x + 3, cy + 9, 12)
-    for a in range(len(cells) - 1):
-        if cells[a + 1][1] - 1 >= cells[a][2] + 1:
-            s.d.rectangle([cells[a][2] + 1, wy, cells[a + 1][1] - 1, wy], fill=1)
-    if cells:
-        if cells[0][0] > 0:
-            s.d.rectangle([0, wy, cells[0][1] - 1, wy], fill=1)
-        if cells[-1][0] < len(st.board) - 1:
-            s.d.rectangle([cells[-1][2] + 1, wy, WIDTH - 1, wy], fill=1)
-    if st.node == 0 and not st.moving:         # Q2: SYSTEM is one scroll-left past start
+    for a in range(len(drawn) - 1):
+        if drawn[a + 1][1] - 1 >= drawn[a][2] + 1:
+            s.d.rectangle([drawn[a][2] + 1, wy, drawn[a + 1][1] - 1, wy], fill=1)
+    if drawn:
+        if drawn[0][0] > 0:
+            s.d.rectangle([0, wy, drawn[0][1] - 1, wy], fill=1)
+        if drawn[-1][0] < len(axis) - 1:
+            s.d.rectangle([drawn[-1][2] + 1, wy, WIDTH - 1, wy], fill=1)
+    if fp == 0 and not st.moving:              # Q2: SYSTEM is one scroll-left past the head
         s.T("<SYS", 5, 15, 8)
     s.hline(0, 40, 128)
+    if adding:                                 # parked on a [+]: no node to show below
+        head = st.add != "tail"
+        s.T("ADD FX", 4, 45, 16)
+        s.T("at the %s of the chain" % ("head" if head else "tail"), 4, 68, 8)
+        s.T("(empty chain)" if not st.board else
+            ("before %s" % st.board[0]["abbr"] if head else "after %s" % st.board[-1]["abbr"]),
+            4, 80, 8)
+        s.T("e0 click = pick FX", 4, 100, 8)
+        s.T("e0 hold = glance", 4, 112, 8)
+        _toast_over(s, st)
+        return s.img
     n = st.board[st.node]
     if st.moving:                              # move mode: instructions in place of knobs
         s.T("MOVING", 4, 45, 16)
@@ -900,11 +983,6 @@ def _chain(st):
         s.T("SLOT %d/%d" % (st.node + 1, len(st.board)), 4, 78, 8)
         s.T("e0 turn = shift", 4, 96, 8)
         s.T("click drop  hold cancel", 4, 108, 8)
-        _toast_over(s, st)
-        return s.img
-    if n["empty"]:
-        s.T("EMPTY SLOT %d" % (st.node + 1), 6, 66, 12)
-        s.T("CLICK e0 -> add FX", 6, 84, 8)
         _toast_over(s, st)
         return s.img
     _marq(s, n["name"], 5, 43, 16, 92, phase(st))     # box stops short of the abbr at x=100
@@ -1043,25 +1121,21 @@ def _menu(st):
     s = Screen()
     n = st.board[st.node]
     s.box(4, 0, 36, 128)                        # +4px: info panel clears the left rail
-    if n["empty"]:
-        s.T("+", 15, 44, 24)
-        s.T("EMPTY", 7, 74, 8)
-        s.T("SLOT %d" % (st.node + 1), 6, 86, 6)
-    else:
-        s.T(n["abbr"], 6, 40, 16)
-        s.T(n["name"], 6, 62, 8)
-        s.T("SLOT %d/6" % (st.node + 1), 6, 76, 6)
-        s.T("BYP" if n["bypass"] else "ON", 6, 88, 6)
+    s.T(n["abbr"], 6, 40, 16)
+    s.T(n["name"], 6, 62, 8)
+    s.T("SLOT %d/%d" % (st.node + 1, len(st.board)), 6, 76, 6)
+    s.T("BYP" if n["bypass"] else "ON", 6, 88, 6)
     s.T("ACTION", 46, 5, 8, ls=1)
     items = menu_items(st)
-    y0, rh = 17, 17
+    y0, rh = 13, 16                              # 7 rows now (Add Before/After): 13+7*16 = 125
     for i, (ic, label, _) in enumerate(items):
         y = y0 + i * rh
+        row = _fit(s, ic + " " + label, 8, 76)   # the row box is x=44..127
         if i == st.menu:
             s.box(44, y - 1, 84, rh - 2, fill=True)
-            s.T(ic + " " + label, 48, y + 1, 8, fill=0)
+            s.T(row, 48, y + 1, 8, fill=0)
         else:
-            s.T(ic + " " + label, 48, y + 1, 8)
+            s.T(row, 48, y + 1, 8)
     _toast_over(s, st)
     return s.img
 
@@ -1177,37 +1251,42 @@ def _striplist(s, items, sel, x, w, y0, active, size=8, vis=5, rh=14, t=0.0):
 
 
 def _pick_chain(s, st):
-    """Top band: the node chain with the target slot showing the pending FX."""
-    s.T("PLACE", 4, 1, 8, ls=1)
-    s.T(_fit(s, st.wl[st.pick_cat]["key"], 8, 56), 46, 1, 8)
-    s.T("SL%d" % (st.node + 1), 106, 2, 6)
+    """Top band: the chain AS IT WILL BE — the pending FX shown in place. Insert
+    splices a new cell in (the chain grows under it); replace swaps the focused
+    one. Either way the dashed cell is exactly where the plugin will land."""
+    ins = st.ins_at >= 0
+    s.T("INSERT" if ins else "REPLACE", 4, 1, 8, ls=1)
+    s.T(_fit(s, st.wl[st.pick_cat]["key"], 8, 46), 56, 1, 8)
+    pend = st.wl[st.pick_cat]["abbr"]
+    at = min(st.ins_at, len(st.board)) if ins else st.node
+    strip = [n["abbr"] for n in st.board]
+    if ins:
+        strip.insert(at, pend)
+    else:
+        strip[at] = pend
+    s.T("SL%d" % (at + 1), 106, 2, 6)
     step, cw, ty, ch = 25, 23, 12, 20
     wy = ty + ch // 2
-    cells = []
-    pend = st.wl[st.pick_cat]["abbr"]
-    for j in range(5):
-        idx = st.node - 2 + j
-        if idx < 0 or idx >= len(st.board):
-            continue
-        n = st.board[idx]
+    drawn = []
+    start = _window(len(strip), at, 5)
+    for j in range(min(5, len(strip) - start)):
+        idx = start + j
         x = 2 + j * step
-        cells.append((idx, x, x + cw - 1))
-        if idx == st.node:                      # target slot: incoming FX preview
+        drawn.append((idx, x, x + cw - 1))
+        if idx == at:                           # the pending FX, where it will land
             s.dashed(x, ty, cw, ch, on=2, off=2)
             s.T(pend, x + 3, ty + 7, 12)
-        elif n["empty"]:
-            s.dashed(x, ty, cw, ch, on=1, off=2)
         else:
             s.box(x, ty, cw, ch)
-            s.T(n["abbr"], x + 3, ty + 7, 12)
-    for a in range(len(cells) - 1):
-        if cells[a + 1][1] - 1 >= cells[a][2] + 1:
-            s.d.rectangle([cells[a][2] + 1, wy, cells[a + 1][1] - 1, wy], fill=1)
-    if cells:
-        if cells[0][0] > 0:
-            s.d.rectangle([0, wy, cells[0][1] - 1, wy], fill=1)
-        if cells[-1][0] < len(st.board) - 1:
-            s.d.rectangle([cells[-1][2] + 1, wy, WIDTH - 1, wy], fill=1)
+            s.T(strip[idx], x + 3, ty + 7, 12)
+    for a in range(len(drawn) - 1):
+        if drawn[a + 1][1] - 1 >= drawn[a][2] + 1:
+            s.d.rectangle([drawn[a][2] + 1, wy, drawn[a + 1][1] - 1, wy], fill=1)
+    if drawn:
+        if drawn[0][0] > 0:
+            s.d.rectangle([0, wy, drawn[0][1] - 1, wy], fill=1)
+        if drawn[-1][0] < len(strip) - 1:
+            s.d.rectangle([drawn[-1][2] + 1, wy, WIDTH - 1, wy], fill=1)
 
 
 def _pick(st):
@@ -1271,7 +1350,7 @@ OFF = "off"
 
 def leds(st):
     m = mode_of(st)
-    n = st.board[st.node]
+    n = st.board[st.node] if st.board else None   # no node under the cursor on an empty chain
     if m == "tuner":
         return ("purple", "purple")
     if m == "confirm":                        # delete danger on the operating encoder
@@ -1290,9 +1369,9 @@ def leds(st):
         return ("grey", OFF)
     if m == "glance":
         return ("blue", "green")
-    l0 = OFF                                   # menu / chain
-    if not n["empty"]:
-        l0 = "red" if n["bypass"] else BUCKETCOL.get(n["bucket"], "grey")
+    if m == "adding":                          # [+] cell: E0 commits (amber = the add action)
+        return ("amber", OFF)
+    l0 = "red" if n["bypass"] else BUCKETCOL.get(n["bucket"], "grey")   # menu / chain
     l1 = OFF
     if m == "menu":                           # Q5: danger(red) rides ENC0 (the commit hand)
         if menu_items(st)[st.menu][2] == "remove":
@@ -1334,7 +1413,8 @@ def _walk():
     do("x", "combo")       # save snapshot (toast)
     do("e", "hold-down")   # back to depth 0
     do("rrr", "to-node0")  # enc0 CCW: node 3 -> 0
-    do("r", "sys-focus")   # one more left past start -> PARK at SYS entry (guard, not enter)
+    do("r", "add-head")    # one more left -> the head [+] cell (add at the front)
+    do("r", "sys-focus")   # one more left past THAT -> PARK at SYS entry (guard, not enter)
     do("w", "sys-enter")   # enc0 click: commit -> SYSTEM menu opens
     do("w", "sys-exec")    # enc0 click: SYSTEM item 0 = Tuner -> tuner
     do("w", "tuner-exit")  # click exits tuner
@@ -1350,13 +1430,25 @@ def _walk():
     do("s", "place")       # enc1 click: place node -> board[0] replaced
     do("w", "menu2")       # reopen menu on the freshly placed node
     do("w", "bypass2")     # bypass it (sanity: node model intact)
-    # insert (net-new): grow the chain with a fresh node AFTER the focused one
+    # insert (net-new): the side is chosen explicitly — Insert Before / Insert After
     print("      chain   %s (len %d)" % ([b["abbr"] for b in c.st.board], len(c.st.board)))
     do("w", "menu-ins")    # slot menu on node 0
-    do("ttt", "to-insert") # menu 0 -> 3 (Bypass/Move/Replace/Insert)
-    do("w", "ins-pick")    # exec Insert -> picker (inserting=True)
-    do("s", "ins-fx")      # enc1 click: cat -> plugin strip
-    do("s", "ins-add")     # enc1 click: splice new node after node 0 -> chain grows
+    do("ttt", "to-insB")   # menu 0 -> 3 (Bypass/Move/Replace/InsBefore/InsAfter/Remove/Back)
+    do("w", "insB-pick")   # exec Insert Before -> picker (ins_at = node)
+    do("s", "insB-fx")     # enc1 click: cat -> plugin strip
+    do("s", "insB-add")    # enc1 click: splice BEFORE node 0 -> lands at index 0
+    print("      chain   %s (len %d) focus=%d" % ([b["abbr"] for b in c.st.board], len(c.st.board), c.st.node))
+    do("w", "menu-ins2")   # slot menu on the new node 0
+    do("tttt", "to-insA")  # menu 0 -> 4 (Insert After)
+    do("w", "insA-pick")   # exec Insert After -> picker (ins_at = node + 1)
+    do("s", "insA-fx")
+    do("s", "insA-add")    # splices at index 1
+    print("      chain   %s (len %d) focus=%d" % ([b["abbr"] for b in c.st.board], len(c.st.board), c.st.node))
+    # the tail [+]: scroll off the right end of the chain and add there
+    do("t" * (len(c.st.board) - c.st.node), "add-tail")   # past the last node -> tail [+]
+    do("w", "tail-pick")   # enc0 click: picker (ins_at = len(board) — appends)
+    do("s", "tail-fx")
+    do("s", "tail-add")    # splices at the end, before OUT
     print("      chain   %s (len %d) focus=%d" % ([b["abbr"] for b in c.st.board], len(c.st.board), c.st.node))
     # move: pick up node 0, shift right two slots, drop
     do("w", "menu3")       # slot menu on node 0
@@ -1399,11 +1491,12 @@ def _walk():
 
 
 def _snap(st):
-    n = st.board[st.node]
-    kv = fmt(n["knobs"][st.knob]) if not n["empty"] and n["knobs"] else "--"
-    return ("d=%d node=%d(%s) k=%d[%s] dirty=%d menu=%d pick=%s mv=%d sub=%s name=%s conf=%s "
-            "sysf=%d sys=%d tun=%d pb=%d(%s) snap=%d toast=%r"
-            % (st.depth, st.node, n["abbr"] or "--", st.knob, kv, st.dirty,
+    n = st.board[st.node] if st.board else None
+    kv = fmt(n["knobs"][st.knob]) if n and n["knobs"] else "--"
+    return ("d=%d node=%d(%s) k=%d[%s] add=%s ins=%d dirty=%d menu=%d pick=%s mv=%d sub=%s name=%s "
+            "conf=%s sysf=%d sys=%d tun=%d pb=%d(%s) snap=%d toast=%r"
+            % (st.depth, st.node, (n["abbr"] if n else "--") or "--", st.knob, kv,
+               st.add or "-", st.ins_at, st.dirty,
                st.menu_open, st.pick or "-", st.moving, st.sub or "-", st.naming or "-",
                st.confirm or "-", st.sys_focus, st.sys, st.tuner, st.pb, st.boards[st.pb], st.snap, st.toast))
 

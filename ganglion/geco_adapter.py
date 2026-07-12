@@ -107,7 +107,7 @@ class GecoAdapter(GecoBackend):
         knobs = [self._patch_knob(p) for p in e.patches.values()] + \
                 [self._knob(p) for p in e.ports.values()]
         return {"name": disp or e.name, "abbr": abbr, "bucket": key,
-                "bypass": bool(e.bypassed), "empty": False, "knobs": knobs}
+                "bypass": bool(e.bypassed), "knobs": knobs}
 
     # -- reads -----------------------------------------------------------------
     def board(self):

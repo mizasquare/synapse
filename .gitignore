@@ -33,3 +33,8 @@ pedal/
 
 # local diagnostic (untracked)
 stress_add_test.py
+
+# editor swap files
+*.swp
+*.swo
+*~

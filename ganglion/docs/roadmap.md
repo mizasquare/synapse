@@ -4,7 +4,7 @@
 > [`decisions.md`](decisions.md)(구현 결정 로그 A~O)에, 주제별 상세는
 > [`encoder-rail-todo.md`](encoder-rail-todo.md) · [`workflow-review-todo.md`](workflow-review-todo.md)에 남아 있고
 > 이 문서는 거기 흩어진 "남은 것"만 집계한다. 설계 정본 = [`design.md`](design.md).
-> 마지막 갱신: **2026-07-12 (문서 신설 — 첫 집계. + ③ 노브 스크롤·패치 2×1·marquee 완료 반영.)**
+> 마지막 갱신: **2026-07-12 (문서 신설 — 첫 집계. + ③ 노브 스크롤·패치 2×1·marquee, ⑤ [+] 셀 완료 반영.)**
 >
 > **정렬 원칙 — 우선순위 축:** ① 온메탈 브링업(유일한 진짜 미지수) → ② 기능(미구현 본체) →
 > ③ 뷰 폴리시(상태를 올바로 드러냄) → ④ 아키텍처·성능 → ⑤ 백로그·미세관찰.
@@ -101,7 +101,11 @@
 - [ ] **knob lock 탈출 비대칭** — 락 해제는 ENC1 토글뿐인데 ENC0 hold는 GLANCE로 점프해버린다.
 - [ ] **back 3중 중복** — MENU·SYS·SUB의 `< Back` 항목 + ENC0 hold + 반대손 click. 항목형 Back 제거 여지.
 - [ ] **dirty 비대칭** — board saveas는 dirty를 안 세우고 snap saveas만 세운다. 상단 점 의미가 갈림.
-- [ ] **빈 체인(0노드) insert 진입점** — Insert는 after-only(맨 앞은 Move로). 0노드 보드엔 진입로가 없다.
+> ✅ 2026-07-12 완료: **[+] 셀** — 빈 체인(0노드) 진입점 + Insert after-only 갭이 한꺼번에 닫힘.
+> 파보니 0노드는 진입점이 없는 게 아니라 **크래시**였다(`render`/`rails`/`leds` IndexError; 이펙트
+> 1개짜리 보드에서 그것을 지우면 앱 사망). 체인 커서 축에 머리·꼬리 `[+]` 의사-셀을 두어 0노드를
+> 합법적 상태로 만들고, 슬롯 메뉴는 `Add Before`/`Add After`로 방향을 명시. FakeGeco의 빈 슬롯은
+> 폐기(에뮬 == 실기). 체인 상한은 두지 않음. → [`decisions.md`](decisions.md) R.
 - [ ] **스테레오 입력 옵션** — IN=mono L(`capture_1`) 확정[사용자, 기타]. 나중에 SYSTEM에서 선택 시
       `_reconcile`의 `in_mode` 파라미터화.
 - [ ] **`geco_conform --all` 배치 영구화** — conform-on-load로 충분해서 미구현. 선택적 위생.
@@ -115,7 +119,7 @@
 ## 참조
 
 - [`design.md`](design.md) — **설계 정본.** 하드웨어 스펙 · 2a 인터랙션 모델 · 화면별 결정 · §9 열린결정.
-- [`decisions.md`](decisions.md) — **구현 결정 로그(A~Q).** 왜 그렇게 정했나 + 라이브 검증 기록.
+- [`decisions.md`](decisions.md) — **구현 결정 로그(A~R).** 왜 그렇게 정했나 + 라이브 검증 기록.
 - [`encoder-rail-todo.md`](encoder-rail-todo.md) — 좌측 3px 인코더 레일 (구현 완료, 상세·비용표 보존).
 - [`workflow-review-todo.md`](workflow-review-todo.md) — 워크플로우 검토 Q1–Q7 (전부 착지, 대응 근거 보존).
 - [`plugin-whitelist.md`](plugin-whitelist.md) — 피커 버킷 큐레이션 (→ `geco_whitelist.json`).

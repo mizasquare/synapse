@@ -8,17 +8,19 @@ model / modepctrl / pedalboard-editor. The swap is wiring only — the controlle
 never names a concrete backend.
 
 Data contracts (the shapes the app renders):
-  node   = {"name","abbr","bucket","bypass","empty","knobs":[knob]}
+  node   = {"name","abbr","bucket","bypass","knobs":[knob]}
   knob   = {"n","v","mn","mx","u","k","scale"}   # k in dial/toggle/enum/file
   bucket = {"key","abbr","plugins":[{"display","name","uri","brand","alias"}]}
 
 Method contracts:
   - Reads return a fresh copy the app may cache and render; the backend stays the
     source of truth (mutations only via the methods below).
-  - The chain is a fixed-length list of slots; an empty slot is a node with
-    ``empty=True``. ``move`` reorders it. Reordering/placement is an EDITOR-level
-    concern: the live adapter must port synapse's pedalboard-editor routing
-    (out->in re-wire + graph refresh), not just call a host primitive.
+  - The chain is a VARIABLE-length list of effects — no slots, no holes (this
+    mirrors the live graph: ``remove`` shortens the chain, ``insert`` splices).
+    An empty chain (0 nodes) is legal; the app draws its head ``[+]`` cell.
+    ``move`` reorders. Reordering/placement is an EDITOR-level concern: the live
+    adapter must port synapse's pedalboard-editor routing (out->in re-wire +
+    graph refresh), not just call a host primitive.
   - Mutations return ``None`` on success or an error string (mirrors synapse
     backend); ``save_as``/``delete`` return the affected list index.
 """
@@ -35,11 +37,7 @@ def K(n, v, mn, mx, u="", k="dial", scale=None):
 
 def _node(name, abbr, bucket, bypass, knobs):
     return {"name": name, "abbr": abbr, "bucket": bucket, "bypass": bypass,
-            "empty": False, "knobs": knobs}
-
-
-def _empty():
-    return {"name": "", "abbr": "", "bucket": "", "bypass": False, "empty": True, "knobs": []}
+            "knobs": knobs}
 
 
 def make_board():
@@ -95,7 +93,7 @@ def load_whitelist():
 def make_node(cat, plug):
     tmpl = _KNOB_TMPL.get(cat["key"], lambda: [K("Level", .7, 0, 1)])
     return {"name": plug["display"], "abbr": cat["abbr"], "bucket": cat["key"],
-            "bypass": False, "empty": False, "knobs": tmpl()}
+            "bypass": False, "knobs": tmpl()}
 
 
 PBS = ["Lead Joyful", "Clean Verse", "Ambient Cathedral Wash"]
@@ -231,7 +229,7 @@ class FakeGeco(GecoBackend):
         return None
 
     def remove(self, slot):
-        self._board[slot] = _empty()
+        self._board.pop(slot)                  # variable length, like the live graph
         return None
 
     def move(self, slot, to):
