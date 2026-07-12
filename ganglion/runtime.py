@@ -37,6 +37,7 @@ class Runtime:
         self.tick_s = tick_s
         self.clock = clock
         self.sleep = sleep
+        self._t0 = None
 
     def _draw(self):
         self.sink.show(self.view(self.c.st))
@@ -45,7 +46,10 @@ class Runtime:
 
     def step(self):
         now = self.clock()
-        for ev in self.source.poll(now):
+        if self._t0 is None:
+            self._t0 = now
+        self.c.st.t = now - self._t0        # display clock for the marquee phase;
+        for ev in self.source.poll(now):    # the controller stays time-blind
             self.c.feed(ev)
         self._draw()
         if self.c.st.toast:                     # confirmation splash: hold, then clear

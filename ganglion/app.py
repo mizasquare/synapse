@@ -168,6 +168,10 @@ class AppState:
     cyes: bool = False        # confirm overlay highlight (No/Yes)
     dirty: bool = False
     toast: str = ""
+    # Display clock (seconds since the loop started), written by Runtime before
+    # each draw — the ONLY time in the state. Marquee phase reads it; the
+    # controller never does. Stays 0.0 off-loop (--walk, goldens) => static frames.
+    t: float = 0.0
     # Render caches mirrored from the backend (the source of truth). Seeded by
     # AppController.__init__ and re-synced after each mutation; the view reads
     # only these, so it never touches the backend. Bare AppState() starts empty.
@@ -898,7 +902,7 @@ def _chain(st):
         s.T("CLICK e0 -> add FX", 6, 84, 8)
         _toast_over(s, st)
         return s.img
-    s.T(_fit(s, n["name"], 16, 92), 5, 43, 16)   # clear the abbr at x=100; marquee later
+    _marq(s, n["name"], 5, 43, 16, 92, st.t)     # box stops short of the abbr at x=100
     s.T("BYP" if n["bypass"] else n["abbr"], 100, 45, 8)
     rows = knob_rows(n["knobs"])
     top = _window(len(rows), row_of(rows, st.knob), KROWS)   # scroll by rows, no new state
@@ -908,14 +912,19 @@ def _chain(st):
         for col, i in enumerate(rows[r]):
             kb = n["knobs"][i]
             x, w = (KX[0], KWFULL) if wide else (KX[col], KWHALF)
-            if i == st.knob:
+            on = i == st.knob
+            if on:
                 if st.locked:
                     s.box(x - 3, yy - 2, w, KH - 1)
                 else:
                     s.dashed(x - 3, yy - 2, w, KH - 1, on=2, off=2)
-            s.T(_fit(s, kb["n"], 8, w - 4), x, yy, 8)     # trunc now; marquee later
             vt = 6 if wide else 8                         # patch values are long: Micro5 tier
-            s.T(_fit(s, fmt(kb), vt, w - 4), x, yy + 8, vt)
+            if on:                                        # only the focused cell animates
+                _marq(s, kb["n"], x, yy, 8, w - 4, st.t)
+                _marq(s, fmt(kb), x, yy + 8, vt, w - 4, st.t)
+            else:
+                s.T(_fit(s, kb["n"], 8, w - 4), x, yy, 8)
+                s.T(_fit(s, fmt(kb), vt, w - 4), x, yy + 8, vt)
             if kb["k"] == "dial":
                 s.gbar(x, yy + 17, w - 8, 3, norm(kb))
     _toast_over(s, st)
@@ -941,13 +950,13 @@ def _glance(st):
     on_pb = st.pb == st.pb_cur                          # highlight == the loaded board?
     on_snap = on_pb and st.snap == st.snap_cur
     s.T("PEDALBOARD", 8, 5, 8, ls=1)
-    s.T(_fit(s, st.boards[st.pb], 24, 112), 8, 14, 24)  # marquee later
+    _marq(s, st.boards[st.pb], 8, 14, 24, 112, st.t)    # 24px fits ~6 chars: always scrolls
     if on_pb:
         s.d.rectangle([121, 26, 125, 30], fill=1)       # this board is loaded on the host
     s.hline(0, 56, 128)                                 # position: left rail thumbs (dots removed)
     s.T("SNAPSHOT", 8, 62, 8, ls=1)
     if on_pb:                                           # snap list belongs to the loaded board
-        s.T(_fit(s, st.snaps[st.snap], 24, 112), 8, 71, 24)
+        _marq(s, st.snaps[st.snap], 8, 71, 24, 112, st.t)
         if on_snap:
             s.d.rectangle([121, 83, 125, 87], fill=1)
     else:                                               # highlight is off the loaded board -> stale
@@ -1061,6 +1070,36 @@ def _fit(s, txt, size, maxw):
     return txt
 
 
+# ---- marquee: the long-name answer (roadmap ③) ------------------------------
+# 128px can't hold the names we actually have — board names truncate 100% of the
+# time, node names 75% (measured; see roadmap). A name that reads "NAM LOA" or
+# "CompAmpCabE" is worse than useless, so the *focused* line scrolls instead.
+#
+# Purity: the phase is a function of ``st.t``, a clock the runtime loop writes
+# into the state before each draw (decision Q). The view stays f(st) and the
+# controller stays time-blind; --walk/goldens leave t=0, where offset == 0 and
+# the frame is identical to today's head-truncated one.
+#
+# Discipline (design.md §2): only the line the user is *on* animates — one page
+# band, which is exactly what the future diff driver will have to push. Static
+# context keeps its plain trunc.
+MARQ_DWELL = 1.1      # s held at each end (time to actually read the head/tail)
+MARQ_SPEED = 24.0     # px/s scroll — slow enough to read at 8px tiers
+
+
+def _marq(s, txt, x, y, size, maxw, t, fill=1, bg=0):
+    """Draw txt in a maxw box: static if it fits, else dwell-scroll-dwell on t."""
+    over = s.Tw(size, txt) - maxw
+    if over <= 0:
+        s.T(txt, x, y, size, fill=fill)
+        return
+    travel = over / MARQ_SPEED
+    p = t % (2 * MARQ_DWELL + travel)                 # t=0 -> p=0 -> off=0 (head)
+    off = 0 if p < MARQ_DWELL else \
+        over if p >= MARQ_DWELL + travel else (p - MARQ_DWELL) * MARQ_SPEED
+    s.Tclip(txt, x, y, size, maxw, off=round(off), fill=fill, bg=bg)
+
+
 def _window(n, sel, vis):
     return 0 if n <= vis else max(0, min(sel - vis // 2, n - vis))
 
@@ -1105,24 +1144,24 @@ def _is_patch(knobs, row):
     return len(row) == 1 and knobs[row[0]]["k"] == "file"
 
 
-def _striplist(s, items, sel, x, w, y0, active, size=8, vis=5, rh=14):
+def _striplist(s, items, sel, x, w, y0, active, size=8, vis=5, rh=14, t=0.0):
     """Windowed list inside [x, x+w). Focus ring = filled; locked = hollow.
-    Scroll carets are drawn by the caller (in the gaps) so text keeps full width."""
+    Scroll carets are drawn by the caller (in the gaps) so text keeps full width.
+    The selected row of the *active* strip marquees (inverted); the rest trunc."""
     n = len(items)
     pad = max(1, (rh - 2 - round(fs(size) * 0.72)) // 2)   # center ink in the row
     start = _window(n, sel, vis)
     for r in range(min(vis, n)):
         i = start + r
         y = y0 + r * rh
-        lbl = _fit(s, items[i], size, w - 6)
         if i == sel and active:
             s.box(x, y - 1, w, rh - 2, fill=True)
-            s.T(lbl, x + 3, y + pad, size, fill=0)
-        elif i == sel:                          # inactive strip: hollow marker
+            _marq(s, items[i], x + 3, y + pad, size, w - 6, t, fill=0, bg=1)
+            continue
+        lbl = _fit(s, items[i], size, w - 6)
+        if i == sel:                            # inactive strip: hollow marker
             s.box(x, y - 1, w, rh - 2)
-            s.T(lbl, x + 3, y + pad, size)
-        else:
-            s.T(lbl, x + 3, y + pad, size)
+        s.T(lbl, x + 3, y + pad, size)
 
 
 def _pick_chain(s, st):
@@ -1167,11 +1206,11 @@ def _pick(st):
     on_cat = st.pick == "cat"
     # left strip: category abbrs, big font (matches node-strip abbrs), 4 rows
     cats = [b["abbr"] for b in st.wl]
-    _striplist(s, cats, st.pick_cat, 5, 44, by, active=on_cat, size=16, vis=4, rh=17)  # +5px: clear rail
+    _striplist(s, cats, st.pick_cat, 5, 44, by, active=on_cat, size=16, vis=4, rh=17, t=st.t)  # +5px: rail
     s.d.rectangle([49, by - 2, 49, 115], fill=1)
     # right strip: plugins of the hovered/locked category (preview until locked)
     plugs = [p["display"] for p in st.wl[st.pick_cat]["plugins"]]
-    _striplist(s, plugs, -1 if on_cat else st.pick_fx, 51, 77, by, active=not on_cat, size=8)
+    _striplist(s, plugs, -1 if on_cat else st.pick_fx, 51, 77, by, active=not on_cat, size=8, t=st.t)
     # scroll position is carried by the left rail thumb now (carets removed)
     s.T("e1 turn/sel   e0hold back", 4, 120, 6)
     _toast_over(s, st)

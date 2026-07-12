@@ -72,6 +72,20 @@ class Screen:
     def Tw(self, size, s, ls=0):
         return face(size).width(s, ls)
 
+    def Th(self, size):
+        """Ink height of a tier — the exact band a line of text occupies."""
+        f = face(size)
+        b = f.font.getbbox("ABCXYZ0289gjpq")
+        return b[3] - b[1]
+
+    def Tclip(self, s, x, y, size, maxw, off=0, fill=1, bg=0):
+        """Draw text into a maxw-wide band, shifted left by ``off`` px and clipped
+        to it. The band is composed off-screen and pasted, so glyphs can never
+        bleed past the box — this is what lets a name scroll (app._marq)."""
+        band = Image.new("1", (max(1, maxw), self.Th(size)), bg)
+        face(size).draw(ImageDraw.Draw(band), -off, 0, s, fill)
+        self.img.paste(band, (x, y))
+
     def hline(self, x, y, w):
         self.d.rectangle([x, y, x + w - 1, y], fill=1)
 
