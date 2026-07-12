@@ -68,23 +68,36 @@ class GecoAdapter(GecoBackend):
                 "k": _KIND.get(p.widget_kind, "dial"), "scale": _scale(p.scale_points)}
 
     def _dirlist(self, d):
-        """Files in a patch dir (cached). PATCH_FILE_DIR_MAP dirs are already
-        type-segregated (configs), so no fileType filter — just skip dotfiles/dirs."""
+        """Files in a patch dir (cached), **recursively**, as paths relative to it.
+
+        These libraries nest: NAM ships 12 amp folders (231 models) with only 2
+        loose files at the top, Reverb IRs 141 files behind one folder. A flat
+        listdir showed 2 of 231 — the folders ARE the library. Relative paths keep
+        ``os.path.join(file_path, name)`` (set_param) valid and sort into folder
+        groups. PATCH_FILE_DIR_MAP dirs are type-segregated (configs), so no
+        extension filter — just skip dotfiles."""
         if d not in self._dircache:
-            try:
-                names = sorted(n for n in os.listdir(d)
-                               if not n.startswith(".") and os.path.isfile(os.path.join(d, n)))
-            except OSError:
-                names = []
-            self._dircache[d] = names
+            names = []
+            for root, subs, files in os.walk(d):
+                subs[:] = [x for x in subs if not x.startswith(".")]
+                names += [os.path.relpath(os.path.join(root, f), d)
+                          for f in files if not f.startswith(".")]
+            self._dircache[d] = sorted(names)
         return self._dircache[d]
+
+    def _rel(self, value, d):
+        """The host's absolute patch value as a key into _dirlist(d)."""
+        if not value:
+            return ""
+        r = os.path.relpath(value, d)
+        return os.path.basename(value) if r.startswith("..") else r
 
     def _patch_knob(self, p):
         """A patch (NAM model / cab IR / ...) as a ``k='file'`` knob: the value is
         the current file, rotation walks the directory listing (accel makes long
         lists usable), set writes via ``patch_set``. Shown at the top of the node."""
         files = self._dirlist(p.file_path)
-        cur = os.path.basename(p.value) if p.value else ""
+        cur = self._rel(p.value, p.file_path)
         idx = files.index(cur) if cur in files else 0
         return {"n": p.label, "v": float(idx), "mn": 0.0, "mx": float(max(0, len(files) - 1)),
                 "u": "", "k": "file", "scale": [os.path.splitext(f)[0] for f in files]}
