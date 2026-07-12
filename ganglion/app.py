@@ -172,6 +172,7 @@ class AppState:
     # each draw — the ONLY time in the state. Marquee phase reads it; the
     # controller never does. Stays 0.0 off-loop (--walk, goldens) => static frames.
     t: float = 0.0
+    t_mark: float = 0.0       # t at the last input: marquee phase = t - t_mark
     # Render caches mirrored from the backend (the source of truth). Seeded by
     # AppController.__init__ and re-synced after each mutation; the view reads
     # only these, so it never touches the backend. Bare AppState() starts empty.
@@ -256,6 +257,10 @@ class AppController:
         elif isinstance(ev, Combo):
             if ev.kind == "press":         # global save; guards on its own
                 self.combo()
+        # Any input restarts the marquee (decision Q): scrolling past the head of a
+        # name the user just landed on is unreadable. Not a clock read — the display
+        # clock is already in the state; the controller only anchors to it.
+        self.st.t_mark = self.st.t
 
     def enter(self, name, **kw):
         """Deliberately switch into a mode: the target Mode sets its own flag and
@@ -902,7 +907,7 @@ def _chain(st):
         s.T("CLICK e0 -> add FX", 6, 84, 8)
         _toast_over(s, st)
         return s.img
-    _marq(s, n["name"], 5, 43, 16, 92, st.t)     # box stops short of the abbr at x=100
+    _marq(s, n["name"], 5, 43, 16, 92, phase(st))     # box stops short of the abbr at x=100
     s.T("BYP" if n["bypass"] else n["abbr"], 100, 45, 8)
     rows = knob_rows(n["knobs"])
     top = _window(len(rows), row_of(rows, st.knob), KROWS)   # scroll by rows, no new state
@@ -920,8 +925,8 @@ def _chain(st):
                     s.dashed(x - 3, yy - 2, w, KH - 1, on=2, off=2)
             vt = 6 if wide else 8                         # patch values are long: Micro5 tier
             if on:                                        # only the focused cell animates
-                _marq(s, kb["n"], x, yy, 8, w - 4, st.t)
-                _marq(s, fmt(kb), x, yy + 8, vt, w - 4, st.t)
+                _marq(s, kb["n"], x, yy, 8, w - 4, phase(st))
+                _marq(s, fmt(kb), x, yy + 8, vt, w - 4, phase(st))
             else:
                 s.T(_fit(s, kb["n"], 8, w - 4), x, yy, 8)
                 s.T(_fit(s, fmt(kb), vt, w - 4), x, yy + 8, vt)
@@ -950,13 +955,13 @@ def _glance(st):
     on_pb = st.pb == st.pb_cur                          # highlight == the loaded board?
     on_snap = on_pb and st.snap == st.snap_cur
     s.T("PEDALBOARD", 8, 5, 8, ls=1)
-    _marq(s, st.boards[st.pb], 8, 14, 24, 112, st.t)    # 24px fits ~6 chars: always scrolls
+    _marq(s, st.boards[st.pb], 8, 14, 24, 112, phase(st))    # 24px fits ~6 chars: always scrolls
     if on_pb:
         s.d.rectangle([121, 26, 125, 30], fill=1)       # this board is loaded on the host
     s.hline(0, 56, 128)                                 # position: left rail thumbs (dots removed)
     s.T("SNAPSHOT", 8, 62, 8, ls=1)
     if on_pb:                                           # snap list belongs to the loaded board
-        _marq(s, st.snaps[st.snap], 8, 71, 24, 112, st.t)
+        _marq(s, st.snaps[st.snap], 8, 71, 24, 112, phase(st))
         if on_snap:
             s.d.rectangle([121, 83, 125, 87], fill=1)
     else:                                               # highlight is off the loaded board -> stale
@@ -1087,6 +1092,13 @@ MARQ_DWELL = 1.1      # s held at each end (time to actually read the head/tail)
 MARQ_SPEED = 24.0     # px/s scroll — slow enough to read at 8px tiers
 
 
+def phase(st):
+    """Marquee phase: time since the last input, not since boot. Landing on a new
+    board mid-scroll and reading it from the middle is worse than not scrolling —
+    every gesture rewinds every name to its head (st.t_mark, set in feed())."""
+    return st.t - st.t_mark
+
+
 def _marq(s, txt, x, y, size, maxw, t, fill=1, bg=0):
     """Draw txt in a maxw box: static if it fits, else dwell-scroll-dwell on t."""
     over = s.Tw(size, txt) - maxw
@@ -1206,11 +1218,11 @@ def _pick(st):
     on_cat = st.pick == "cat"
     # left strip: category abbrs, big font (matches node-strip abbrs), 4 rows
     cats = [b["abbr"] for b in st.wl]
-    _striplist(s, cats, st.pick_cat, 5, 44, by, active=on_cat, size=16, vis=4, rh=17, t=st.t)  # +5px: rail
+    _striplist(s, cats, st.pick_cat, 5, 44, by, active=on_cat, size=16, vis=4, rh=17, t=phase(st))  # +5px: rail
     s.d.rectangle([49, by - 2, 49, 115], fill=1)
     # right strip: plugins of the hovered/locked category (preview until locked)
     plugs = [p["display"] for p in st.wl[st.pick_cat]["plugins"]]
-    _striplist(s, plugs, -1 if on_cat else st.pick_fx, 51, 77, by, active=not on_cat, size=8, t=st.t)
+    _striplist(s, plugs, -1 if on_cat else st.pick_fx, 51, 77, by, active=not on_cat, size=8, t=phase(st))
     # scroll position is carried by the left rail thumb now (carets removed)
     s.T("e1 turn/sel   e0hold back", 4, 120, 6)
     _toast_over(s, st)
