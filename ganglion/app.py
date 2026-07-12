@@ -801,7 +801,12 @@ def rails(st):
     if m == "moving":                        # E0 shifts the picked-up node
         return ("solid", "off")
     n = st.board[st.node]                    # chain home
-    z1 = "solid" if st.locked else ("off" if n["empty"] else "idle")
+    if st.locked:                            # E1 owns one value: no list to place
+        z1 = "solid"
+    elif n["empty"] or not n["knobs"]:
+        z1 = "off"
+    else:                                    # browsing knobs IS a list — and once the
+        z1 = (st.knob, len(n["knobs"]))      # grid scrolls, the thumb is the only cue
     return ((st.node, len(st.board)), z1)
 
 
@@ -893,23 +898,26 @@ def _chain(st):
         s.T("CLICK e0 -> add FX", 6, 84, 8)
         _toast_over(s, st)
         return s.img
-    s.T(n["name"], 5, 43, 16)
+    s.T(_fit(s, n["name"], 16, 92), 5, 43, 16)   # clear the abbr at x=100; marquee later
     s.T("BYP" if n["bypass"] else n["abbr"], 100, 45, 8)
-    kx, base, kh, cw2 = [8, 67], 62, 21, 56    # +3px on col0 so its focus ring clears the rail
-    for i, kb in enumerate(n["knobs"][:6]):
-        col, row = i % 2, i // 2
-        if row >= 3:
-            break
-        x, yy = kx[col], base + row * kh
-        if i == st.knob:
-            if st.locked:
-                s.box(x - 3, yy - 2, cw2, kh - 1)
-            else:
-                s.dashed(x - 3, yy - 2, cw2, kh - 1, on=2, off=2)
-        s.T(_fit(s, kb["n"], 8, cw2 - 4), x, yy, 8)      # trunc now; marquee later
-        s.T(_fit(s, fmt(kb), 8, cw2 - 4), x, yy + 8, 8)
-        if kb["k"] == "dial":
-            s.gbar(x, yy + 17, cw2 - 8, 3, norm(kb))
+    rows = knob_rows(n["knobs"])
+    top = _window(len(rows), row_of(rows, st.knob), KROWS)   # scroll by rows, no new state
+    for r in range(top, min(len(rows), top + KROWS)):
+        yy = KBASE + (r - top) * KH
+        wide = _is_patch(n["knobs"], rows[r])
+        for col, i in enumerate(rows[r]):
+            kb = n["knobs"][i]
+            x, w = (KX[0], KWFULL) if wide else (KX[col], KWHALF)
+            if i == st.knob:
+                if st.locked:
+                    s.box(x - 3, yy - 2, w, KH - 1)
+                else:
+                    s.dashed(x - 3, yy - 2, w, KH - 1, on=2, off=2)
+            s.T(_fit(s, kb["n"], 8, w - 4), x, yy, 8)     # trunc now; marquee later
+            vt = 6 if wide else 8                         # patch values are long: Micro5 tier
+            s.T(_fit(s, fmt(kb), vt, w - 4), x, yy + 8, vt)
+            if kb["k"] == "dial":
+                s.gbar(x, yy + 17, w - 8, 3, norm(kb))
     _toast_over(s, st)
     return s.img
 
@@ -1055,6 +1063,46 @@ def _fit(s, txt, size, maxw):
 
 def _window(n, sel, vis):
     return 0 if n <= vis else max(0, min(sel - vis // 2, n - vis))
+
+
+# ---- knob grid: row packing (a patch takes the full width) -------------------
+# The chain's bottom band is a 2-col grid, KROWS rows tall. A patch knob (k="file"
+# — a NAM model, a cab IR) carries a *filename*, which no half cell can hold (7
+# chars), so it claims a whole row: 2x1, ~30 chars at the Micro5 tier. The adapter
+# emits patches first, so they land on top naturally. Rows past KROWS scroll —
+# the window is derived from st.knob, so the view stays a pure f(st).
+KX, KBASE, KH, KROWS = [8, 67], 62, 21, 3   # col0 +3px so its focus ring clears the rail
+KWHALF, KWFULL = 56, 115                    # cell widths (ring-inclusive; both end at x=119)
+
+
+def knob_rows(knobs):
+    """Pack knob indices into rows: a patch owns its row, the rest pair up."""
+    rows, pair = [], []
+    for i, kb in enumerate(knobs):
+        if kb["k"] == "file":
+            if pair:
+                rows.append(pair)
+                pair = []
+            rows.append([i])
+            continue
+        pair.append(i)
+        if len(pair) == 2:
+            rows.append(pair)
+            pair = []
+    if pair:
+        rows.append(pair)
+    return rows
+
+
+def row_of(rows, knob):
+    for r, row in enumerate(rows):
+        if knob in row:
+            return r
+    return 0
+
+
+def _is_patch(knobs, row):
+    return len(row) == 1 and knobs[row[0]]["k"] == "file"
 
 
 def _striplist(s, items, sel, x, w, y0, active, size=8, vis=5, rh=14):

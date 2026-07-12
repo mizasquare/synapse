@@ -23,7 +23,7 @@
 ## 상태별 레일 매핑 & 비용
 | 상태 | ENC0 | ENC1 | 재배치 비용 |
 |------|------|------|------------|
-| CHAIN | list(node) | idle / **solid**(lock 시) | IN·노드스트립·<SYS·노브col0 +3px |
+| CHAIN | list(node) | **list(knob)** / **solid**(lock 시) | IN·노드스트립·<SYS·노브col0 +3px |
 | GLANCE | list(board) | list(snap) | **dots 제거**(레일이 위치 표시), 내용 +2px |
 | SLOT MENU | list(menu) | idle | 좌측 정보패널 x0→x4 |
 | PICKER | **off**(죽음) | list(cat/fx) | 카테고리 스트립 x0→x5, **carets 제거** |
@@ -52,6 +52,13 @@
   → 체인/move=y40(갭이 hline에 정렬, ~3:7) · glance=y56(pb/snap 분할) · 모달=y64(~1:1,
   인코더가 상/하 콘텐츠로 안 갈리므로 중립). 각 화면에서 레일이 자기 콘텐츠 옆에 붙어
   "레일이 노브를 되가리킨다" 원칙이 강화됨. (물리-정렬 → 콘텐츠-정렬로 트레이드.)
+
+## 개정 — CHAIN의 ENC1은 idle이 아니라 list (2026-07-12)
+초안 표는 CHAIN의 ENC1을 `idle`로 뒀다. 노브가 2×3 그리드에 다 들어가던 시절엔 스크롤이 없어
+"목록 위치"라 할 게 없었기 때문. **노브 그리드가 행 단위로 스크롤하게 되면서**(→ [`decisions.md`](decisions.md) P)
+화면 밖 노브가 생겼고, 레일 썸이 "아래에 더 있다"를 알려줄 **유일한 수단**이 됐다.
+→ ENC1 = `list(knob, len(knobs))` (락 시 `solid`, 노브 없으면 `off`)로 승격. 원칙("목록 주역=list")과
+오히려 더 맞고, 기존 GLANCE dots 제거와 같은 결(레일 = 스크롤의 단일 진실)이다.
 
 ## 남은 검토
 - **패널 실측** — 실제 3px 가로줄(1:2)이 목표 명도로 읽히는지 하드웨어 확인(디더 간격 튜닝 여지).

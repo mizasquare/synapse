@@ -66,7 +66,8 @@ Keyboard = encoders: `r`/`t` = ENC0 turn, `f`/`g` = ENC1 turn, `w`/`s` = click,
 
 | Doc | What's in it |
 |---|---|
+| [`docs/roadmap.md`](docs/roadmap.md) | **What's left** — the living roadmap (on-metal bring-up first) |
 | [`docs/design.md`](docs/design.md) | The design — hardware spec, the 2a interaction model, screen-by-screen decisions |
 | [`docs/decisions.md`](docs/decisions.md) | Running implementation-decision log as the mockup was ported to `app.py` |
 | [`docs/plugin-whitelist.md`](docs/plugin-whitelist.md) | How the picker's plugin buckets are curated |
-| [`docs/encoder-rail-todo.md`](docs/encoder-rail-todo.md) · [`docs/workflow-review-todo.md`](docs/workflow-review-todo.md) | Open threads |
+| [`docs/encoder-rail-todo.md`](docs/encoder-rail-todo.md) · [`docs/workflow-review-todo.md`](docs/workflow-review-todo.md) | Design-study threads — both landed; kept for the rationale |
