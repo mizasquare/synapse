@@ -18,3 +18,5 @@
 PyQt6==6.4.2      # Qt Quick (QML) + PyQt6 GUI toolkit binding
 PyQt6-Qt6==6.4.2  # Qt runtime; pin to match the Pi (binding's dep is unpinned >=)
 requests==2.34.2  # core dep imported at modepctrl top (unused at runtime in fake mode)
+numpy==1.26.4     # cochlea (tuner DSP) — Pi ships 1.24.2 (apt), but 1.24.x has no
+                  # Python 3.12 wheels; 1.26.4 is the nearest 1.x that installs on 3.12

@@ -28,21 +28,21 @@
       {"source": "Cab/Out", "target": "playback_2"}
     ],
     "plugins": [
-      {"instance": "Tuner", "uri": "http://example.org/synapse/tuner", "bypassed": false, "x": 200.0, "y": 250.0,
+      {"instance": "Tuner", "uri": "http://example.org/synapse/tuner", "bypassed": false, "x": 200.0, "y": 200.0,
        "ports": [{"symbol": "ref", "value": 440.0}]},
-      {"instance": "Drive", "uri": "http://example.org/synapse/drive", "bypassed": false, "x": 200.0, "y": 800.0,
+      {"instance": "Drive", "uri": "http://example.org/synapse/drive", "bypassed": false, "x": 200.0, "y": 700.0,
        "ports": [{"symbol": "gain", "value": 0.62}, {"symbol": "tone", "value": 0.45}, {"symbol": "level", "value": 0.7}]},
-      {"instance": "Comp", "uri": "http://example.org/synapse/comp", "bypassed": false, "x": 700.0, "y": 800.0,
+      {"instance": "Comp", "uri": "http://example.org/synapse/comp", "bypassed": false, "x": 1450.0, "y": 700.0,
        "ports": [{"symbol": "thresh", "value": -18.0}, {"symbol": "ratio", "value": 4.0}, {"symbol": "attack", "value": 12.0}, {"symbol": "makeup", "value": 6.0}]},
-      {"instance": "Gate", "uri": "http://example.org/synapse/gate", "bypassed": true, "x": 1200.0, "y": 800.0,
+      {"instance": "Gate", "uri": "http://example.org/synapse/gate", "bypassed": true, "x": 2700.0, "y": 700.0,
        "ports": [{"symbol": "thresh", "value": -55.0}, {"symbol": "range", "value": 40.0}]},
-      {"instance": "Recorder", "uri": "http://example.org/synapse/recorder", "bypassed": false, "x": 1700.0, "y": 800.0,
+      {"instance": "Recorder", "uri": "http://example.org/synapse/recorder", "bypassed": false, "x": 200.0, "y": 1200.0,
        "ports": [{"symbol": "format", "value": 1}, {"symbol": "rec", "value": 1}, {"symbol": "thru", "value": 1}]},
-      {"instance": "Meter", "uri": "http://example.org/synapse/meter", "bypassed": false, "x": 2200.0, "y": 800.0,
+      {"instance": "Meter", "uri": "http://example.org/synapse/meter", "bypassed": false, "x": 1450.0, "y": 1200.0,
        "ports": [{"symbol": "reset", "value": 1}]},
-      {"instance": "WidgetLab", "uri": "http://example.org/synapse/widgetlab", "bypassed": false, "x": 2700.0, "y": 800.0,
+      {"instance": "WidgetLab", "uri": "http://example.org/synapse/widgetlab", "bypassed": false, "x": 2700.0, "y": 1200.0,
        "ports": [{"symbol": "gain", "value": 6.0}, {"symbol": "freq", "value": 1000.0}, {"symbol": "taps", "value": 3}, {"symbol": "active", "value": 1}, {"symbol": "reset", "value": 1}, {"symbol": "mode", "value": 2}]},
-      {"instance": "Cab", "uri": "http://moddevices.com/plugins/mod-devel/cabsim", "bypassed": false, "x": 2700.0, "y": 1200.0,
+      {"instance": "Cab", "uri": "http://moddevices.com/plugins/mod-devel/cabsim", "bypassed": false, "x": 2700.0, "y": 1700.0,
        "ports": [{"symbol": "gain", "value": 1.0}]}
     ]
   },
@@ -50,7 +50,7 @@
     "http://example.org/synapse/widgetlab": {
       "name": "Widget Lab", "brand": "Synapse", "category": ["Utility"], "parameters": [],
       "gui": {"monitoredOutputs": ["level", "clip", "bpm", "cent"]},
-      "ports": {"control": {
+      "ports": {"audio": {"input": [{"symbol": "In", "name": "In"}], "output": [{"symbol": "Out", "name": "Out"}]}, "control": {
         "input": [
           {"symbol": "gain", "name": "Gain", "ranges": {"minimum": -20.0, "maximum": 20.0, "default": 0.0}, "units": {"symbol": "dB"}, "properties": []},
           {"symbol": "freq", "name": "Freq", "ranges": {"minimum": 20.0, "maximum": 20000.0, "default": 1000.0}, "units": {"symbol": "Hz"}, "properties": ["logarithmic"]},
@@ -70,7 +70,7 @@
     "http://example.org/synapse/meter": {
       "name": "Level Meter", "brand": "x42", "category": ["Utility"], "parameters": [],
       "gui": {"monitoredOutputs": ["level", "peak", "rms"]},
-      "ports": {"control": {
+      "ports": {"audio": {"input": [{"symbol": "In", "name": "In"}], "output": [{"symbol": "Out", "name": "Out"}]}, "control": {
         "input": [
           {"symbol": "reset", "name": "Reset Peak", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.0}, "units": {"symbol": ""}, "properties": ["integer", "toggled", "trigger"]}
         ],
@@ -84,7 +84,7 @@
     "http://example.org/synapse/recorder": {
       "name": "Recorder", "brand": "Synapse", "category": ["Utility"], "parameters": [],
       "gui": {"monitoredOutputs": ["lmeter", "clip"]},
-      "ports": {"control": {
+      "ports": {"audio": {"input": [{"symbol": "In", "name": "In"}], "output": [{"symbol": "Out", "name": "Out"}]}, "control": {
         "input": [
           {"symbol": "format", "name": "Format", "ranges": {"minimum": 0.0, "maximum": 2.0, "default": 0.0}, "units": {"symbol": ""}, "properties": ["enumeration", "integer"], "scalePoints": [[0.0, "WAV"], [1.0, "FLAC"], [2.0, "MP3"]]},
           {"symbol": "rec", "name": "Record", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.0}, "units": {"symbol": ""}, "properties": ["toggled"]},
@@ -99,7 +99,7 @@
     "http://example.org/synapse/tuner": {
       "name": "Instrument Tuner", "brand": "x42", "category": ["Utility"], "parameters": [],
       "gui": {"monitoredOutputs": ["note", "cent", "freq"]},
-      "ports": {"control": {
+      "ports": {"audio": {"input": [{"symbol": "In", "name": "In"}], "output": []}, "control": {
         "input": [
           {"symbol": "ref", "name": "Ref A", "ranges": {"minimum": 400.0, "maximum": 480.0, "default": 440.0}, "units": {"symbol": "Hz"}, "properties": []}
         ],
@@ -116,7 +116,7 @@
         {"uri": "file:///fake/preset1", "label": "Crunch"},
         {"uri": "file:///fake/preset2", "label": "Clean"}
       ],
-      "ports": {"control": {
+      "ports": {"audio": {"input": [{"symbol": "In", "name": "In"}], "output": [{"symbol": "Out", "name": "Out"}]}, "control": {
         "input": [
           {"symbol": "gain", "name": "Gain", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.5}, "units": {"symbol": ""}, "properties": []},
           {"symbol": "tone", "name": "Tone", "ranges": {"minimum": 0.0, "maximum": 1.0, "default": 0.5}, "units": {"symbol": ""}, "properties": []},
@@ -127,7 +127,7 @@
     "http://example.org/synapse/comp": {
       "name": "Compressor", "brand": "Synapse", "category": ["Dynamics"], "parameters": [],
       "gui": {"monitoredOutputs": ["gr"]},
-      "ports": {"control": {
+      "ports": {"audio": {"input": [{"symbol": "In", "name": "In"}], "output": [{"symbol": "Out", "name": "Out"}]}, "control": {
         "input": [
           {"symbol": "thresh", "name": "Threshold", "ranges": {"minimum": -60.0, "maximum": 0.0, "default": -20.0}, "units": {"symbol": "dB"}, "properties": []},
           {"symbol": "ratio", "name": "Ratio", "ranges": {"minimum": 1.0, "maximum": 20.0, "default": 4.0}, "units": {"symbol": ""}, "properties": ["logarithmic"]},
@@ -142,7 +142,7 @@
     "http://example.org/synapse/gate": {
       "name": "Noise Gate", "brand": "Synapse", "category": ["Dynamics"], "parameters": [],
       "gui": {"monitoredOutputs": ["open"]},
-      "ports": {"control": {
+      "ports": {"audio": {"input": [{"symbol": "In", "name": "In"}], "output": [{"symbol": "Out", "name": "Out"}]}, "control": {
         "input": [
           {"symbol": "thresh", "name": "Threshold", "ranges": {"minimum": -80.0, "maximum": 0.0, "default": -60.0}, "units": {"symbol": "dB"}, "properties": []},
           {"symbol": "range", "name": "Range", "ranges": {"minimum": 0.0, "maximum": 90.0, "default": 40.0}, "units": {"symbol": "dB"}, "properties": []}
@@ -157,7 +157,7 @@
       "parameters": [
         {"valid": true, "uri": "http://moddevices.com/plugins/mod-devel/cabsim-IR-loader#ir", "label": "IR File", "fileTypes": ["cabsim", "audio"]}
       ],
-      "ports": {"control": {
+      "ports": {"audio": {"input": [{"symbol": "In", "name": "In"}], "output": [{"symbol": "Out", "name": "Out"}]}, "control": {
         "input": [
           {"symbol": "gain", "name": "Gain", "ranges": {"minimum": 0.0, "maximum": 2.0, "default": 1.0}, "units": {"symbol": ""}, "properties": []}
         ]

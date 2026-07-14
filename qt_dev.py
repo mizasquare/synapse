@@ -34,6 +34,8 @@ from fakehardware import FakeController
 from qtscheduler import QtScheduler
 from qtview import QtView
 from presenter import Presenter
+from theme_qml import ThemeProvider
+from strings_qml import I18nProvider
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 
@@ -113,6 +115,13 @@ def main():
     ctx.setContextProperty("view", view)
     ctx.setContextProperty("editor", editor)
     ctx.setContextProperty("uiFont", ui_font)
+    # Theme tokens + user-facing strings — same injection as qt_main.py (the QML
+    # binds Theme.*/Tr.* everywhere; without these every color/font/text breaks).
+    # Both providers are kept alive by this function's scope for the event loop.
+    theme_provider = ThemeProvider(ui_font)
+    ctx.setContextProperty("Theme", theme_provider)
+    i18n_provider = I18nProvider()
+    ctx.setContextProperty("Tr", i18n_provider)
     engine.load(QUrl.fromLocalFile(os.path.join(BASE, "qml", "main.qml")))
     if not engine.rootObjects():
         print("[qt_dev] QML failed to load")

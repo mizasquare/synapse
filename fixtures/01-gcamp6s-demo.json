@@ -65,6 +65,7 @@
       "category": ["Dynamics"],
       "parameters": [],
       "ports": {
+        "audio": {"input": [{"symbol": "In", "name": "In"}], "output": [{"symbol": "Out", "name": "Out"}]},
         "control": {
           "input": [
             {
@@ -95,6 +96,7 @@
         {"uri": "file:///fake/preset2", "label": "Clean"}
       ],
       "ports": {
+        "audio": {"input": [{"symbol": "In", "name": "In"}], "output": [{"symbol": "Out", "name": "Out"}]},
         "control": {
           "input": [
             {
@@ -135,6 +137,7 @@
         }
       ],
       "ports": {
+        "audio": {"input": [{"symbol": "In", "name": "In"}], "output": [{"symbol": "Out", "name": "Out"}]},
         "control": {
           "input": [
             {
