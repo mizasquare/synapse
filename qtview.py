@@ -360,6 +360,32 @@ class QtView(QObject):
         if self.presenter:
             self.presenter.set_bpb(value)
 
+    # ------------------------------------------- volume/expression pedal (reflex)
+    # The pedal CONFIG leaf polls pedalStatus while visible (a QML Timer); the
+    # socket round-trip is a local get_status, cheap enough for the GUI thread.
+
+    @Slot(result="QVariant")
+    def pedalStatus(self):
+        """Per-axis pedal snapshot for the CONFIG leaf ({avail, axes}); see
+        presenter.pedal_status for the row shape."""
+        p = self.presenter
+        return p.pedal_status() if p else {"avail": False, "axes": []}
+
+    @Slot(int, str, result=bool)
+    def pedalCapture(self, channel, end):
+        """Calibration wizard captured an endpoint ("heel"/"toe") on a channel."""
+        return bool(self.presenter and self.presenter.pedal_capture(channel, end))
+
+    @Slot(result=bool)
+    def pedalSave(self):
+        """Calibration wizard commits the pending captures."""
+        return bool(self.presenter and self.presenter.pedal_save())
+
+    @Slot(str, int, result=bool)
+    def pedalSetCc(self, axis, cc):
+        """CONFIG stepper picked a new CC number for a pedal axis."""
+        return bool(self.presenter and self.presenter.pedal_set_cc(axis, cc))
+
     @Slot()
     def refreshBoards(self):
         """Populate the overview board-manager list from the live host (call when

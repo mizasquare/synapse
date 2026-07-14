@@ -77,15 +77,19 @@ def main():
     # (watch the needle move). On-device qt_main injects nothing -> real JackSource.
     from cochlea import ToneSweepSource
     tuner_src = lambda: ToneSweepSource(110.0)
+    # Pedal CONFIG leaf: same protocol handler as the on-device service, over a
+    # synthetic pedal (ch0 sweeps heel<->toe, ch1 reads unplugged).
+    from fakereflex import FakeReflexClient
+    reflex_fake = lambda: FakeReflexClient()
     if "--real" in argv:
         # No backend= / no set_backend -> default get_backend() = real ModepController.
         presenter = Presenter(view, scheduler, hardware=FakeController(),
-                              tuner_source_factory=tuner_src)
+                              tuner_source_factory=tuner_src, reflex_factory=reflex_fake)
     else:
         backend = FakeModepController()
         modepctrl.set_backend(backend)
         presenter = Presenter(view, scheduler, backend=backend, hardware=FakeController(),
-                              tuner_source_factory=tuner_src)
+                              tuner_source_factory=tuner_src, reflex_factory=reflex_fake)
     view.set_presenter(presenter)
 
     # Populate the view from the presenter before loading QML, so first paint is
@@ -136,6 +140,17 @@ def main():
         if ov is not None:
             ov.setProperty("hubLeaf", leaf)
             ov.setProperty("hubOpen", True)
+
+    if "--pedalcal" in argv:
+        # dev: open the pedal leaf with the calibration wizard active on ch0
+        # (volume) for a screenshot — the wizard is touch-entered on device.
+        ov = engine.rootObjects()[0].findChild(QObject, "overviewScreen")
+        if ov is not None:
+            ov.setProperty("hubLeaf", "pedal")
+            ov.setProperty("hubOpen", True)
+        pl = engine.rootObjects()[0].findChild(QObject, "pedalLeaf")
+        if pl is not None:
+            pl.setProperty("calCh", 0)
 
     if "--snaps" in argv:
         # dev: open the overview snapshot-browser overlay for a screenshot

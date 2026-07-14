@@ -24,7 +24,7 @@ _STOMP_EXCLUDED = ("simulator", "amp", "cab", "utility")
 
 class Presenter:
     def __init__(self, view, scheduler, backend=None, hardware=None,
-                 tuner_source_factory=None):
+                 tuner_source_factory=None, reflex_factory=None):
         self.view = view
         # scheduler: event-loop timer abstraction (see scheduler.Scheduler).
         # Keeps the presenter and hardware layer free of any GUI-framework import.
@@ -62,6 +62,12 @@ class Presenter:
         self._tuner_source_factory = tuner_source_factory
         self._tuner_engine = None
         self._in_tuner = False
+        # Reflex pedal management client (calibration + CC mapping over the
+        # service's unix socket). Built lazily on first CONFIG-leaf use — the
+        # default is the real socket client; an off-device entry point injects
+        # fakereflex.FakeReflexClient (same seam idiom as tuner_source_factory).
+        self._reflex_factory = reflex_factory
+        self._reflex = None
         # (the tuner LED strobe now lives entirely in LedView; the presenter only
         #  owns the engine lifecycle + exit-on-press.)
         self._poll_thread = None
@@ -1153,6 +1159,86 @@ class Presenter:
             self.pedalboard.bpb = int(value)
         else:
             self._notify(strings.tr('toast.timeSigFail'))
+
+    # ── Volume/expression pedal (reflex management socket, CONFIG leaf) ──
+
+    # Open jack floats to the pull-up, i.e. raw rides above the calibrated toe
+    # (measured on device — see expression-pedal-handoff-DONE.md). Beyond the
+    # ceiling by this fraction of the calibrated span = treated as unplugged.
+    PEDAL_UNPLUG_FACTOR = 0.12
+
+    def _reflex_client(self):
+        if self._reflex is None:
+            if self._reflex_factory is not None:
+                self._reflex = self._reflex_factory()
+            else:
+                from reflexclient import ReflexClient
+                self._reflex = ReflexClient()
+        return self._reflex
+
+    def pedal_status(self):
+        """One pedal-leaf poll: the service's get_status flattened to per-axis
+        rows QML can bind directly ({avail, axes:[{axis, channel, cc, raw,
+        lo, hi, midi, state, pendHeel, pendToe}]}). ``state`` folds the
+        plugged/unplugged judgement so the view stays dumb; ints are -1 when
+        the service has no value (QML-friendly — no nulls)."""
+        st = self._reflex_client().get_status()
+        if not st or not st.get("ok"):
+            return {"avail": False, "axes": []}
+        axes = []
+        for ch, axis in ((0, "volume"), (1, "expression")):
+            m = (st.get("mapping") or {}).get(axis) or {}
+            cal = (st.get("calibration") or {}).get(str(ch)) or {}
+            pend = (st.get("pending") or {}).get(str(ch)) or {}
+            raw = (st.get("raw") or {}).get(str(ch))
+            midi = (st.get("midi") or {}).get(axis)
+            lo, hi = int(cal.get("in_min", 0)), int(cal.get("in_max", 0))
+            span = max(0, hi - lo)
+            if raw is None:
+                state = "nosignal"
+            elif span and raw > hi + span * self.PEDAL_UNPLUG_FACTOR:
+                state = "unplugged"
+            else:
+                state = "ok"
+            axes.append({"axis": axis, "channel": ch,
+                         "cc": int(m.get("cc", -1)),
+                         "raw": -1 if raw is None else int(raw),
+                         "lo": lo, "hi": hi,
+                         "midi": -1 if midi is None else int(midi),
+                         "state": state,
+                         "pendHeel": int(pend["heel"]) if "heel" in pend else -1,
+                         "pendToe": int(pend["toe"]) if "toe" in pend else -1})
+        return {"avail": True, "axes": axes}
+
+    def pedal_capture(self, channel, end):
+        """Record the current raw as the pending heel/toe endpoint (wizard tap)."""
+        resp = self._reflex_client().capture(channel, end)
+        ok = bool(resp and resp.get("ok"))
+        if not ok:
+            self._notify(strings.tr('toast.pedalFail'))
+        return ok
+
+    def pedal_save(self):
+        """Fold pending captures into the calibration (service applies its
+        inward margin and persists)."""
+        resp = self._reflex_client().save()
+        ok = bool(resp and resp.get("ok"))
+        self._notify(strings.tr('toast.pedalSaved') if ok else strings.tr('toast.pedalFail'))
+        return ok
+
+    def pedal_set_cc(self, axis, cc):
+        """CONFIG stepper picked a new CC for an axis; the MIDI channel is
+        preserved (the mapping is axis -> {channel, cc} and only cc is UI)."""
+        st = self._reflex_client().get_status()
+        m = (st.get("mapping") or {}).get(axis) if st and st.get("ok") else None
+        if not m:
+            self._notify(strings.tr('toast.pedalFail'))
+            return False
+        resp = self._reflex_client().set_mapping(axis, m.get("channel", 0), cc)
+        ok = bool(resp and resp.get("ok"))
+        if not ok:
+            self._notify(strings.tr('toast.pedalFail'))
+        return ok
 
     # ── Tap tempo (entered via the C+D footswitch chord) ─────────────────
     def enter_tap_tempo(self):

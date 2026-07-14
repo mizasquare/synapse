@@ -827,9 +827,10 @@ Window {
                                text: Tr.tr("menu.back"); color: cMuted; font: Theme.typeFont("button")
                                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
                                MouseArea { anchors.fill: parent
-                                           onClicked: { overviewScreen.hubLeaf = "menu"; overviewScreen.sysConfirm = false } } }
+                                           onClicked: { overviewScreen.hubLeaf = overviewScreen.hubLeaf === "pedal" ? "config" : "menu"; overviewScreen.sysConfirm = false } } }
                         Text { text: overviewScreen.hubLeaf === "system" ? Tr.tr("menu.titleSystem")
-                                     : overviewScreen.hubLeaf === "config" ? Tr.tr("menu.titleConfig") : Tr.tr("menu.titleHub")
+                                     : overviewScreen.hubLeaf === "config" ? Tr.tr("menu.titleConfig")
+                                     : overviewScreen.hubLeaf === "pedal" ? Tr.tr("menu.titlePedal") : Tr.tr("menu.titleHub")
                                color: cText; font: Theme.typeFont("overlayTitle")
                                anchors.horizontalCenter: parent.horizontalCenter
                                anchors.verticalCenter: parent.verticalCenter }
@@ -998,6 +999,193 @@ Window {
                         Text { text: Tr.tr("config.bpbHelp")
                                color: cDim; font: Theme.typeFont("smallLabel")
                                wrapMode: Text.WordWrap; width: parent.width }
+                        // --- volume pedal (own leaf: jack status / calibration / CC) ---
+                        Rectangle {
+                            width: parent.width; height: 56; radius: 8
+                            color: Theme.color("surface.card"); border.width: 1; border.color: cBorder
+                            Column {
+                                anchors.left: parent.left; anchors.leftMargin: 14
+                                anchors.verticalCenter: parent.verticalCenter; spacing: 3
+                                Text { text: Tr.tr("pedal.section"); color: cText; font: Theme.typeFont("heading") }
+                                Text { text: Tr.tr("pedal.sectionSub"); color: cDim; font: Theme.typeFont("smallLabel") }
+                            }
+                            Text { text: ">"; color: cMuted; font.pixelSize: Theme.typeSize("heading")
+                                   anchors.right: parent.right; anchors.rightMargin: 16
+                                   anchors.verticalCenter: parent.verticalCenter }
+                            MouseArea { anchors.fill: parent; onClicked: overviewScreen.hubLeaf = "pedal" }
+                        }
+                    }
+                    // ---- volume pedal (reflex service: status / calibration / CC) ----
+                    Column {
+                        id: pedalLeaf
+                        objectName: "pedalLeaf"   // qt_dev --pedalcal screenshot hook
+                        visible: overviewScreen.hubLeaf === "pedal"
+                        width: parent.width; spacing: 12
+                        property var pst: ({avail: false, axes: []})
+                        property int calCh: -1     // calibration wizard channel (-1 = idle list)
+                        property int calStep: 0    // 0 capture heel, 1 capture toe, 2 review/save
+                        onVisibleChanged: if (!visible) { calCh = -1; calStep = 0 }
+                        function axisRow(ch) {
+                            for (var i = 0; i < pst.axes.length; i++)
+                                if (pst.axes[i].channel === ch) return pst.axes[i];
+                            return null;
+                        }
+                        function stepCc(row, dir) {
+                            // wrap within the undefined-CC band (102–119, why CC102/103 were
+                            // chosen for the shared bus), skipping the other axis's CC
+                            var other = -1;
+                            for (var i = 0; i < pst.axes.length; i++)
+                                if (pst.axes[i].channel !== row.channel) other = pst.axes[i].cc;
+                            var cc = row.cc;
+                            do {
+                                cc += dir;
+                                if (cc > 119) cc = 102;
+                                if (cc < 102) cc = 119;
+                            } while (cc === other);
+                            if (view.pedalSetCc(row.axis, cc)) pst = view.pedalStatus();
+                        }
+                        Timer {   // live raw/CC while the leaf is up (get_status is one cheap local round-trip)
+                            interval: 250; repeat: true; triggeredOnStart: true
+                            running: overviewScreen.hubOpen && overviewScreen.hubLeaf === "pedal"
+                            onTriggered: pedalLeaf.pst = view.pedalStatus()
+                        }
+                        Text { visible: !pedalLeaf.pst.avail
+                               text: Tr.tr("pedal.missing")
+                               color: cMuted; font: Theme.typeFont("label")
+                               wrapMode: Text.WordWrap; width: parent.width }
+                        // ---- per-axis cards (idle: status + CC stepper + calibrate entry) ----
+                        Repeater {
+                            model: (pedalLeaf.pst.avail && pedalLeaf.calCh < 0) ? pedalLeaf.pst.axes : []
+                            Rectangle {
+                                width: parent.width; height: 96; radius: 8
+                                color: Theme.color("surface.card"); border.width: 1; border.color: cBorder
+                                Column {
+                                    anchors.left: parent.left; anchors.leftMargin: 14
+                                    anchors.verticalCenter: parent.verticalCenter; spacing: 7
+                                    Row {
+                                        spacing: 10
+                                        Text { text: modelData.axis === "volume" ? Tr.tr("pedal.axisVolume") : Tr.tr("pedal.axisExpression")
+                                               color: cText; font: Theme.typeFont("heading") }
+                                        Rectangle { width: 9; height: 9; radius: 4.5
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    color: modelData.state === "ok" ? cGreen
+                                                         : modelData.state === "unplugged" ? Theme.color("state.warn") : cMuted }
+                                        Text { text: modelData.state === "ok" ? Tr.tr("pedal.stateOk")
+                                                   : modelData.state === "unplugged" ? Tr.tr("pedal.stateUnplugged") : Tr.tr("pedal.stateNoSignal")
+                                               anchors.verticalCenter: parent.verticalCenter
+                                               color: modelData.state === "ok" ? cGreen
+                                                    : modelData.state === "unplugged" ? Theme.color("state.warn") : cMuted
+                                               font: Theme.typeFont("smallLabel") }
+                                    }
+                                    Rectangle {   // live raw within the calibrated span
+                                        width: 190; height: 8; radius: 4
+                                        color: Theme.color("surface.control")
+                                        Rectangle {
+                                            height: parent.height; radius: 4
+                                            color: modelData.state === "ok" ? cGreen : Theme.color("state.warn")
+                                            width: {
+                                                var span = modelData.hi - modelData.lo;
+                                                if (modelData.raw < 0 || span <= 0) return 0;
+                                                return parent.width * Math.max(0, Math.min(1, (modelData.raw - modelData.lo) / span));
+                                            }
+                                        }
+                                    }
+                                    Text { text: Tr.tr("pedal.jack") + " " + (modelData.channel + 1) + " · "
+                                                 + Tr.tr("pedal.cc") + " " + modelData.cc + "  →  " + (modelData.midi < 0 ? "—" : modelData.midi)
+                                           color: cDim; font: Theme.typeFont("smallLabel") }
+                                }
+                                Row {
+                                    anchors.right: parent.right; anchors.rightMargin: 12
+                                    anchors.verticalCenter: parent.verticalCenter; spacing: 10
+                                    Rectangle {   // CC minus
+                                        width: 48; height: 44; radius: 8
+                                        color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
+                                        Text { text: "−"; anchors.centerIn: parent; color: cText; font: Theme.typeFont("title") }
+                                        MouseArea { anchors.fill: parent; onClicked: pedalLeaf.stepCc(modelData, -1) }
+                                    }
+                                    Text { text: modelData.cc; width: 44; horizontalAlignment: Text.AlignHCenter
+                                           anchors.verticalCenter: parent.verticalCenter
+                                           color: cGreen; font: Theme.typeFont("title") }
+                                    Rectangle {   // CC plus
+                                        width: 48; height: 44; radius: 8
+                                        color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
+                                        Text { text: "＋"; anchors.centerIn: parent; color: cText; font: Theme.typeFont("title") }
+                                        MouseArea { anchors.fill: parent; onClicked: pedalLeaf.stepCc(modelData, 1) }
+                                    }
+                                    Rectangle {   // calibrate entry
+                                        width: 118; height: 44; radius: 8
+                                        color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
+                                        Text { anchors.centerIn: parent; text: Tr.tr("pedal.calibrate")
+                                               color: cText; font: Theme.typeFont("button") }
+                                        MouseArea { anchors.fill: parent
+                                                    onClicked: { pedalLeaf.calCh = modelData.channel; pedalLeaf.calStep = 0 } }
+                                    }
+                                }
+                            }
+                        }
+                        Text { visible: pedalLeaf.pst.avail && pedalLeaf.calCh < 0
+                               text: Tr.tr("pedal.ccHelp")
+                               color: cDim; font: Theme.typeFont("smallLabel")
+                               wrapMode: Text.WordWrap; width: parent.width }
+                        // ---- calibration wizard (replaces the list while active) ----
+                        Column {
+                            id: calWiz
+                            visible: pedalLeaf.pst.avail && pedalLeaf.calCh >= 0
+                            width: parent.width; spacing: 12
+                            property var row: pedalLeaf.axisRow(pedalLeaf.calCh)
+                            Text { text: (calWiz.row ? (calWiz.row.axis === "volume" ? Tr.tr("pedal.axisVolume") : Tr.tr("pedal.axisExpression")) : "") + " — " + Tr.tr("pedal.calibrate")
+                                   color: cText; font: Theme.typeFont("heading") }
+                            Text { text: pedalLeaf.calStep === 0 ? Tr.tr("pedal.calIntroHeel")
+                                       : pedalLeaf.calStep === 1 ? Tr.tr("pedal.calIntroToe") : Tr.tr("pedal.calReview")
+                                   color: cDim; font: Theme.typeFont("label")
+                                   wrapMode: Text.WordWrap; width: parent.width }
+                            Rectangle {   // live raw, absolute ADC scale (calibration must see beyond the current span)
+                                width: parent.width; height: 22; radius: 6
+                                color: Theme.color("surface.control")
+                                Rectangle {
+                                    height: parent.height; radius: 6; color: cGreen
+                                    width: parent.width * Math.max(0, Math.min(1,
+                                        (calWiz.row && calWiz.row.raw >= 0 ? calWiz.row.raw : 0) / 27000))
+                                }
+                            }
+                            Text { text: "raw " + (calWiz.row && calWiz.row.raw >= 0 ? calWiz.row.raw : "—")
+                                         + "    HEEL " + (calWiz.row && calWiz.row.pendHeel >= 0 ? calWiz.row.pendHeel : "—")
+                                         + " · TOE " + (calWiz.row && calWiz.row.pendToe >= 0 ? calWiz.row.pendToe : "—")
+                                   color: cMuted; font: Theme.typeFont("smallLabel") }
+                            Row {
+                                spacing: 12
+                                Rectangle {   // capture heel -> toe (contextual), then save
+                                    visible: pedalLeaf.calStep < 2
+                                    width: 200; height: 56; radius: 8
+                                    color: Theme.color("btn.affirm.fill"); border.width: 1; border.color: cGreen
+                                    Text { anchors.centerIn: parent
+                                           text: pedalLeaf.calStep === 0 ? Tr.tr("pedal.captureHeel") : Tr.tr("pedal.captureToe")
+                                           color: cGreen; font: Theme.typeFont("button") }
+                                    MouseArea { anchors.fill: parent
+                                                onClicked: if (view.pedalCapture(pedalLeaf.calCh, pedalLeaf.calStep === 0 ? "heel" : "toe"))
+                                                               pedalLeaf.calStep += 1 }
+                                }
+                                Rectangle {
+                                    visible: pedalLeaf.calStep === 2
+                                    width: 200; height: 56; radius: 8
+                                    color: Theme.color("btn.affirm.fill"); border.width: 1; border.color: cGreen
+                                    Text { anchors.centerIn: parent; text: Tr.tr("pedal.save")
+                                           color: cGreen; font: Theme.typeFont("button") }
+                                    MouseArea { anchors.fill: parent
+                                                onClicked: if (view.pedalSave()) { pedalLeaf.calCh = -1; pedalLeaf.calStep = 0 } }
+                                }
+                                Rectangle {
+                                    // cancel leaves any pending capture in the service (the protocol
+                                    // has no clear); harmless — pendings only apply on an explicit save
+                                    width: 130; height: 56; radius: 8
+                                    color: Theme.color("surface.control"); border.width: 1; border.color: cBorder
+                                    Text { anchors.centerIn: parent; text: Tr.tr("pedal.cancel")
+                                           color: cText; font: Theme.typeFont("button") }
+                                    MouseArea { anchors.fill: parent
+                                                onClicked: { pedalLeaf.calCh = -1; pedalLeaf.calStep = 0 } }
+                                }
+                            }
+                        }
                     }
                     // ---- system (real: shutdown / reboot, 2-tap confirm) ----
                     Column {

@@ -124,6 +124,10 @@ def test_protocol():
 
 # ------------------------------------------------------ socket round trip
 def test_socket_roundtrip():
+    if not hasattr(socket, "AF_UNIX"):
+        print("SKIP socket round trip (no AF_UNIX on this platform; protocol "
+              "itself is covered above, the wire is Pi-only)")
+        return
     with tempfile.TemporaryDirectory() as d:
         sock_path = os.path.join(d, "reflex.sock")
         state = reflex.ReflexState(cal_path=os.path.join(d, "cal.json"),
