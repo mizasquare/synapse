@@ -158,6 +158,8 @@ synapse/
 ├── levelmeter.py       # own JACK client → overview IN/OUT level meters
 ├── taptempo.py         # tap-tempo engine (timing + LED metronome)
 ├── reflex.py           # standalone foot-pedal MIDI device (separate service; socket-managed)
+├── reflexclient.py     # app-side client for reflex's management socket (pedal CONFIG leaf)
+├── fakereflex.py       # off-device reflex: real protocol handler over a synthetic pedal
 ├── mastervolume.py     # master-volume controller (raw CC + state echo) → synapse-volume daemon
 ├── configs.py          # MODEP paths, patch-file dir/type maps, synapsin socket path
 ├── utils.py            # helpers
@@ -168,7 +170,7 @@ synapse/
 ├── resources/          # images, fonts (VT323), icons
 ├── mod-tweaks/         # patched mod-ui source + deploy.sh (see below)
 ├── deploy/             # on-device services (volume-service: soft master volume · reflex-service: pedals)
-├── tests/              # qt_smoke · taptempo_selftest · cochlea_selftest · reflex_selftest (run from repo root)
+├── tests/              # qt_smoke · taptempo_selftest · cochlea_selftest · reflex_selftest · pedalconfig_selftest (run from repo root)
 ├── tools/              # dev/bring-up scripts: dump_effects · hwitest · ADStest · test (obsolete — wvkbd retired)
 ├── docs/               # design / diagnosis / roadmap notes
 ├── REFERENCES.md       # external + live-system references

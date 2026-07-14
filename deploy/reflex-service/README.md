@@ -42,7 +42,10 @@ echo '{"cmd":"get_status"}' | nc -U ~/.modep/reflex.sock
 
 응답은 항상 `{"ok": true/false, ...}` + `get_status`에 `version` 필드.
 
-## 캘리브레이션 절차 (SSH 또는 추후 앱 화면)
+## 캘리브레이션 절차 (앱 화면 또는 SSH)
+
+앱 화면이 생겼다(2026-07-15): **⚙MENU → Config → Volume Pedal** — 탈착 판별·캘리 위저드·
+CC 매핑, 클라이언트는 [`reflexclient.py`](../../reflexclient.py). 아래 SSH 절차는 폴백/디버깅용.
 
 ```bash
 # 페달을 힐 끝까지 → capture_heel, 토 끝까지 → capture_toe, 저장

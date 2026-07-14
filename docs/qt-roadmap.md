@@ -3,7 +3,8 @@
 > 🛠 **살아있는 로드맵 (남은 일만).** 완료 항목은 [`qt-roadmap-DONE.md`](qt-roadmap-DONE.md)로 이관,
 > 맥락 필요 시 포인터로 참조. 마일스톤 최심층 상세 = 메모리 `synapse-roadmap`. 이주 스택 결정·검증 =
 > [`qt-migration-FINISHED.md`](qt-migration-FINISHED.md).
-> 마지막 갱신: **2026-07-11 (③ LED seam 완료·이관 + FOCUS 풋스위치 수동배정 재구현 + 삭제보드 부팅 fallback으로 ① 잔여 재확인. 실기 검증 전 항목 통과.)**
+> 마지막 갱신: **2026-07-15 (② 볼륨페달 앱 내 페달 CONFIG 화면 코드 완료 — 탈착 판별·캘리 위저드·CC 매핑,
+> 실기 검증 대기. 윈도 목업 개발환경 복구(`fcd8ea3`)로 목업 우선 개발 워크플로 재개.)**
 >
 > **정렬 원칙 — 우선순위 축:** ① 안정성(크래시/데이터손상/무대 리스크) → ② 기능(미구현 본체) →
 > ③ 설계상 미덕(상태를 올바로 드러냄) → ④ 아키텍처 우아함(관심사 분리·유지보수성) → ⑤ 미관.
@@ -42,8 +43,13 @@ C* Click·오버뷰 렌더·손감각 1차, [`qt-roadmap-DONE.md`](qt-roadmap-DO
 - [ ] **볼륨페달 후속(온디바이스)** — **부팅 페달 감지**(게인토글 프로브, ch0) + **config 사용여부 옵션**.
       ~~언플러그 시퀀스~~ → 구현 불필요 판정(2026-07-05): 분리 후 풀업이 캘리 상한을 넘어 CC 127
       유니티로 자연 고정됨 — 실측 확인, [`expression-pedal-handoff-DONE.md`](expression-pedal-handoff-DONE.md) 노트.
-      코드개선(미적용): 단발→연속모드, EMA+히스테리시스 CC 지터제거. 앱 내 캘리브레이션 화면
-      (reflex 소켓 클라이언트, 프로토콜은 확정됨). (중)
+      코드개선(미적용): 단발→연속모드, EMA+히스테리시스 CC 지터제거. (중)
+      - [x] **앱 내 페달 CONFIG 화면** — 코드 완료 2026-07-15 (`25e119e`), **실기 검증 대기**. ⚙MENU→Config→
+        Volume Pedal: 축별 탈착 판별(raw > 캘리 상한 + 스팬 12% = 풀업 부양)·라이브 raw/CC 표시·
+        3단계 캘리 위저드(힐→토→저장)·CC 스텝퍼(102–119 순환, 상대 축 스킵). `reflexclient.py`(실 소켓)
+        + `fakereflex.py`(실 ReflexState 인프로세스, 합성 페달) — seam은 `Presenter(reflex_factory=)`.
+        오프디바이스 검증: `tests/pedalconfig_selftest.py` 18체크 + 목업 스크린샷. 실기 잔여: 실 소켓
+        접속·실 페달 캘리 1사이클·CC 변경 후 MIDI-learn.
 - [ ] **모멘터리(홀드) 모드** — **이벤트 경로는 이제 열림**(2026-07-11 ④ 리팩터로 `FootswitchReader`가
       `('press',i)`/`('release',i)` 디바운스 엣지를 emit). 남은 건 **소비처**: `_dispatch_fs_events`에서
       press/release를 홀드 액션(누르는 동안 engage·떼면 disengage)에 연결 + 홀드 모드 진입 UX. 단일/콤보
