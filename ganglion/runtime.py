@@ -146,29 +146,79 @@ LED_RGB = {"amber": (255, 120, 0), "green": (0, 200, 60), "blue": (0, 90, 255),
            "off": (0, 0, 0)}
 
 
-def run_device(controller, view, leds):
-    """On-metal driver: seesaw encoders in, luma SH1107 out. Stub-level.
+def run_encoders_terminal(controller, view, leds=None, hud=None, mode="braille"):
+    """Bring-up driver: real seesaw encoders in, **terminal** out (no OLED yet).
 
-    Untested off-hardware; imports are lazy so this module still loads on a dev
-    box. NeoPixel colours use the provisional ``LED_RGB`` map (decision I).
+    The hardware seam is half-populated -- the two encoders are wired and verified
+    (``tools/encoder_bench``) but the SH1107 hasn't arrived. This runs the live
+    app on the real knobs while the frame still renders to the terminal, so the
+    whole state machine gets exercised on metal input before the panel exists.
+    It is ``run_device`` with the luma sink swapped for ``run_terminal``'s: same
+    ``SeesawInput`` source and NeoPixel ``led_out``, ``TerminalSink`` for display.
+
+    No keyboard is read (the encoders are the input), so there is no quit char --
+    Ctrl-C stops it, and the terminal is always restored on the way out.
     """
-    import board
-    import busio
-    from luma.core.interface.serial import i2c
-    from luma.oled.device import sh1107
+    import sys
+    from ganglion.display import TerminalRenderer
     from ganglion.hw.seesaw import SeesawInput
 
-    i2c_bus = busio.I2C(board.SCL, board.SDA)
-    source = SeesawInput(i2c=i2c_bus)
-    device = sh1107(i2c(port=1, address=0x3C), width=128, height=128, rotate=0)
+    import board
+    import busio
 
-    class _LumaSink:
-        def show(self, frame):
-            device.display(frame.convert("1"))
+    source = SeesawInput(i2c=busio.I2C(board.SCL, board.SDA))
+    sink = TerminalSink(TerminalRenderer(mode), sys.stdout, hud)
 
     def led_out(colors):
         for idx, name in enumerate(colors):
             source.set_rgb(idx, LED_RGB.get(name, (0, 0, 0)))
 
-    rt = Runtime(controller, source, _LumaSink(), view, leds=leds, led_out=led_out)
+    rt = Runtime(controller, source, sink, view, leds=leds, led_out=led_out)
+    try:
+        sys.stdout.write("\x1b[?25l\x1b[?1049h\x1b[2J")
+        rt.run()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        try:
+            led_out(("off", "off"))             # don't leave the NeoPixels lit
+        except OSError:
+            pass                                # but never let that strand the terminal
+        sys.stdout.write("\x1b[?1049l\x1b[?25h")
+        sys.stdout.flush()
+
+
+def run_device(controller, view, leds):
+    """On-metal driver: seesaw encoders in, luma SH1107 out (diff-pushed).
+
+    Untested off-hardware; imports are lazy so this module still loads on a dev
+    box. NeoPixel colours use the provisional ``LED_RGB`` map (decision I).
+    The display path is ``hw.oled.DiffSink`` — its diff/pack half is verified
+    lossless off-metal, its ``LumaWriter`` half is the part still to confirm.
+    """
+    import board
+    import busio
+    from luma.core.interface.serial import i2c
+    from luma.oled.device import sh1107
+    from ganglion.hw.oled import DiffSink, LumaWriter
+    from ganglion.hw.seesaw import SeesawInput
+
+    i2c_bus = busio.I2C(board.SCL, board.SDA)
+    source = SeesawInput(i2c=i2c_bus)
+    # rotate=2: panel mounts FFC-down, i.e. 180deg from upright (design.md §2).
+    # That lands on SH1107's slow axis, so a *full* frame costs ~49ms — longer
+    # than the 30ms tick, which would starve the encoder poll sharing this bus.
+    device = sh1107(i2c(port=1, address=0x3C), width=128, height=128, rotate=2)
+
+    # So we never send one. DiffSink pushes only the page-row spans that changed
+    # (typically one 8px band, often nothing at all) and diffs in panel space,
+    # after luma's rotation. Measured on real frame sequences by
+    # ``python3 -m ganglion.tools.oled_bench``.
+    sink = DiffSink(LumaWriter(device), preprocess=device.preprocess)
+
+    def led_out(colors):
+        for idx, name in enumerate(colors):
+            source.set_rgb(idx, LED_RGB.get(name, (0, 0, 0)))
+
+    rt = Runtime(controller, source, sink, view, leds=leds, led_out=led_out)
     rt.run()

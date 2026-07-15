@@ -1039,7 +1039,14 @@ def _glance(st):
     s.hline(0, 56, 128)                                 # position: left rail thumbs (dots removed)
     s.T("SNAPSHOT", 8, 62, 8, ls=1)
     if on_pb:                                           # snap list belongs to the loaded board
-        _marq(s, st.snaps[st.snap], 8, 71, 24, 112, phase(st))
+        # 16px, not 24: at the board's tier this line marquees too, and *two*
+        # 24px names scrolling at once cost more than everything else the app
+        # animates put together (7.0ms/tick, a quarter of the bus — measured,
+        # tools/oled_bench.py). Dropping a tier fits the common names outright
+        # (they stop scrolling), halves the band when a long one doesn't, and
+        # says the true thing anyway: the board is the subject, the snapshot
+        # its qualifier.
+        _marq(s, st.snaps[st.snap], 8, 74, 16, 112, phase(st))
         if on_snap:
             s.d.rectangle([121, 83, 125, 87], fill=1)
     else:                                               # highlight is off the loaded board -> stale
@@ -1562,6 +1569,15 @@ def main(argv):
     if "--device" in argv:
         from ganglion.runtime import run_device
         run_device(c, render, leds)
+        return
+    if "--encoders" in argv:                     # real knobs in, terminal out (no OLED yet)
+        from ganglion.runtime import run_encoders_terminal
+
+        def ehud():
+            return ["ENC0 turn/click/hold", "ENC1 turn/click/hold", "Ctrl-C quit",
+                    "", _snap(c.st)[:40], "leds " + str(leds(c.st))]
+
+        run_encoders_terminal(c, render, leds=leds, hud=ehud)
         return
     run_terminal(c, render, leds=leds, hud=hud)
 

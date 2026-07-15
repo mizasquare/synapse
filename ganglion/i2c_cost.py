@@ -27,12 +27,18 @@ _PAGE_CMD_OVERHEAD = 6
 _DATA_CONTROL = 1
 _TXN_OVERHEAD = 2
 _PER_PAGEROW_OVERHEAD = _PAGE_CMD_OVERHEAD + _DATA_CONTROL + _TXN_OVERHEAD  # 9
+PER_PAGEROW_OVERHEAD = _PER_PAGEROW_OVERHEAD   # public: the diff driver bills per span
 
 FREQS = {"100kHz": 100_000, "400kHz": 400_000, "1MHz": 1_000_000}
 
 
 def _byte_us(freq_hz):
     return 9.0 / freq_hz * 1e6  # 8 data bits + 1 ack
+
+
+def wire_ms(total_bytes, freq="400kHz"):
+    """Wire time for a byte count (what the diff driver actually sends)."""
+    return total_bytes * _byte_us(FREQS[freq]) / 1000.0
 
 
 def _summary(data_bytes, overhead_bytes, extra=None):
@@ -73,16 +79,28 @@ def full_cost():
 
 
 def frame_pages(img):
-    """Pack a PIL image into 16 page-rows of 128 bytes (as the panel stores it)."""
-    px = img.convert("1").load()
+    """Pack a PIL image into page-rows of `width` bytes (as the panel stores it).
+
+    Height must be a multiple of 8; a full 128x128 frame gives 16 rows. Cropped
+    *bands* pack too (the diff driver packs only the rows it is about to push),
+    which is why the row count comes from the image, not from ``PAGES``.
+
+    Pixels are read from one ``tobytes()`` buffer rather than ``px[x, y]``: this
+    runs every tick on the Pi, and the per-pixel PIL accessor is ~5x slower.
+    """
+    w, h = img.size
+    px = img.convert("1").convert("L").tobytes()   # 1 byte/px, row-major, 0 or 255
     pages = []
-    for p in range(PAGES):
-        row = bytearray(WIDTH)
-        for x in range(WIDTH):
+    for p in range(h // PAGE_H):
+        base = p * PAGE_H * w
+        row = bytearray(w)
+        for x in range(w):
+            i = base + x
             b = 0
             for bit in range(PAGE_H):
-                if px[x, p * PAGE_H + bit]:
+                if px[i]:
                     b |= (1 << bit)
+                i += w
             row[x] = b
         pages.append(row)
     return pages

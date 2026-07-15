@@ -22,10 +22,34 @@ lazily in ``__init__`` so importing this module off-device (no I2C, no libs)
 does not fail -- only *instantiating* ``SeesawInput`` touches hardware.
 """
 
+import time
+
 from ganglion.input import GestureRecognizer
 
 _SWITCH_PIN = 24   # seesaw GPIO for the encoder push switch (QT Rotary Encoder)
 _NEOPIXEL_PIN = 6  # seesaw GPIO for the on-board NeoPixel
+
+_IO_RETRIES = 4       # seesaw NACKs a transfer now and then (Errno 121), esp. on
+_IO_BACKOFF_S = 0.001 # a Pi 5 with reads + NeoPixel writes racing -- retry, don't crash.
+
+
+def _retry_io(fn):
+    """Call ``fn`` (a bus read or write), retrying transient I2C NACKs a few times.
+
+    The seesaw firmware occasionally fails to ACK a transfer when it is mid-op (a
+    NeoPixel ``show`` in particular leaves it briefly busy). Measured clean over
+    300 back-to-back reads, but it *does* fire when reads and writes interleave on
+    the shared bus -- and the app touches both every tick -- so all per-tick I/O
+    goes through here. Re-raises if it never recovers, which would mean a real
+    wiring/address fault, not a blip.
+    """
+    for attempt in range(_IO_RETRIES):
+        try:
+            return fn()
+        except OSError:
+            if attempt == _IO_RETRIES - 1:
+                raise
+            time.sleep(_IO_BACKOFF_S)
 
 
 class _Module:
@@ -42,21 +66,31 @@ class _Module:
         self._button = digitalio.DigitalIO(self._ss, _SWITCH_PIN)
         self._pixel = neopixel.NeoPixel(self._ss, _NEOPIXEL_PIN, 1)
         self._last_pos = self._enc.position
+        self._last_rgb = None
 
     def read_delta(self):
         """Encoder detents since the last read (signed, direction-corrected)."""
-        pos = self._enc.position
+        pos = _retry_io(lambda: self._enc.position)
         raw = pos - self._last_pos
         self._last_pos = pos
         return -raw if self._invert else raw
 
     def read_pressed(self):
         """True while the switch is held (pull-up: pressed pulls the line low)."""
-        return not self._button.value
+        return not _retry_io(lambda: self._button.value)
 
     def set_rgb(self, color):
-        """``color``: (r, g, b) 0-255, or 0 to turn off."""
-        self._pixel.fill(color)
+        """``color``: (r, g, b) 0-255, or 0 to turn off.
+
+        The caller (Runtime) repaints every tick, so skip the write when the
+        colour is unchanged -- a NeoPixel ``show`` is a heavy transfer to spend
+        33x/s for nothing, and every needless one is another chance to collide
+        with the encoder reads sharing the bus (the write NACK we retry below)."""
+        rgb = (0, 0, 0) if color == 0 else tuple(color)
+        if rgb == self._last_rgb:
+            return
+        _retry_io(lambda: self._pixel.fill(rgb))
+        self._last_rgb = rgb
 
 
 class SeesawInput:
@@ -67,8 +101,11 @@ class SeesawInput:
     whichever loop shape fits -- both return the same events.)
     """
 
-    def __init__(self, i2c=None, addresses=(0x36, 0x37), invert=(False, False),
+    def __init__(self, i2c=None, addresses=(0x36, 0x37), invert=(True, True),
                  recognizer=None):
+        # invert default = True: on this build CW read as negative (cursor moved
+        # the wrong way) -- flip both so CW = forward/down. Per-module override
+        # stays available if the two ever get wired opposite.
         if i2c is None:
             import board
             import busio

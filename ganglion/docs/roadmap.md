@@ -18,8 +18,9 @@
 인코더 레일·워크플로우 검토 Q1–Q7 전부 착지했고, `GecoAdapter`가 **살아있는 MODEP/pisound에 붙어
 실 오디오 그래프를 편집**한다(param/bypass/place/insert/move/remove/save/rename/delete + patch 위젯,
 전부 라이브 검증). synapse 코어 수정은 `modepctrl.py` 확장 한 건뿐.
-**미지수는 실물 하드웨어 하나로 수렴한다** — OLED·인코더 모듈이 아직 온메탈 검증 전이고,
-`runtime.run_device`와 `hw/seesaw.py`는 **스텁**(하드웨어 없이 작성, 미실행)이다.
+**남은 미지수는 OLED 하나로 수렴한다** — 인코더 2개는 온메탈 검증 완료(`hw/seesaw.py` 스텁 →
+실물, 아래 ①), OLED는 아직 미착이라 `runtime.run_device`만 미검증. 그 사이 실물 노브로 앱
+전체를 돌려볼 수 있게 `--encoders`(입력=인코더, 출력=터미널) 브링업 러너를 뒀다.
 
 ---
 
@@ -28,18 +29,25 @@
 앱 로직은 터미널·라이브 백엔드로 다 검증됐다. 반면 **물리 I/O 경로는 한 번도 실행된 적이 없다.**
 이 축이 닫히기 전엔 나머지 항목의 우선순위도 확정할 수 없다(실측이 설계를 바꿀 수 있으므로).
 
-- [ ] **I2C 실측 & 주소 확정** — 설치 후 `i2cdetect -y 1`: 디스플레이(0x3C/0x3D) + 인코더 2개
-      (0x36 / 점퍼로 0x37) + **pisound와의 주소·버스 충돌 확인**. → `hw/seesaw.py` TODO ①.
-- [ ] **`hw/seesaw.py` 실기 확정 (스텁 → 실물)** — ② 회전 부호(`invert=`로 모듈별 반전),
-      ③ 스위치/NeoPixel 핀(문서상 기본값 24/6, 보드 리비전 대조). 폴링은 **확정**
+- [~] **I2C 실측 & 주소 확정** — 인코더 2개 `i2cdetect -y 1`에서 **0x36/0x37 확인**(Pi 5).
+      OLED(0x3C/0x3D)는 모듈 미착이라 미확인. pisound 주소·버스 충돌은 OLED 합류 시 재확인.
+- [x] **`hw/seesaw.py` 실기 확정 (스텁 → 실물)** — 온메탈 검증 완료(`tools/encoder_bench`).
+      ② 회전 부호: 기본 방향이 반대라 **`invert=(True,True)` 기본값**으로 뒤집음(모듈별 override 유지).
+      ③ 스위치/NeoPixel 핀 24/6 **동작 확인**. 추가 발견: seesaw가 read/write를 간헐 NACK(Errno 121,
+      특히 NeoPixel show와 겹칠 때)해 **`_retry_io`(4회) 필수** + **색 무변화 시 write 스킵**(매 틱
+      led_out이 불필요한 show를 33회/s 쏘던 것 차단). 폴링은 **확정**
       (INT는 read-to-clear라 오프로드 아님 — [`design.md`](design.md) §3). 33Hz 폴 기준.
 - [ ] **`runtime.run_device` 실기 기동** — luma.oled `sh1107` 지원 버전 확정 + 실 패널 렌더 확인.
-      현재 `rotate=0`으로 열지만 **FFC-down 고정 방향이라 rotate 강제가 필요**(design.md의 90° 전제와
-      충돌 — 실측이 정본). 여기서 방향을 못 박는다.
-- [ ] **OLED diff 기반 on-change 드라이버** — ①의 진짜 성능 레버. 지금은 매 틱 풀프레임 전송이라
-      I2C 버스를 독차지한다(인코더 폴 굶김 위험). **바뀐 페이지 밴드만 전송**하는 diff 드라이버로
-      바꾼다. 코스트 모델은 [`../i2c_cost.py`](../i2c_cost.py), 규율은 design.md §2. rotate 성능 비교는
-      무의미(방향이 고정이므로) — 레버는 diff 하나뿐. (중)
+      **장착 180° 잠정 확정 → `rotate=2`로 연다**(design.md §2). 실기에서 0~3 중 똑바로 뜨는 값으로
+      최종 확정 — 뒤집혀 뜨면 0. 어느 쪽이든 0/180°는 느린 레짐이라 풀프레임 천장은 ~10fps.
+- [x] **OLED diff 기반 on-change 드라이버** — ①의 진짜 성능 레버. 풀프레임 49ms는 30ms 틱보다 길어
+      인코더 폴을 굶겼다. [`hw/oled.py`](../hw/oled.py) `DiffSink`가 바뀐 페이지행 컬럼 스팬만 밀고,
+      무변화 틱엔 0바이트. `runtime.run_device`에 물림. **무손실 검증 + 실측: `python3 -m
+      ganglion.tools.oled_bench`** (버스 점유 3~21%, 표는 design.md §2). 남은 건 아래 ⑥ 하나.
+- [ ] **`hw/oled.LumaWriter` 실기 확정 (스텁 → 실물)** — diff/패킹 절반은 off-metal로 검증됐고,
+      **실제 바이트를 SH1107에 꽂는 절반만 미검증**. 확인할 3가지(도크스트링 TODO): 페이지 주소지정
+      모드(luma sh1107 init이 vertical addressing으로 남겨두는지), 컬럼 오프셋(가로로 밀리면 이것),
+      페이지 축 전치(풀 푸시는 맞는데 부분 푸시가 엉뚱한 밴드에 뜨면 이것). (중)
 - [ ] **1MHz I2C 오버클럭 채택 여부** — 위 diff 드라이버로 충분하면 불필요. 신뢰성 실측 후 판단.
 - [ ] **LED 팔레트 실값 확정 (결정 I)** — `runtime.LED_RGB`는 잠정값. 실 NeoPixel에서 **주간 시인성·
       밝기·off 처리** 튜닝. 버킷색 구분이 실제로 눈에 들어오는지가 판정 기준.

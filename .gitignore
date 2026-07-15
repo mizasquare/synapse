@@ -38,3 +38,6 @@ stress_add_test.py
 *.swp
 *.swo
 *~
+
+# hardware bring-up venv (system-site; not committed)
+venv/
