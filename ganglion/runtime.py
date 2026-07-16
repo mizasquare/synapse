@@ -17,27 +17,45 @@ Seams:
   source.poll(now) -> [events]         (KeyboardSource / hw.seesaw.SeesawInput)
   sink.show(frame)                     (TerminalSink / luma device)
   led_out((name0, name1)) -> None      (optional; device NeoPixels)
+  power.idle(elapsed) / .wake()        (optional; hw.oled.PanelPower)
 """
 
 import time as _time
 
 
 class Runtime:
-    """One poll loop over an injected input source and display sink."""
+    """One poll loop over an injected input source and display sink.
+
+    It also owns **idle panel power** (``power``, optional): dim then blank the
+    display once the knobs have gone quiet, so a static UI does not burn itself
+    into the glass. That lives here and not in the controller because it is a
+    hardware state (contrast, 0xAE) and not a pixel -- putting it in the pure app
+    would break ``view = f(st)`` and contaminate the golden frames. The loop
+    already holds the clock, so it costs no new state in ``AppState``.
+
+    Note it tracks its own ``_t_input`` rather than reading ``st.t_mark``, which
+    is also "time of last input". ``t_mark`` is the *marquee phase anchor*
+    (decision Q) -- a rendering concern -- and hanging panel lifetime off it
+    would silently break the day someone re-anchors the marquee. It could not be
+    used anyway: waking swallows the input, so ``feed()`` never runs to set it.
+    """
 
     def __init__(self, controller, source, sink, view, *, leds=None, led_out=None,
-                 splash_s=0.5, tick_s=0.03, clock=_time.monotonic, sleep=_time.sleep):
+                 power=None, splash_s=0.5, tick_s=0.03, clock=_time.monotonic,
+                 sleep=_time.sleep):
         self.c = controller
         self.source = source
         self.sink = sink
         self.view = view
         self.leds = leds
         self.led_out = led_out
+        self.power = power
         self.splash_s = splash_s
         self.tick_s = tick_s
         self.clock = clock
         self.sleep = sleep
         self._t0 = None
+        self._t_input = None
 
     def _draw(self):
         self.sink.show(self.view(self.c.st))
@@ -47,16 +65,25 @@ class Runtime:
     def step(self):
         now = self.clock()
         if self._t0 is None:
-            self._t0 = now
+            self._t0 = self._t_input = now
         self.c.st.t = now - self._t0        # display clock for the marquee phase;
-        for ev in self.source.poll(now):    # the controller stays time-blind
+        events = self.source.poll(now)      # the controller stays time-blind
+        if events:
+            self._t_input = now
+        if self.power:
+            if events and self.power.blanked:
+                self.power.wake()               # off a dark panel the first input
+                events = []                     # only wakes it: never edit what
+            self.power.idle(now - self._t_input)  # the user cannot see (cf. F)
+        for ev in events:
             self.c.feed(ev)
-        self._draw()
-        if self.c.st.toast:                     # confirmation splash: hold, then clear
-            self.sleep(self.splash_s)
-            self.c.st.toast = ""
-            self._draw()
-        self.sleep(self.tick_s)
+        if not (self.power and self.power.blanked):     # a blank panel keeps its
+            self._draw()                                # GDDRAM; drawing into it
+            if self.c.st.toast:                 # confirmation splash: hold, then clear
+                self.sleep(self.splash_s)
+                self.c.st.toast = ""
+                self._draw()
+        self.sleep(self.tick_s)                         # is pure bus waste
 
     def run(self, should_stop=lambda: False):
         while not should_stop():
@@ -145,6 +172,12 @@ LED_RGB = {"amber": (255, 120, 0), "green": (0, 200, 60), "blue": (0, 90, 255),
            "purple": (150, 0, 255), "red": (255, 0, 0), "grey": (60, 60, 60),
            "off": (0, 0, 0)}
 
+# Idle thresholds for the panel (hw.oled.PanelPower). Constants for now: there is
+# nowhere to persist a user's choice yet — no settings store exists, and these
+# move into it when it does (roadmap ③).
+IDLE_DIM_S = 30.0
+IDLE_OFF_S = 300.0
+
 
 def run_encoders_terminal(controller, view, leds=None, hud=None, mode="braille"):
     """Bring-up driver: real seesaw encoders in, **terminal** out (no OLED yet).
@@ -204,7 +237,7 @@ def run_device(controller, view, leds):
     import busio
     from luma.core.interface.serial import i2c
     from luma.oled.device import sh1107
-    from ganglion.hw.oled import DiffSink, LumaWriter
+    from ganglion.hw.oled import DiffSink, LumaWriter, PanelPower
     from ganglion.hw.seesaw import SeesawInput
 
     i2c_bus = busio.I2C(board.SCL, board.SDA)
@@ -232,11 +265,17 @@ def run_device(controller, view, leds):
     # when nothing moved).
     sink = DiffSink(LumaWriter(device), preprocess=device.preprocess)
 
+    # Idle burn-in defence. The UI is mostly static furniture and the device sits
+    # on a desk for hours, so quiet knobs have to reach the glass: dim at 30s,
+    # blank at 5min. OFF_S is provisional -- pick it by living with it.
+    power = PanelPower(device, dim_s=IDLE_DIM_S, off_s=IDLE_OFF_S)
+
     def led_out(colors):
         for idx, name in enumerate(colors):
             source.set_rgb(idx, LED_RGB.get(name, (0, 0, 0)))
 
-    rt = Runtime(controller, source, sink, view, leds=leds, led_out=led_out)
+    rt = Runtime(controller, source, sink, view, leds=leds, led_out=led_out,
+                 power=power)
     try:
         rt.run()                       # Ctrl-C is the only way out: no quit gesture
     except KeyboardInterrupt:

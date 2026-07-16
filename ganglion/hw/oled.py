@@ -128,6 +128,67 @@ class LumaWriter:
         self.device.data(list(data))
 
 
+class PanelPower:
+    """Idle dimming and blanking — burn-in defence, not a screensaver.
+
+    OLED pixels wear in proportion to lit time, and this UI is mostly static
+    furniture: the header, the rail and the labels sit in the same place for as
+    long as the device is on. The app will hold one frame all night, which is
+    the textbook way to burn a panel. So idleness has to reach the glass.
+
+    Two levers, both already on the luma device:
+
+      1. ``contrast(dim)`` once idle passes ``dim_s``. design.md §2 files
+         contrast as a weak lever, but that verdict was **about flicker**. For
+         wear it is a real one -- the full range measured 49->87mA, so the floor
+         cuts drive current ~44%. The same measurement found the brightness
+         change barely perceptible, which is exactly what this state wants: it
+         must stay readable, and it does.
+      2. ``hide()`` (SH1107 ``0xAE``) once idle passes ``off_s``. This is the
+         actual fix -- dimming only slows the wear down.
+
+    ``0xAE`` turns the scan off but leaves GDDRAM intact, so blanking loses no
+    pixels and waking needs no redraw of its own.
+
+    Mechanism and policy, but **no clock**: the thresholds live here, the time
+    does not. The Runtime owns time and calls ``idle(elapsed)`` / ``wake()``,
+    which keeps this testable with no hardware and no waiting.
+    """
+
+    # 0x7F is what luma's sh1107 init sets, so "on" restores the panel's own
+    # nominal rather than a number we picked. 0x01 is the floor.
+    def __init__(self, device, *, dim_s=30.0, off_s=300.0, on=0x7F, dim=0x01):
+        self.device = device
+        self.dim_s = dim_s
+        self.off_s = off_s
+        self.on_level = on
+        self.dim_level = dim
+        self.state = "on"                       # "on" | "dim" | "off"
+
+    @property
+    def blanked(self):
+        return self.state == "off"
+
+    def idle(self, elapsed):
+        """Apply the state ``elapsed`` seconds without input implies."""
+        self._set("off" if elapsed >= self.off_s else
+                  "dim" if elapsed >= self.dim_s else "on")
+
+    def wake(self):
+        self._set("on")
+
+    def _set(self, want):
+        if want == self.state:
+            return                              # edge-only: a steady state must
+        if self.state == "off":                 # not put bytes on the encoders'
+            self.device.show()                  # bus every tick
+        if want == "off":
+            self.device.hide()
+        else:
+            self.device.contrast(self.on_level if want == "on" else self.dim_level)
+        self.state = want
+
+
 class CountingWriter:
     """Fake writer: records spans instead of sending them (bench + tests)."""
 

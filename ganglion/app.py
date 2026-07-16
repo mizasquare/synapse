@@ -1527,6 +1527,74 @@ class _CaptureSink:
         self.frames, self.last = self.frames + 1, frame
 
 
+class _FakePanel:
+    """Records the panel-power commands instead of sending them (for --sleeptest)."""
+
+    def __init__(self):
+        self.log = []
+
+    def contrast(self, level):
+        self.log.append("contrast(0x%02X)" % level)
+
+    def hide(self):
+        self.log.append("hide")
+
+    def show(self):
+        self.log.append("show")
+
+
+def _sleeptest():
+    """Burn-in defence under a fake clock — the one thing we can't test by waiting.
+
+    Living through it takes five minutes and a pair of eyes, and eyes cannot see
+    "no bytes went out". So run the real PanelPower through the real Runtime with
+    time as a variable, and check the four things that matter: it dims on
+    schedule, it blanks on schedule, a blank panel stops being drawn into, and
+    the first input off a blank panel wakes it *without* editing anything.
+    """
+    from ganglion.runtime import Runtime
+    from ganglion.hw.oled import PanelPower
+    from ganglion.input import KeyboardInput
+    clk = [0.0]
+    panel = _FakePanel()
+    c = AppController()
+    src = _ScriptSource(KeyboardInput(), [])            # silence: nobody touches it
+    rt = Runtime(c, src, _CaptureSink(), render, leds=leds, tick_s=1.0,
+                 power=PanelPower(panel, dim_s=30.0, off_s=300.0),
+                 clock=lambda: clk[0], sleep=lambda dt: clk.__setitem__(0, clk[0] + dt))
+    marks, ok = {}, True
+    for _ in range(302):                                # 1s ticks: 0 -> 301
+        now, was = clk[0], rt.power.state
+        rt.step()
+        if rt.power.state != was:
+            marks[rt.power.state] = now
+    for want, at in (("dim", 30.0), ("off", 300.0)):
+        hit = marks.get(want)
+        ok &= hit == at
+        print("%-4s at %-6s (want %ss)  %s"
+              % (want, hit, at, "OK" if hit == at else "FAIL"))
+
+    frames = rt.sink.frames                             # a dark panel gets nothing
+    for _ in range(10):
+        rt.step()
+    ok &= rt.sink.frames == frames
+    print("blank: frames %d -> %d over 10 ticks  %s"
+          % (frames, rt.sink.frames, "OK" if rt.sink.frames == frames else "FAIL"))
+
+    src.chars, node = ["t"], c.st.node                  # 't' would nav if it landed
+    rt.step()
+    woke = rt.power.state == "on" and c.st.node == node and rt.sink.frames > frames
+    ok &= woke
+    print("wake:  state=%s node=%d->%d (swallowed) frames=%d  %s"
+          % (rt.power.state, node, c.st.node, rt.sink.frames, "OK" if woke else "FAIL"))
+
+    want = ["contrast(0x01)", "hide", "show", "contrast(0x7F)"]
+    ok &= panel.log == want                             # edge-only: 313 ticks, 4 cmds
+    print("panel: %s  %s" % (panel.log, "EDGE-ONLY-OK" if panel.log == want else
+                             "FAIL want=%s" % want))
+    print("SLEEPTEST", "PASS" if ok else "FAIL")
+
+
 def _looptest():
     """Drive the Runtime under a fake clock (no TTY) — proves loop + splash (F)."""
     from ganglion.runtime import Runtime
@@ -1554,6 +1622,9 @@ def main(argv):
         return
     if "--looptest" in argv:
         _looptest()
+        return
+    if "--sleeptest" in argv:
+        _sleeptest()
         return
     from ganglion.runtime import run_terminal
     if "--live" in argv:                       # inject the live synapse backend
