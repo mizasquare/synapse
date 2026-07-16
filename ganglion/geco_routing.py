@@ -57,6 +57,15 @@ def desired_wiring(nodes, in_mode="mono"):
     of inline fx (``ain>0 and aout>0``) IN -> fx -> ... -> OUT; taps (``aout==0``:
     meters/recorders) fed from the nearest prior trunk fx (or IN); sources
     (``ain==0``: metronomes) into OUT.
+
+    The trunk always terminates in OUT, **including when it is empty** -- then
+    ``prev`` is still IN and the pair below is the IN -> OUT passthrough. The
+    port inherited an ``if fx:`` guard here from ``_quick_wire_keys`` and with it
+    a bug: a chain with no inline fx left the guitar wired to nothing at all.
+    That is not an exotic state -- an empty chain ([+] cell, decision R), a
+    lone metronome (source), or a lone meter (tap) all reach it, and the last
+    two look like a populated chain while being silent. A pedal that goes quiet
+    when you remove its last effect is broken; passthrough is the floor.
     """
     pos = {n["inst"]: i for i, n in enumerate(nodes)}
     fx = [n for n in nodes if n["ain"] and n["aout"]]
@@ -65,8 +74,7 @@ def desired_wiring(nodes, in_mode="mono"):
     for n in fx:
         edges += _pair(_outs(prev, in_mode), _ins(n))
         prev = n
-    if fx:
-        edges += _pair(_outs(prev, in_mode), _ins("OUT"))
+    edges += _pair(_outs(prev, in_mode), _ins("OUT"))
     for n in nodes:
         if n["ain"] and n["aout"]:
             continue

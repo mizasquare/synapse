@@ -471,9 +471,16 @@ class AppController:
             self._toast("TODO: " + it)
 
     def combo(self):
+        """ENC0+ENC1 — the global snapshot save (2a).
+
+        The backend call is the whole point and it was missing: this toasted
+        "SNAPSHOT SAVED" and cleared the dirty dot without persisting anything,
+        so the gesture read as a save, looked like a save, and lost the work.
+        """
         st = self.st
         if st.moving or st.pick or st.sub or st.naming or st.confirm or st.sys_focus:
             return
+        self.backend.save("snap")
         st.dirty = False                       # Q7: keep current depth; splash confirms
         self._toast("SNAPSHOT SAVED")
 
@@ -1595,12 +1602,25 @@ def _sleeptest():
     print("SLEEPTEST", "PASS" if ok else "FAIL")
 
 
+class _SpyGeco(FakeGeco):
+    """FakeGeco that records the persist calls it was asked for (for --looptest)."""
+
+    def __init__(self):
+        super().__init__()
+        self.saves = []
+
+    def save(self, which):
+        self.saves.append(which)
+        return super().save(which)
+
+
 def _looptest():
     """Drive the Runtime under a fake clock (no TTY) — proves loop + splash (F)."""
     from ganglion.runtime import Runtime
     from ganglion.input import KeyboardInput
     clk = [0.0]
-    c = AppController()
+    be = _SpyGeco()
+    c = AppController(backend=be)
     src = _ScriptSource(KeyboardInput(), ["t", "x", "t"])   # nav, combo(save), nav
     rt = Runtime(c, src, _CaptureSink(), render, leds=leds, splash_s=0.5, tick_s=0.03,
                  clock=lambda: clk[0], sleep=lambda dt: clk.__setitem__(0, clk[0] + dt))
@@ -1612,6 +1632,11 @@ def _looptest():
     ok = c.st.toast == "" and dt >= 0.5
     print("x (combo) depth=%d toast=%r  splash_dt=%.2f  %s"
           % (c.st.depth, c.st.toast, dt, "SPLASH-OK" if ok else "SPLASH-FAIL"))
+    # The combo *said* SNAPSHOT SAVED long before it saved anything, and the fake
+    # backend persists to RAM, so only the call itself can be checked.
+    saved = be.saves == ["snap"]
+    print("          backend.save calls=%r  %s"
+          % (be.saves, "SAVE-OK" if saved else "SAVE-FAIL want ['snap']"))
     rt.step()
     print("t (nav)   pb=%d  frames=%d" % (c.st.pb, rt.sink.frames))
 
