@@ -1,0 +1,36 @@
+[Unit]
+Description=Ganglion (GECO1: 2 encoders + SH1107 OLED, headless pedal UI)
+# --live builds its GecoAdapter against the MODEP host *at construction*
+# (geco_adapter.__init__ -> modepctrl.get_backend() -> _load_current()), so it
+# cannot come up before mod-host answers. After= only orders the start, it does
+# not wait for readiness -- Restart=always is what actually covers the early-boot
+# race, the same bargain synapse-ui.service takes ("fails loud, we retry").
+# Wants=, not Requires=: a mod-host restart shouldn't tear this down, the retry
+# loop already handles it.
+After=modep-mod-host.service local-fs.target sound.target
+Wants=modep-mod-host.service
+
+[Service]
+# Runs as `miza`: in the `i2c` group, which is what /dev/i2c-1 (root:i2c 0660)
+# needs for both the seesaw encoders (0x36/0x37) and the OLED (0x3D).
+User=miza
+WorkingDirectory=/home/miza/synapse
+# The hardware bring-up venv (system-site; gitignored, see ganglion/README).
+# It carries luma.oled + adafruit-blinka + adafruit-circuitpython-seesaw, which
+# the system python cannot get (externally-managed). Adjust if the venv moves.
+ExecStart=/home/miza/synapse/venv/bin/python ganglion/app.py --device --live
+
+# THE IMPORTANT LINE. systemd stops services with SIGTERM, and python's default
+# SIGTERM handling kills the process outright -- no `finally`, no `atexit`. That
+# would strand the hardware lit: run_device's cleanup (NeoPixels off) lives in a
+# finally, and luma blanks/powers down the panel from an atexit hook. Neither
+# would run, so every `systemctl stop` would leave the OLED burning a static
+# frame (burn-in) and both LEDs on. SIGINT raises KeyboardInterrupt instead,
+# which run_device already catches -- verified on metal.
+KillSignal=SIGINT
+
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
