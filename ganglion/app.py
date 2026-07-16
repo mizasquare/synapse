@@ -69,7 +69,12 @@ def fmt(kb):
     return s + ((" " + kb["u"]) if kb["u"] else "")
 
 
-SYSITEMS = ["Tuner", "Brightness", "MIDI Ch", "About", "< Back"]
+# No "MIDI Ch": GECO has nothing to send. synapse's MIDI is expression/volume
+# pedal plumbing (reflex CC102/103 -> GAAD67) and this rig has no pedals -- the
+# label came along with the port, not with a use. Inbound already works without
+# us: MODEP changes snapshots on PC ch1 today, with zero app code. See design.md
+# §9-9, closed.
+SYSITEMS = ["Tuner", "Brightness", "About", "< Back"]
 
 # ---- SAVE AS naming (reuses synapse's word bank; 0 core edits) --------------
 # Reuses synapse's SAVE AS word pool (qtview/editor_bridge), the SAME shared

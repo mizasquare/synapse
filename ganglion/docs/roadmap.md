@@ -59,9 +59,13 @@ finalize다.
       brightness/MIDI 필드가 없고, `configs.py`는 상수 모듈이라 writer가 없다(공유물이라 손대지
       않는다 — §1 재사용 경계). 아래 Brightness·MIDI Ch·WiFi·번인 시간값이 **전부 여기 걸려
       있으므로** 이걸 먼저 세운다. `configs.LOCAL_STORAGE` 아래 JSON 하나면 충분. (중, **선결**)
-- [ ] **SYSTEM 메뉴 항목 3개** — `Brightness` · `MIDI Ch` · `About`이 아직 `TODO:` 토스트 스텁
-      ([`../app.py`](../app.py):471 — 구 로드맵의 `app.py:431`은 스테일이었다). Tuner·Back만 실동작.
-      렌더(`_sys()`)가 5개를 동일하게 그려 **스텁이 실동작 항목과 구분되지 않는다.** (소)
+- [ ] **SYSTEM 메뉴 항목 2개** — `Brightness` · `About`이 아직 `TODO:` 토스트 스텁
+      ([`../app.py`](../app.py):471). Tuner·Back만 실동작. 렌더(`_sys()`)가 전 항목을 동일하게 그려
+      **스텁이 실동작 항목과 구분되지 않는다.** (소)
+      > ✅ 2026-07-17: **`MIDI Ch` 제거**[사용자 동의] — 3개→2개. 설계가 없는 라벨이었다(스펙 0,
+      > design.md §7의 열린 질문 한 줄이 전부). GECO는 **보낼 게 없고**(synapse의 MIDI = 페달
+      > 배선인데 이 기기엔 페달이 없다), 인바운드는 **MODEP가 이미 처리한다**(PC ch1 → 스냅샷,
+      > 지금 켜져 있음). 검증할 장비도 없어 만들면 영원히 미검증으로 남았을 것. → design.md §9-9 닫음.
   - **Brightness는 contrast seam이 필요하다** — luma device가 `run_device()` 지역변수
     ([`../runtime.py`](../runtime.py):225)라 컨트롤러가 참조를 못 한다. `LumaWriter`가 이미
     `self.device`를 들고 있으니 거기 노출하는 게 최단 경로. **`PanelPower`와 같은 seam** — 그건
@@ -135,7 +139,9 @@ finalize다.
 - [ ] **키보드 타이밍-accel** — 하드웨어 전 테스트용(키보드는 |delta|=1이라 D의 가속이 no-op). 선택.
 - [ ] **TUNER 레일 ↔ Q1 정합** — 레일은 E0-solid(=E0 hold 나감)로 그리는데 코드는 "아무 press 이탈".
       레일은 힌트라 상충은 아님. 튜너 이탈을 E0-hold 전용으로 좁힐지는 Q1 재검 시 함께.
-- [ ] **GECO 자체 MIDI 정체성** (design.md §9-9) · **헤더 이름 티어**(24px+마퀴 vs 16px, §9-10) — 열린 결정.
+- [ ] **헤더 이름 티어** (24px+마퀴 vs 16px, design.md §9-10) — 열린 결정.
+- [ ] **GAAD67 잔재 정리** — `/etc/rc.local`의 `amidithru "GAAD67"`가 이 박스에서도 뜨는데
+      (클론 이미지 잔재) `reflex`/`mastervol`이 inactive라 **아무도 안 쓴다**. 지울지 확인. (소)
 - [ ] **관찰: connect 500 버스트** — 2026-07-16 23:17~23:20 `journalctl -u ganglion`에 `/effect/connect`
       HTTP 500이 134건. 그 이후로는 없다(MODEP 재기동 흔적으로 보임). 재발하면 조사, 아니면 폐기.
 
