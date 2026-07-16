@@ -24,10 +24,12 @@ Seam: ``DiffSink.show(frame)`` is the sink the Runtime already calls. The bytes
 leave through an injected *writer* -- ``LumaWriter`` on metal, a counting fake in
 the bench -- so all the diff logic above is testable with no hardware present.
 
-STATUS: the diff/pack half is verified off-metal -- ``python3 -m
-ganglion.tools.oled_bench`` replays every span into a fake panel and asserts its
-framebuffer equals the drawn frame on every tick. ``LumaWriter``, the half that
-actually puts bytes on the wire, is **unverified on hardware** -- see its TODOs.
+STATUS: verified end to end. The diff/pack half is proven off-metal -- ``python3
+-m ganglion.tools.oled_bench`` replays every span into a fake panel and asserts
+its framebuffer equals the drawn frame on every tick. ``LumaWriter``, the half
+that puts bytes on the wire, is now proven **on the panel** -- ``python3 -m
+ganglion.tools.oled_probe`` renders the same frame through luma's own
+``display()`` and through this driver and they agree.
 """
 
 from PIL import ImageChops
@@ -90,21 +92,30 @@ class DiffSink:
 class LumaWriter:
     """Write one page-row span to a real SH1107 through luma's command/data seam.
 
-    STUB -- written against the SH1107 datasheet + luma.oled, unverified on metal.
-    Three things to pin down when the panel arrives (mirrors hw/seesaw.py):
+    Verified on metal (``tools/oled_probe``, panel at 0x3D). The three unknowns
+    this class carried as TODOs while it was a stub all resolved in its favour --
+    recorded here because each was a real fork, not a formality:
 
-      1. **Addressing mode.** These are page-addressing commands (0xB0|page, then
-         column low/high). luma's sh1107 init may leave the chip in *vertical*
-         addressing, in which case the pointer must be reset once here.
-      2. **Column offset.** Some 128x128 SH1107 modules map column 0 to an offset
-         (commonly 0). If the image comes out shifted horizontally, this is why.
-      3. **Row-vs-column pages.** If a full push renders correctly but a partial
-         one lands on the wrong band, the page axis is transposed against ours.
+      1. **Addressing mode.** luma's ``sh1107`` init pumps a bare ``0x20``. That
+         is SSD1306's *two-byte* MEMORYMODE opcode, and luma reuses the SSD1306
+         constant table for this chip -- but on an SH1107 ``0x20`` is a complete
+         one-byte command meaning **page addressing** (``0x21`` would be
+         vertical). So the chip is already in the mode these commands assume and
+         the pointer needs no reset. The feared case was the opposite.
+      2. **Column offset.** 0. luma's own ``display()`` writes column 0 for the
+         128x128 variant (``displayoffset=0x00``), and our border lands on the
+         edge, so this module does not shift its columns.
+      3. **Row-vs-column pages.** Not transposed: partial pushes land in the band
+         they were packed for (``oled_probe --stage diff``).
 
-    All three fail *visibly* on the first frame (shifted, torn, or wrong-band),
-    so ``python3 ganglion/app.py --device`` is the test -- there is nothing
-    subtle to catch here, which is why this stayed a stub rather than a guess
-    dressed up as a fallback.
+    We address the page and column exactly as luma's ``display()`` does, only
+    with a span instead of the full 128 -- same registers, and their order does
+    not matter as each command sets an independent one.
+
+    The stakes are the whole reason the app can run: a full frame measures
+    **220ms** here (luma packs pixels in a per-pixel Python loop, on a 100kHz
+    bus), which is 7 ticks long and would starve the encoders sharing the bus.
+    A diffed tick is ~10ms, and an unchanged one 0.4ms.
     """
 
     def __init__(self, device, col_offset=0):

@@ -29,19 +29,40 @@ from ganglion.input import GestureRecognizer
 _SWITCH_PIN = 24   # seesaw GPIO for the encoder push switch (QT Rotary Encoder)
 _NEOPIXEL_PIN = 6  # seesaw GPIO for the on-board NeoPixel
 
-_IO_RETRIES = 4       # seesaw NACKs a transfer now and then (Errno 121), esp. on
-_IO_BACKOFF_S = 0.001 # a Pi 5 with reads + NeoPixel writes racing -- retry, don't crash.
+# These NeoPixels are uncomfortably bright at full scale on a device you sit in
+# front of -- 0.5 was still too bright on metal, hence 0.1. Dim here rather than
+# by editing ``runtime.LED_RGB``: that map encodes what a colour *means*
+# (decision I — category/state), and folding brightness into it would tangle the
+# two, so every future palette edit would have to re-derive the dimming. This
+# scales on the way to the wire and leaves the palette's hues intact. (Power was
+# never the reason — 2 LEDs full white = ~58mA with ~340mA of budget spare —
+# this is purely comfort.)
+#
+# CAVEAT: a WS2812 has no global current control, so ``brightness`` can only
+# scale the 8-bit values before they go out. At 0.1 the palette lands on 2..26
+# per channel — grey (60,60,60) becomes (6,6,6) — and down there the channels no
+# longer track each other, so hues drift and the dimmer colours start to
+# converge. If two categories stop being tellable apart, that is this line's
+# fault, not the palette's: raise the floor here before retuning LED_RGB.
+_LED_BRIGHTNESS = 0.1
+
+_IO_RETRIES = 6       # seesaw NACKs a transfer now and then (Errno 121), esp. on
+_IO_BACKOFF_S = 0.002 # a Pi 5 with reads + NeoPixel writes racing -- retry, don't crash.
+_IO_BACKOFF_CAP_S = 0.02
 
 
 def _retry_io(fn):
     """Call ``fn`` (a bus read or write), retrying transient I2C NACKs a few times.
 
     The seesaw firmware occasionally fails to ACK a transfer when it is mid-op (a
-    NeoPixel ``show`` in particular leaves it briefly busy). Measured clean over
-    300 back-to-back reads, but it *does* fire when reads and writes interleave on
-    the shared bus -- and the app touches both every tick -- so all per-tick I/O
-    goes through here. Re-raises if it never recovers, which would mean a real
-    wiring/address fault, not a blip.
+    NeoPixel ``show`` in particular leaves it busy for a few ms). Measured clean
+    over 300 back-to-back reads, but it *does* fire when reads and writes
+    interleave on the shared bus -- and the app touches both every tick -- so all
+    per-tick I/O goes through here. Backoff **escalates** (2,4,8,16,20 ms): a flat
+    few-ms window was too short to outlast the busy patch after a paint and still
+    crashed (seen on metal). ~50ms worst case is invisible at 33Hz and only paid
+    on the rare blip. Re-raises if it never recovers -- a real wiring/address
+    fault, not a transient.
     """
     for attempt in range(_IO_RETRIES):
         try:
@@ -49,13 +70,13 @@ def _retry_io(fn):
         except OSError:
             if attempt == _IO_RETRIES - 1:
                 raise
-            time.sleep(_IO_BACKOFF_S)
+            time.sleep(min(_IO_BACKOFF_S * (2 ** attempt), _IO_BACKOFF_CAP_S))
 
 
 class _Module:
     """One seesaw rotary-encoder-switch-RGB board."""
 
-    def __init__(self, i2c, address, invert=False):
+    def __init__(self, i2c, address, invert=False, brightness=_LED_BRIGHTNESS):
         # Lazy imports: only needed on-device, kept out of module import.
         from adafruit_seesaw import seesaw, rotaryio, digitalio, neopixel
 
@@ -64,7 +85,8 @@ class _Module:
         self._enc = rotaryio.IncrementalEncoder(self._ss)
         self._ss.pin_mode(_SWITCH_PIN, self._ss.INPUT_PULLUP)
         self._button = digitalio.DigitalIO(self._ss, _SWITCH_PIN)
-        self._pixel = neopixel.NeoPixel(self._ss, _NEOPIXEL_PIN, 1)
+        self._pixel = neopixel.NeoPixel(self._ss, _NEOPIXEL_PIN, 1,
+                                        brightness=brightness)
         self._last_pos = self._enc.position
         self._last_rgb = None
 
@@ -102,7 +124,7 @@ class SeesawInput:
     """
 
     def __init__(self, i2c=None, addresses=(0x36, 0x37), invert=(True, True),
-                 recognizer=None):
+                 recognizer=None, brightness=_LED_BRIGHTNESS):
         # invert default = True: on this build CW read as negative (cursor moved
         # the wrong way) -- flip both so CW = forward/down. Per-module override
         # stays available if the two ever get wired opposite.
@@ -111,7 +133,7 @@ class SeesawInput:
             import busio
             i2c = busio.I2C(board.SCL, board.SDA)
         self._i2c = i2c
-        self._modules = [_Module(i2c, addr, inv)
+        self._modules = [_Module(i2c, addr, inv, brightness=brightness)
                          for addr, inv in zip(addresses, invert)]
         self.gestures = recognizer or GestureRecognizer()
 

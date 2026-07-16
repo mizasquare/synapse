@@ -14,7 +14,7 @@ each encoder's detents land on both LEDs at once -- confirming read direction,
 the switch, and NeoPixel output in one glance. Press either encoder to quit
 (Ctrl-C also works).
 
-Run: ganglion/venv/bin/python -m ganglion.tools.encoder_bench
+Run: venv/bin/python -m ganglion.tools.encoder_bench
 """
 
 import colorsys

@@ -191,10 +191,14 @@ def run_encoders_terminal(controller, view, leds=None, hud=None, mode="braille")
 def run_device(controller, view, leds):
     """On-metal driver: seesaw encoders in, luma SH1107 out (diff-pushed).
 
-    Untested off-hardware; imports are lazy so this module still loads on a dev
-    box. NeoPixel colours use the provisional ``LED_RGB`` map (decision I).
-    The display path is ``hw.oled.DiffSink`` — its diff/pack half is verified
-    lossless off-metal, its ``LumaWriter`` half is the part still to confirm.
+    Both halves of the hardware seam are now verified on metal — the encoders by
+    ``tools/encoder_bench``, the panel by ``tools/oled_probe``. Imports stay lazy
+    so this module still loads on a dev box. NeoPixel colours use the provisional
+    ``LED_RGB`` map (decision I).
+
+    Note this does *not* set ``device.persist``: luma's atexit hook blanking and
+    powering the panel down is the right behaviour for the app (it is wrong only
+    for a test screen, which is why ``oled_probe`` opts out of it).
     """
     import board
     import busio
@@ -205,15 +209,27 @@ def run_device(controller, view, leds):
 
     i2c_bus = busio.I2C(board.SCL, board.SDA)
     source = SeesawInput(i2c=i2c_bus)
-    # rotate=2: panel mounts FFC-down, i.e. 180deg from upright (design.md §2).
-    # That lands on SH1107's slow axis, so a *full* frame costs ~49ms — longer
-    # than the 30ms tick, which would starve the encoder poll sharing this bus.
-    device = sh1107(i2c(port=1, address=0x3C), width=128, height=128, rotate=2)
+    # rotate=0, confirmed on the panel (tools/oled_probe). design.md §2 reasoned
+    # from "mounts FFC-down, therefore 180deg" to rotate=2 and marked it 잠정 —
+    # the deduction was wrong: the panel reads upright with no rotation at all.
+    # Costs nothing either way (0 and 180 are both SH1107's slow axis), which is
+    # exactly why it went unnoticed until there was glass to look at.
+    #
+    # 0x3D, not the 0x3C every SH1107 example uses: Adafruit strap the 128x128
+    # module to 0x3D (i2cdetect -y 1 => 36 37 3d = both encoders + this panel).
+    #
+    # A full frame measures ~220ms here (184ms of it wire time at the 100kHz the
+    # bus shipped at; the rest is luma's per-pixel Python packing loop). At the
+    # 400kHz config.txt now asks for it is still ~80ms — nearly 3 ticks, and the
+    # encoders poll on this bus. The diff sink below is not an optimization.
+    device = sh1107(i2c(port=1, address=0x3D), width=128, height=128, rotate=0)
 
     # So we never send one. DiffSink pushes only the page-row spans that changed
     # (typically one 8px band, often nothing at all) and diffs in panel space,
     # after luma's rotation. Measured on real frame sequences by
-    # ``python3 -m ganglion.tools.oled_bench``.
+    # ``python3 -m ganglion.tools.oled_bench``; confirmed on the panel itself by
+    # ``python3 -m ganglion.tools.oled_probe`` (10ms/tick vs 220ms full, and 0.4ms
+    # when nothing moved).
     sink = DiffSink(LumaWriter(device), preprocess=device.preprocess)
 
     def led_out(colors):
@@ -221,4 +237,15 @@ def run_device(controller, view, leds):
             source.set_rgb(idx, LED_RGB.get(name, (0, 0, 0)))
 
     rt = Runtime(controller, source, sink, view, leds=leds, led_out=led_out)
-    rt.run()
+    try:
+        rt.run()                       # Ctrl-C is the only way out: no quit gesture
+    except KeyboardInterrupt:
+        pass
+    finally:
+        # The panel takes care of itself — ``persist`` is left unset, so luma's
+        # atexit hook blanks and powers it down. The NeoPixels have no such hook
+        # and would simply stay lit, so put them out by hand.
+        try:
+            led_out(("off", "off"))
+        except OSError:
+            pass                       # a dead bus must not mask the real error
