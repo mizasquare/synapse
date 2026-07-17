@@ -36,8 +36,8 @@ It was neither. The client **could not get real-time scheduling**, because
 ``LimitRTPRIO`` is a systemd unit setting and ``limits.conf`` only ever reaches PAM
 sessions. It ran SCHED_OTHER, the one non-FIFO client in a sync (``-S``) graph. The
 journal said so at startup and was read eight hours late. Two lines in the unit
-took it to 22/10min — the rig's own baseline — and the callback thread is now
-``SCHED_FIFO 90``. See ``deploy/ganglion-service/ganglion.service`` and decisions X.
+collapsed the rate (to what looked like 22/10min — walked back below) and the
+callback thread is now ``SCHED_FIFO 90``. See the unit and decisions X.
 
 So the GIL was never the constraint here, and the numbers say why: this callback
 costs **0.025ms, 0.9% of the 2.67ms period**, and triggers no GC at all (it frees
