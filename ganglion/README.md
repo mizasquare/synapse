@@ -43,6 +43,7 @@ python3 ganglion/app.py --looptest # loop + splash (F) under a fake clock
 python3 ganglion/app.py --sleeptest # idle dim/off (S) under a fake clock — no hardware, no waiting
 python3 ganglion/app.py --settingstest # persistence (V), including 7 kinds of corrupt file
 python3 ganglion/app.py --radiotest # radio argv (W) — injected runner, no radio touched
+python3 ganglion/app.py --fonttest  # text cache (X) draws pixel-for-pixel what ImageDraw.text does
 ```
 
 On the device it runs as a systemd unit — see [`../deploy/ganglion-service/`](../deploy/ganglion-service/).
@@ -57,7 +58,7 @@ Keyboard = encoders: `r`/`t` = ENC0 turn, `f`/`g` = ENC1 turn, `w`/`s` = click,
 | `config.py` | **This rig's numbers** — panel address/rotation, brightness levels, idle timings. Measured, not deduced |
 | `settings.py` | **What the user chose**, across a boot — atomic + forgiving, because this thing gets unplugged |
 | `app.py` | The 2a state machine — modes, controller, `render(st)`, the whole UI spine |
-| `render.py` | 1-bit drawing primitives + pixel-font tiers for the 128×128 OLED |
+| `render.py` | 1-bit drawing primitives + pixel-font tiers for the 128×128 OLED. Text rasters are cached per string — re-rasterising them was **97% of every frame**, and a frame is now 0.26ms (X) |
 | `input.py` | Input events + gesture recognition (rotate / press / combo), shared by every source |
 | `runtime.py` | Headless main loop — ties input, view, splash, LEDs, idle panel power, settings and radios together |
 | `display.py` | Mono framebuffer + the terminal renderer |

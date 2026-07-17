@@ -5,7 +5,12 @@
 > [`encoder-rail-todo.md`](encoder-rail-todo.md) · [`workflow-review-todo.md`](workflow-review-todo.md)에 남아 있고
 > 이 문서는 거기 흩어진 "남은 것"만 집계한다. 설계 정본 = [`design.md`](design.md).
 > 마지막 갱신: **2026-07-17** — 전면 재작성(온메탈축 폐지) 후 같은 날: 번인 방어(S) · 버그 2건(T) ·
-> MIDI Ch 제거 · Brightness(U) · 설정 저장소(V) · 라디오(W)까지 닫힘. **①에 About·monitorfeed·튜너만 남았다.**
+> MIDI Ch 제거 · Brightness(U) · 설정 저장소(V) · 라디오(W) · **텍스트 래스터 캐시(X)**까지 닫힘.
+> **①에 About·레벨미터·튜너만 남았다.**
+>
+> ⚠️ **이 문서가 "튜너는 monitorfeed 배선이 전제"라고 적었던 것은 오류였다**(결정 H에서 물려받음).
+> 튜너는 monitorfeed를 안 쓴다 — `cochlea`가 자기 JACK 클라이언트로 `capture_1`을 직접 뜬다.
+> 없는 의존을 만들어 순서를 거꾸로 잡고 있었다. 자세한 건 [`decisions.md`](decisions.md) H의 폐기 블록.
 >
 > **정렬 원칙 — 우선순위 축:** ① 기능(미구현 본체) → ② 뷰 폴리시 → ③ 온메탈 잔여 →
 > ④ 아키텍처·성능 → ⑤ 백로그. (번인 방어·버그 축은 열린 날 닫혔다 — 위 ✅ 둘.)
@@ -86,11 +91,23 @@ finalize다.
 - [ ] **SYSTEM `About`** — 마지막 남은 `TODO:` 토스트 스텁이자 **유일한 미구현 액션**(값 항목은
       클릭에 반응하지 않는다 — 결정 W 후속). 무엇을 보일지 미결: 버전? 보드수? I2C 주소?
       **hotspot SSID/IP?** 위 `[열림]`과 같은 주제라 같이 정하는 게 자연스럽다. (소, 결정 필요)
-- [ ] **monitorfeed 배선 (결정 H)** — IN/OUT 헤더 레벨(−14.2/−4.3)이 **하드코딩**. synapse
-      `monitorfeed.py`를 `Runtime.step()`에 틱으로 얹는다. 코스트 모델상 좁은 밴드 갱신은 저렴. (중)
+- [ ] **레벨미터 배선 (결정 H)** — IN/OUT 헤더 레벨(−14.2/−4.3)이 **하드코딩**. ~~monitorfeed~~가
+      아니라 synapse `levelmeter.py`(자체 `jack.Client`, IN=`capture_1/2` 탭 · OUT=playback 피더
+      미러링)를 `Runtime`의 심으로 얹는다 — `power`/`settings`/`radio`와 같은 자리지만 **방향이
+      반대**(하드웨어→상태, `st.t`와 같은 부류). **[사용자] 필수 — 입력 클리핑 확인용.**
+      온메탈 기동 확인 완료(2026-07-17), 전제였던 X도 닫혀 **인프로세스로 간다**. 숫자는 live amp가
+      아니라 **5초 윈도 peak**(synapse `pack()`과 동일 — live는 매 틱 떨려 헤더 밴드를 매번 민다).
+      포맷 = `"%.1f dB" % 20*log10(amp)`. 남음: `Meter` 심 + `st.inlvl`/`st.outlvl` + `_chain` 렌더.
+      `st` 기본값을 `None`(→ `"--"`)으로 둘지 결정 필요 — **JACK 없는 dev/터미널에서 가짜 −14.2를
+      보이면 거짓말**이지만, README 스크린샷(`assets/screens/*.png`)이 같이 바뀐다. (중)
 - [ ] **튜너 실동작** — 지금은 **껍데기**다. `tcents=6` / `tnote="A"`가 `AppState` 기본값
       ([`../app.py`](../app.py):156-157)이고 **쓰는 코드가 없다** — 라이브 튜너는 영구히 "A / +6 cents",
-      바늘은 x≈70에 얼어 있다. `TunerMode`는 플래그만 세운다. **monitorfeed 배선이 전제.** (중)
+      바늘은 x≈70에 얼어 있다. `TunerMode`는 플래그만 세운다. ~~monitorfeed 배선이 전제~~ —
+      **틀렸다**(H 폐기 블록). 튜너는 `cochlea.TunerEngine`(NSDF+HPS, 자체 `capture_1` 클라이언트,
+      `get_reading()` 풀 API)이고 **안 막혀 있었다**. 오히려 **온디맨드라 안전한 쪽**이다 —
+      튜닝 중엔 연주 중이 아니다. 심 모양은 미터와 같고, 모드 진입/이탈 엣지에서 engine을
+      start/stop(synapse `presenter.enter_tuner`와 동형). 무음/저신뢰 = `get_reading()→None`이라
+      "listening" 표시가 필요하다(지금 상태엔 그 자리가 없다). (중)
 - [ ] **effect 채널 (toast/persist emit)** — 콤보 저장 버그(위 ✅)는 닫혔지만 채널 자체는
       남아 있다. → [`decisions.md`](decisions.md) N "남은 것"(2). (소)
 
@@ -127,6 +144,14 @@ finalize다.
 
 ## ④ 아키텍처 · 성능
 
+- [ ] **JACK을 별도 프로세스로 분리** `[사용자]` — 미터/튜너가 자기 프로세스를 갖고 ganglion은
+      IPC로 값만 읽는다. 오디오가 드로잉과 GIL을 **영원히 공유하지 않으므로** xrun 위험이
+      구조적으로 0. **지금은 필요 없다** — X(텍스트 캐시)가 GIL 홀드를 8.79ms→0.32ms로 낮춰
+      xrun이 0/s가 됐고, 이는 "아예 안 그리는 것"과 구별되지 않는다(결정 X의 스윕 표).
+      [사용자] "궁극적으로는 성능상 2를 택하는 게 자연스러운 최적화". 착수 조건: **실기에서
+      xrun이 관측되면**(`jack_control` 또는 `set_xrun_callback` 프로브). 그때까진 프로세스 하나가
+      더 단순하다. ⚠️ 되돌아올 때를 대비해 남긴다 — **render를 다시 무겁게 만드는 변경은
+      이 결정을 되살린다**. 1ms가 임계선이고 지금 0.32ms다. (대)
 - [ ] **move per-detent reconcile 최적화** — 노드를 들고 한 칸 움직일 때마다 full reconcile
       (`dump_graph` GET/detent). tracked-set을 유지하면 diff만으로 충분. 실기에서 체감되면 착수. (중)
 - [ ] **파라미터 스케일링 곡선 (결정 E)** — `adjust()`는 `(max−min)/40` **선형**. Hz·ms류는 로그가
