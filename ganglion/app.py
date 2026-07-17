@@ -204,6 +204,13 @@ class AppState:
     cyes: bool = False        # confirm overlay highlight (No/Yes)
     dirty: bool = False
     toast: str = ""
+    # IN/OUT header level, dB (decision H), written by Runtime from the JACK meter
+    # before each draw — like `t` below, a fact from outside pushed into the state
+    # so the view stays f(st) and the controller stays deaf. None = no meter (dev
+    # box, no JACK, or the client failed to attach) and renders "--": a pedal that
+    # invents a level it cannot hear is worse than one that admits it has none.
+    inlvl: float = None
+    outlvl: float = None
     # Display clock (seconds since the loop started), written by Runtime before
     # each draw — the ONLY time in the state. Marquee phase reads it; the
     # controller never does. Stays 0.0 off-loop (--walk, goldens) => static frames.
@@ -977,12 +984,23 @@ def _toast_over(s, st):
     s.T(st.toast, 64 - int(s.Tw(8, st.toast) / 2), 56, 8, fill=0)
 
 
+def lvl(db):
+    """dB -> the header's readout. None (no meter) reads "--", never a number.
+
+    Clamped at -99.9 because the OUT slot is 27px wide and the node counter starts
+    at x=101: "-100.0" is 31px and would run straight into it. -99.9 is 5 chars /
+    26px, the same as the real floor readings (measured on metal: IN -59.2 /
+    OUT -77.0 at silence), so the clamp only ever fires on a dead input.
+    """
+    return "--" if db is None else "%.1f" % max(-99.9, db)
+
+
 def _chain(st):
     s = Screen()
     s.T("IN", 5, 1, 8)                          # +3px: clear the left rail
-    s.T("-14.2", 18, 1, 8)
+    s.T(lvl(st.inlvl), 18, 1, 8)
     s.T("OUT", 54, 1, 8)
-    s.T("-4.3", 74, 1, 8)
+    s.T(lvl(st.outlvl), 74, 1, 8)
     adding = mode_of(st) == "adding"
     s.T("+/%d" % len(st.board) if adding
         else "%d/%d" % (st.node + 1, len(st.board)), 101, 1, 6)
@@ -1890,9 +1908,130 @@ def _fonttest():
         raise SystemExit(1)
 
 
+def _metertest():
+    """IN/OUT header levels (decision H) — injected source, no JACK touched.
+
+    The interesting part is not "does dB work", it is what happens at the edges
+    the rig actually hits: a box with no JACK at all, a client that attached but
+    reports nothing yet, digital silence, and a dead client mid-session. All four
+    have to leave the header honest rather than confident.
+    """
+    from ganglion.hw.meter import Meter, db
+
+    ok = True
+
+    def check(label, got, want):
+        nonlocal ok
+        ok &= got == want
+        print("%-42s %s" % (label, "OK" if got == want else
+                            "FAIL  got %r want %r" % (got, want)))
+
+    class Src:
+        def __init__(self, snap, ok=True):
+            self.snap, self.ok, self.stopped = snap, ok, False
+
+        def snapshot(self):
+            if isinstance(self.snap, Exception):
+                raise self.snap
+            return self.snap
+
+        def stop(self):
+            self.stopped = True
+
+    def peek(src):
+        st = AppState()
+        Meter(src=src).observe(st)
+        return (st.inlvl, st.outlvl)
+
+    # dB maths, against synapse's own readout (qtview._meter_display)
+    check("db(1.0) == 0 dBFS", round(db(1.0), 3), 0.0)
+    check("db(0.5) ~ -6.02", round(db(0.5), 2), -6.02)
+    check("db(0.0) is None (digital silence)", db(0.0), None)
+    check("db(1e-7) is None (below floor)", db(1e-7), None)
+    check("db(None) is None", db(None), None)
+
+    # the real floor readings measured on GECO at silence
+    lv = peek(Src({"in_peak_amp": 0.0011, "out_peak_amp": 0.00014}))
+    check("silence -> IN ~-59 / OUT ~-77 dB",
+          (round(lv[0]), round(lv[1])), (-59, -77))
+
+    # no meter at all (dev box, no JACK): the header must say so, not invent one
+    check("no snapshot -> stays None", peek(Src(None)), (None, None))
+    check("dead client (raises) -> stays None", peek(Src(RuntimeError("gone"))), (None, None))
+    check("Meter.ok mirrors the source", Meter(src=Src(None, ok=False)).ok, False)
+
+    # a live client that reports true digital silence
+    check("amp 0.0 -> None (not -inf, not 0.0)",
+          peek(Src({"in_peak_amp": 0.0, "out_peak_amp": 0.0})), (None, None))
+
+    # once read, a dropped snapshot must not wipe a good reading back to "--"
+    st = AppState()
+    m = Meter(src=Src({"in_peak_amp": 0.5, "out_peak_amp": 0.25}))
+    m.observe(st)
+    m.src.snap = None
+    m.observe(st)
+    check("dropped snapshot keeps the last reading", round(st.inlvl, 2), -6.02)
+
+    # the view: None must render "--", and the clamp must hold the OUT slot
+    check("lvl(None) == '--'", lvl(None), "--")
+    check("lvl(-59.23) == '-59.2'", lvl(-59.23), "-59.2")
+    check("lvl(-120.0) clamps to -99.9", lvl(-120.0), "-99.9")
+    check("lvl(-0.05) == '-0.1' (clipping end)", lvl(-0.05), "-0.1")
+    s = Screen()
+    check("widest readout fits the 27px OUT slot", s.Tw(8, "-99.9") <= 27, True)
+
+    # the header actually changes when the state does
+    st = AppState()
+    a = render(st).tobytes()
+    st.inlvl, st.outlvl = -12.3, -3.1
+    check("header repaints on a new level", render(st).tobytes() != a, True)
+
+    src = Src(None)
+    Meter(src=src).stop()
+    check("stop() reaches the source", src.stopped, True)
+
+    # Late attach: jackd came up 198ms AFTER ganglion at the last boot (hw/meter.py),
+    # and LevelMeter only ever tries once — so the retry is the whole point.
+    tries = []
+
+    def flaky():
+        tries.append(1)
+        return Src({"in_peak_amp": 0.5, "out_peak_amp": 0.5}) if len(tries) >= 3 \
+            else Src(None, ok=False)          # JACK not up yet
+
+    m, st = Meter(make=flaky), AppState()
+    m.observe(st)
+    check("no JACK at boot -> '--', no crash", (st.inlvl, m.ok), (None, False))
+    st.t = 0.5                                # same retry window: must not hammer
+    m.observe(st)
+    check("retry is rate-limited (1 try per 3s)", len(tries), 1)
+    st.t = Meter.RETRY_S + 0.1
+    m.observe(st)
+    check("retries once the window passes", len(tries), 2)
+    st.t = 2 * Meter.RETRY_S + 0.2
+    m.observe(st)
+    check("attaches when jackd finally answers", m.ok, True)
+    check("...and the level lands", round(st.inlvl, 2), -6.02)
+    st.t += 10
+    m.observe(st)
+    check("no further attach attempts once up", len(tries), 3)
+
+    dead = Src(None, ok=False)
+    m2 = Meter(make=lambda: dead)
+    m2.observe(AppState())
+    check("a client that failed to attach is dropped", (m2.ok, dead.stopped), (False, True))
+
+    print("\nMETER-%s" % ("OK" if ok else "FAIL"))
+    if not ok:
+        raise SystemExit(1)
+
+
 def main(argv):
     if "--fonttest" in argv:
         _fonttest()
+        return
+    if "--metertest" in argv:
+        _metertest()
         return
     if "--walk" in argv:
         _walk()

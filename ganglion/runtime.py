@@ -20,6 +20,7 @@ Seams:
   power.idle(elapsed) / .wake() / .set_on(level)   (optional; hw.oled.PanelPower)
   settings.apply(st) / .observe(st)    (optional; settings.Settings)
   radio.set_wifi(state) / .set_bt(state)   (optional; hw.radio.Radio)
+  meter.observe(st)                    (optional; hw.meter.Meter — INBOUND)
 """
 
 import time as _time
@@ -45,8 +46,8 @@ class Runtime:
     """
 
     def __init__(self, controller, source, sink, view, *, leds=None, led_out=None,
-                 power=None, settings=None, radio=None, splash_s=0.5, tick_s=0.03,
-                 clock=_time.monotonic, sleep=_time.sleep):
+                 power=None, settings=None, radio=None, meter=None, splash_s=0.5,
+                 tick_s=0.03, clock=_time.monotonic, sleep=_time.sleep):
         self.c = controller
         self.source = source
         self.sink = sink
@@ -56,6 +57,7 @@ class Runtime:
         self.power = power
         self.settings = settings
         self.radio = radio
+        self.meter = meter
         self.splash_s = splash_s
         self.tick_s = tick_s
         self.clock = clock
@@ -92,13 +94,19 @@ class Runtime:
             self.c.feed(ev)
         if self.settings:
             self.settings.observe(self.c.st)    # writes only when a choice moved
-        if not (self.power and self.power.blanked):     # a blank panel keeps its
-            self._draw()                                # GDDRAM; drawing into it
+        # A blank panel keeps its GDDRAM, so drawing into it is pure bus waste --
+        # and a level nobody can read is not worth a JACK snapshot either, which is
+        # why the meter sits inside the guard and not with the three seams above.
+        # It is also the one that runs the other way: world -> state (cf. st.t).
+        if not (self.power and self.power.blanked):
+            if self.meter:
+                self.meter.observe(self.c.st)
+            self._draw()
             if self.c.st.toast:                 # confirmation splash: hold, then clear
                 self.sleep(self.splash_s)
                 self.c.st.toast = ""
                 self._draw()
-        self.sleep(self.tick_s)                         # is pure bus waste
+        self.sleep(self.tick_s)
 
     def run(self, should_stop=lambda: False):
         while not should_stop():
@@ -246,6 +254,7 @@ def run_device(controller, view, leds):
     import busio
     from luma.core.interface.serial import i2c
     from luma.oled.device import sh1107
+    from ganglion.hw.meter import Meter
     from ganglion.hw.oled import DiffSink, LumaWriter, PanelPower
     from ganglion.hw.radio import Radio
     from ganglion.hw.seesaw import SeesawInput
@@ -286,8 +295,13 @@ def run_device(controller, view, leds):
     settings = Settings()
     settings.apply(controller.st)
 
+    # IN/OUT header (decision H). Its own JACK client, in this process: safe only
+    # because a frame costs 0.26ms of GIL (decision X) -- at the 8.7ms it cost
+    # before, this line alone was 40 xruns/s. Degrades to "--" if JACK is absent.
+    meter = Meter()
+
     rt = Runtime(controller, source, sink, view, leds=leds, led_out=led_out,
-                 power=power, settings=settings, radio=Radio())
+                 power=power, settings=settings, radio=Radio(), meter=meter)
     try:
         rt.run()                       # Ctrl-C is the only way out: no quit gesture
     except KeyboardInterrupt:
@@ -295,8 +309,11 @@ def run_device(controller, view, leds):
     finally:
         # The panel takes care of itself — ``persist`` is left unset, so luma's
         # atexit hook blanks and powers it down. The NeoPixels have no such hook
-        # and would simply stay lit, so put them out by hand.
+        # and would simply stay lit, so put them out by hand; the JACK client is
+        # the same story — leave it and it lingers in the graph until the process
+        # actually dies, so a restart would race its own stale ports.
         try:
             led_out(("off", "off"))
         except OSError:
             pass                       # a dead bus must not mask the real error
+        meter.stop()                   # never raises (hw/meter.py)
