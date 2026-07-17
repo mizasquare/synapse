@@ -36,6 +36,7 @@ from dataclasses import dataclass, field
 from PIL import ImageDraw
 
 from ganglion import WIDTH, HEIGHT
+from ganglion.config import BRIGHT_DEFAULT, BRIGHT_LEVELS, CONTRAST_DIM
 from ganglion.render import Screen, fs
 from ganglion.input import Rotate, Press, Combo
 from ganglion.geco_backend import FakeGeco
@@ -150,6 +151,8 @@ class AppState:
     sys: bool = False
     sys_focus: bool = False   # parked at the SYS entry (edge detent); E0 click enters
     sys_idx: int = 0
+    bright: int = BRIGHT_DEFAULT      # index into config.BRIGHT_LEVELS; the
+                                      # Runtime maps it to a contrast byte
     pick: str = ""            # ""=off, "cat"=category list, "fx"=plugin list
     pick_cat: int = 0
     pick_fx: int = 0
@@ -681,12 +684,26 @@ class MovingMode(Mode):
 
 
 class SysMode(NavMode):
+    """SYSTEM: ENC0 walks the list, ENC1 edits the focused item *in place*.
+
+    Q4 made list scrolling ENC0-only ("양손 스크롤은 제거, 일관성 우선") — it took
+    ENC1 away as a redundant second scroll wheel, it did not reserve it. So ENC1
+    is still the value band 2a §3 says it is, and a value item can be edited
+    where it sits: no value screen, no new mode, and the same grammar as the
+    chain (ENC0 picks, ENC1 turns). Items are therefore one of two kinds —
+    **actions** (ENC0 click: Tuner, About, Back) or **values** (ENC1 rotate).
+    ENC1 does nothing on an action, which is the affordance: the ENC1 rail and
+    LED only come alive over a value, so the hand can feel which kind it is.
+    """
+
     def enter(self, c):
         c.st.sys, c.st.sys_idx = True, 0
-    def on_rotate(self, c, enc, d):        # Q4: ENC0-only (matches other modals)
+    def on_rotate(self, c, enc, d):
         st = c.st
         if enc == 0:
             st.sys_idx = (st.sys_idx + d) % len(SYSITEMS)
+        elif SYSITEMS[st.sys_idx] == "Brightness":     # clamp, don't wrap: a value
+            st.bright = max(0, min(len(BRIGHT_LEVELS) - 1, st.bright + d))
     def on_click(self, c, enc):
         st = c.st
         if enc == 0:
@@ -868,7 +885,9 @@ def rails(st):
             else (st.pick_fx, len(st.wl[st.pick_cat]["plugins"]))
         return ("off", z)                    # E0 dead (hold=back), E1 operates
     if m == "sys":
-        return ((st.sys_idx, len(SYSITEMS)), "idle")
+        val = (st.bright, len(BRIGHT_LEVELS)) \
+            if SYSITEMS[st.sys_idx] == "Brightness" else "off"   # E1 dead on actions
+        return ((st.sys_idx, len(SYSITEMS)), val)
     if m == "menu":
         return ((st.menu, len(menu_items(st))), "idle")
     if m == "glance":                        # E0 boards; E1 snapshots — but the snap list
@@ -1333,12 +1352,13 @@ def _sys(st):
     s.hline(0, 16, 128)
     for i, it in enumerate(SYSITEMS):
         y = 24 + i * 18
-        if i == st.sys_idx:
+        on = i == st.sys_idx
+        if on:
             s.box(4, y - 2, 120, 16, fill=True)
-            s.T(it, 9, y, 12, fill=0)
-        else:
-            s.T(it, 9, y, 12)
-    s.T("e0 move.click  HOLD back", 5, 120, 6)
+        s.T(it, 9, y, 12, fill=0 if on else 1)
+        if it == "Brightness":               # a value item shows its value, always:
+            s.dots(len(BRIGHT_LEVELS), st.bright, 98, y + 4, fill=0 if on else 1)
+    s.T("e0 move.click  e1 set  HOLD back", 5, 120, 6)
     _toast_over(s, st)
     return s.img
 
@@ -1384,8 +1404,8 @@ def leds(st):
         return (BUCKETCOL.get(n["bucket"], "amber"), OFF)
     if m == "sysfocus":                       # parked at SYS entry (edge detent)
         return ("grey", OFF)
-    if m == "sys":
-        return ("grey", OFF)
+    if m == "sys":                             # green=edit (I), only over a value
+        return ("grey", "green" if SYSITEMS[st.sys_idx] == "Brightness" else OFF)
     if m == "glance":
         return ("blue", "green")
     if m == "adding":                          # [+] cell: E0 commits (amber = the add action)
@@ -1600,7 +1620,10 @@ def _sleeptest():
     print("wake:  state=%s node=%d->%d (swallowed) frames=%d  %s"
           % (rt.power.state, node, c.st.node, rt.sink.frames, "OK" if woke else "FAIL"))
 
-    want = ["contrast(0x01)", "hide", "show", "contrast(0x7F)"]
+    # Levels come from config, not literals: this used to assert a hardcoded 0x7F
+    # and failed the day Brightness gave "awake" a configurable meaning.
+    want = ["contrast(0x%02X)" % CONTRAST_DIM, "hide", "show",
+            "contrast(0x%02X)" % BRIGHT_LEVELS[BRIGHT_DEFAULT]]
     ok &= panel.log == want                             # edge-only: 313 ticks, 4 cmds
     print("panel: %s  %s" % (panel.log, "EDGE-ONLY-OK" if panel.log == want else
                              "FAIL want=%s" % want))

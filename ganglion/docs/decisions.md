@@ -441,6 +441,42 @@ N의 seam에 라이브 구현체를 붙임. 이 Pi는 살아있는 MODEP/pisound
   확인하지 않으면 통과해도 아무 말을 안 한다.
 - `FakeGeco.save`는 no-op(픽스처가 RAM)이라 에뮬 행동은 불변 — 골든 무영향.
 
+## U. SYSTEM > Brightness — ENC1 제자리 편집 + `config.py` `[해결]` (2026-07-17)
+
+**먼저 물은 것: 만들 가치가 있나?** design.md §2가 "사용자는 밝기 변화조차 잘 못 느꼈다"고 적어둬서
+지각 안 되는 슬라이더면 방금 지운 MIDI Ch와 같은 부류였다. **실 UI에서 재보니 6단계가 확연히
+구분됐다** — 그 관찰은 전백 테스트 화면 것이었고, 전류 때와 같은 이유로 틀렸다(§2). 실기능 확정.
+
+- `[결정]` **3단계 `(0x08, 0x2D, 0xFF)`, 기본 mid.** 유효 범위 [0x08, 0xFF](그 아래는 무변화),
+  지각이 비율 기반이라 **등비 ~5.6배**로 3점. 구분 가능한 6단계를 다 두지 않는 이유: 한 번
+  맞춰놓고 쓰는 설정에 해상도는 값이 없다[사용자].
+- `[결정]` **새 모드도 새 화면도 없다 — ENC1이 제자리에서 편집.** 사용자 제안. Q4는 목록 스크롤을
+  ENC0 전용으로 했지만("양손 스크롤 제거, 일관성 우선") 그건 **ENC1을 중복 스크롤휠에서 뺀 것**이지
+  예약한 게 아니다. ENC1은 여전히 2a §3의 **값 밴드**다. → SYSTEM 항목은 두 종류가 된다:
+  **액션**(ENC0 click: Tuner·About·Back) / **값**(ENC1 rotate: Brightness). 체인과 같은 문법
+  (ENC0 고르고 ENC1 돌린다)이라 배울 게 없다.
+- `[결정]` **어포던스 = ENC1이 값 위에서만 살아난다.** 액션 항목에선 ENC1 레일 `"off"` + LED `OFF`,
+  Brightness에선 레일 `(bright, 3)` + LED **green**(=편집, 결정 I). **손으로 종류가 느껴진다.**
+  값은 항상 점 3개로 표시(포커스 행은 반전이라 `dots(fill=0)` — `render.dots`에 `fill` 인자 추가).
+  회전은 **clamp, wrap 아님** — 값이 최대에서 최소로 튀면 안 된다.
+- `[결정]` **앱은 contrast 바이트를 모른다.** `st.bright`는 `BRIGHT_LEVELS`의 **인덱스**고, Runtime이
+  `set_on(BRIGHT_LEVELS[st.bright])`로 민다 — **`led_out`과 정확히 같은 모양**(순수 상태 → 주입된
+  seam → 하드웨어). 그래서 순수성이 안 깨진다. 새 모드 0개, `AppState` 필드 1개, 뷰는 점 한 줄.
+  `set_on`은 **엣지 온리**(매 틱 불리므로 무변화 시 0바이트).
+- `[결정]` **`config.py` 신설** — design.md §7이 결정만 해놓고 안 만든 자리[사용자: "매직넘버 말고
+  중앙화"]. 진짜 이유는 취향이 아니다: **`0x3D`와 `rotate=0`이 `runtime.run_device`와
+  `tools/oled_probe`에 설명 주석까지 복사된 채 두 벌** 있었고, 하필 **계측 도구가 자기 사본을
+  읽고** 있었다 — 앱이 쓰는 값과 조용히 어긋날 수 있는 구조. 한 번 틀렸던 적 있고(0x3C) 유리로만
+  확인되는 값이라 특히 나쁘다. 지금 config: 패널 주소·회전·밝기 3단계·dim·유휴 시간값.
+  seesaw 상수(`hw/seesaw.py` 상단)와 `runtime.LED_RGB`는 이미 각자 응집돼 있어 두었다.
+- `[정정]` **`--sleeptest`가 이 변경으로 FAIL 났고, 그게 옳았다.** 기대값에 `0x7F`가 **하드코딩**돼
+  있어서, "깨어있음"의 의미가 설정 가능해진 순간 깨졌다. 테스트도 config에서 끌어오게 고쳤다.
+- **미완**: **영속화 없음** — 재부팅하면 mid로 돌아간다. 설정 저장소가 로드맵 ①의 선결 항목이고
+  `BRIGHT_DEFAULT`가 그때까지의 부팅값이다.
+- **검증**: 오프메탈(액션 항목에서 ENC1 무반응 + 레일/LED off · Brightness에서 레일 (1,3)/green ·
+  양끝 clamp · SYS 렌더) + **온메탈**(실 Runtime·실 PanelPower로 high→mid→low→high, 사용자 육안:
+  "실용적인 수준에서 밝기 조절이 된다"). `--sleeptest`/`--looptest`/`--walk`/`oled_bench` 전부 통과.
+
 ## 해결됨 `[해결]`
 - **입력 어휘**: 우리 GestureRecognizer(Rotate/Press{click,long}/Combo)가 2a에 정확히 충분. 키보드
   에뮬(r/t/w/e · f/g/s/d · x)이 ENC0/ENC1 rot/click/hold + combo에 1:1 매핑 — 검증됨.

@@ -1,7 +1,7 @@
 # Ganglion 로드맵 — 남은 일 (finalize 기준선)
 
 > 🛠 **살아있는 로드맵 (남은 일만).** 끝난 것은 여기 안 적는다 — 결정의 근거·검증 기록은
-> [`decisions.md`](decisions.md)(구현 결정 로그 A~T)에, 주제별 상세는
+> [`decisions.md`](decisions.md)(구현 결정 로그 A~U)에, 주제별 상세는
 > [`encoder-rail-todo.md`](encoder-rail-todo.md) · [`workflow-review-todo.md`](workflow-review-todo.md)에 남아 있고
 > 이 문서는 거기 흩어진 "남은 것"만 집계한다. 설계 정본 = [`design.md`](design.md).
 > 마지막 갱신: **2026-07-17 (전면 재작성 — 온메탈축 폐지(닫힘), 번인 방어 신설 후 같은 날 완료,
@@ -55,23 +55,23 @@ finalize다.
 
 ## ① 기능 (미구현 / 부분구현 본체)
 
-- [ ] **설정 영속화 저장소 `[선결]`** — ganglion은 **설정 파일을 쓰지 않는다.** `AppState`에
-      brightness/MIDI 필드가 없고, `configs.py`는 상수 모듈이라 writer가 없다(공유물이라 손대지
-      않는다 — §1 재사용 경계). 아래 Brightness·MIDI Ch·WiFi·번인 시간값이 **전부 여기 걸려
-      있으므로** 이걸 먼저 세운다. `configs.LOCAL_STORAGE` 아래 JSON 하나면 충분. (중, **선결**)
-- [ ] **SYSTEM 메뉴 항목 2개** — `Brightness` · `About`이 아직 `TODO:` 토스트 스텁
-      ([`../app.py`](../app.py):471). Tuner·Back만 실동작. 렌더(`_sys()`)가 전 항목을 동일하게 그려
-      **스텁이 실동작 항목과 구분되지 않는다.** (소)
-      > ✅ 2026-07-17: **`MIDI Ch` 제거**[사용자 동의] — 3개→2개. 설계가 없는 라벨이었다(스펙 0,
+- [ ] **설정 영속화 저장소 `[선결]`** — ganglion은 **설정을 저장하지 않는다.** [`../config.py`](../config.py)가
+      생겼지만 그건 **상수**(코드가 아는 값)고, **사용자가 고른 값**(밝기 단계, WiFi/BT 상태, 번인
+      `off_s`)을 재부팅 너머로 나르는 물건이 없다 — 지금 Brightness는 매 부팅 mid로 돌아간다.
+      synapse의 `configs.py`는 공유 상수 모듈이라 writer가 없고 손대지 않는다(§1 재사용 경계).
+      `configs.LOCAL_STORAGE` 아래 JSON 하나면 충분. (중, **선결** — 아래 전부가 여기 걸려 있다)
+- [ ] **SYSTEM `About`** — 마지막 남은 `TODO:` 토스트 스텁([`../app.py`](../app.py):471). 무엇을
+      보일지 미결(버전? 보드수? I2C 주소?). (소, 결정 필요)
+      > ✅ 2026-07-17: **`Brightness` 완료** — ENC1 제자리 편집(새 모드 0개, `AppState` 필드 1개),
+      > 3단계 `(0x08, 0x2D, 0xFF)`. 만들기 전에 "지각되긴 하나"부터 쟀고, design.md의 "밝기 변화를
+      > 못 느낀다"는 **전백에서만 참**이었다(실 UI는 6단계 구분). 수치는 신설 [`../config.py`](../config.py)로
+      > — §7이 결정만 해두고 안 만든 자리이고, `0x3D`/`rotate=0`이 두 벌 있던 중복도 같이 없앴다.
+      > 영속화는 아직(재부팅 시 mid로). → [`decisions.md`](decisions.md) U.
+      >
+      > ✅ 2026-07-17: **`MIDI Ch` 제거**[사용자 동의] — 설계가 없는 라벨이었다(스펙 0,
       > design.md §7의 열린 질문 한 줄이 전부). GECO는 **보낼 게 없고**(synapse의 MIDI = 페달
       > 배선인데 이 기기엔 페달이 없다), 인바운드는 **MODEP가 이미 처리한다**(PC ch1 → 스냅샷,
       > 지금 켜져 있음). 검증할 장비도 없어 만들면 영원히 미검증으로 남았을 것. → design.md §9-9 닫음.
-  - **Brightness는 contrast seam이 필요하다** — luma device가 `run_device()` 지역변수
-    ([`../runtime.py`](../runtime.py):225)라 컨트롤러가 참조를 못 한다. `LumaWriter`가 이미
-    `self.device`를 들고 있으니 거기 노출하는 게 최단 경로. **`PanelPower`와 같은 seam** — 그건
-    이미 `device`를 잡고 있으니(번인 방어) 붙일 자리가 이미 있다.
-  - **Brightness는 플리커 대책이 아니다** (design.md §2 `[폐기]`) — 순수 취향 설정. 단 번인
-    맥락에선 강한 레버다(실측 −72%, design.md §2 "유휴 전력"). 두 맥락을 섞지 말 것.
 - [ ] **WiFi / BT on/off** — 리포지토리에 **선례 0**(첫 라디오 제어). (중)
   - **`rfkill`을 쓰면 sudo도 polkit도 필요 없다** — `/dev/rfkill`이 `root:netdev`이고 `miza`가
     `netdev` 소속. **그룹 권한은 세션 독립**이라 로그인 세션 없는 systemd 서비스에서도 산다.
@@ -150,7 +150,7 @@ finalize다.
 ## 참조
 
 - [`design.md`](design.md) — **설계 정본.** 하드웨어 스펙(실측) · 2a 인터랙션 모델 · 화면별 결정 · §9 열린결정.
-- [`decisions.md`](decisions.md) — **구현 결정 로그(A~T).** 왜 그렇게 정했나 + 라이브 검증 기록.
+- [`decisions.md`](decisions.md) — **구현 결정 로그(A~U).** 왜 그렇게 정했나 + 라이브 검증 기록.
 - [`encoder-rail-todo.md`](encoder-rail-todo.md) — 좌측 3px 인코더 레일 (구현 완료, 상세·비용표 보존).
 - [`workflow-review-todo.md`](workflow-review-todo.md) — 워크플로우 검토 Q1–Q7 (전부 착지, 대응 근거 보존).
 - [`plugin-whitelist.md`](plugin-whitelist.md) — 피커 버킷 큐레이션 (→ `geco_whitelist.json`). **스테일**:

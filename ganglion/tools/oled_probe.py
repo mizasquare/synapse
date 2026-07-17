@@ -42,18 +42,18 @@ import time
 from PIL import Image
 
 from ganglion import WIDTH, HEIGHT
+from ganglion.config import I2C_ADDR
+from ganglion.config import ROTATE as _ROTATE
 from ganglion.i2c_cost import PAGE_H, PAGES, PER_PAGEROW_OVERHEAD, wire_ms
 from ganglion.hw.oled import DiffSink, LumaWriter
 from ganglion.render import Screen
 
-# The panel answers at 0x3D, not the 0x3C that is every SH1107 tutorial's default
-# -- Adafruit ship the 128x128 module strapped to 0x3D (confirmed: i2cdetect -y 1
-# shows 36 37 3d, the two encoders and this). ``runtime.run_device`` uses the same
-# value; if a future module is strapped to 0x3C, --address covers it.
-ADDRESS = 0x3D
-# rotate=0, read off the glass by the ``orient`` stage. design.md #2 deduced
-# rotate=2 from the FFC-down mount and flagged it 잠정; the panel says otherwise.
-ROTATE = 0
+# Both of these, and the paragraph explaining each, used to be duplicated here and
+# in ``runtime.run_device``. They now come from ``config``: this module is what
+# *measures* them off the glass, so it must not be reading a second copy that has
+# quietly drifted from the one the app runs on. ``--address`` still overrides.
+ADDRESS = I2C_ADDR
+ROTATE = _ROTATE
 TICK = 0.03                      # runtime.Runtime default: ~33 Hz
 
 # The bus shipped at **100kHz** -- the Pi's default, and config.txt set no

@@ -110,13 +110,14 @@ class Screen:
         if fw > 0:
             self.d.rectangle([x + 1, y + 1, x + fw, y + h - 2], fill=1)
 
-    def dots(self, total, cur, x, y):
+    def dots(self, total, cur, x, y, fill=1):
+        # fill=0 draws them onto an inverted (filled) row -- SYSTEM's focused item
         for i in range(total):
             cx = x + i * 6
             if i == cur:
-                self.d.ellipse([cx, y, cx + 3, y + 3], fill=1)
+                self.d.ellipse([cx, y, cx + 3, y + 3], fill=fill)
             else:
-                self.d.ellipse([cx, y, cx + 3, y + 3], outline=1)
+                self.d.ellipse([cx, y, cx + 3, y + 3], outline=fill)
 
     def chip(self, s, x, y, w, h, size, ls=0, center=True):
         self.box(x, y, w, h, fill=True)

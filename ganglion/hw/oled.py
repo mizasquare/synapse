@@ -34,6 +34,8 @@ ganglion.tools.oled_probe`` renders the same frame through luma's own
 
 from PIL import ImageChops
 
+from ganglion.config import (BRIGHT_DEFAULT, BRIGHT_LEVELS, CONTRAST_DIM,
+                             IDLE_DIM_S, IDLE_OFF_S)
 from ganglion.i2c_cost import PAGE_H, WIDTH, frame_pages, page_span
 
 
@@ -139,13 +141,14 @@ class PanelPower:
     Two levers, both already on the luma device:
 
       1. ``contrast(dim)`` once idle passes ``dim_s``. design.md §2 files
-         contrast as a weak lever, but that verdict was **about flicker**. For
-         wear it is a real one -- the full range measured 49->87mA, so the floor
-         cuts drive current ~44%. The same measurement found the brightness
-         change barely perceptible, which is exactly what this state wants: it
-         must stay readable, and it does.
+         contrast as a weak lever, but that verdict was **about flicker**, and it
+         was reached on full-white test screens. On the real UI it is a strong
+         one: measured against the live service, dimming takes the panel's own
+         draw from 43.9mA to 12.2mA (**-72%**), and the step is plainly visible
+         (six halvings are distinguishable by eye between 0xFF and 0x08).
       2. ``hide()`` (SH1107 ``0xAE``) once idle passes ``off_s``. This is the
-         actual fix -- dimming only slows the wear down.
+         actual fix -- dimming only slows the wear down. Measured: the rail
+         lands exactly on the Pi's own draw, i.e. the panel goes to zero.
 
     ``0xAE`` turns the scan off but leaves GDDRAM intact, so blanking loses no
     pixels and waking needs no redraw of its own.
@@ -155,9 +158,8 @@ class PanelPower:
     which keeps this testable with no hardware and no waiting.
     """
 
-    # 0x7F is what luma's sh1107 init sets, so "on" restores the panel's own
-    # nominal rather than a number we picked. 0x01 is the floor.
-    def __init__(self, device, *, dim_s=30.0, off_s=300.0, on=0x7F, dim=0x01):
+    def __init__(self, device, *, dim_s=IDLE_DIM_S, off_s=IDLE_OFF_S,
+                 on=BRIGHT_LEVELS[BRIGHT_DEFAULT], dim=CONTRAST_DIM):
         self.device = device
         self.dim_s = dim_s
         self.off_s = off_s
@@ -168,6 +170,20 @@ class PanelPower:
     @property
     def blanked(self):
         return self.state == "off"
+
+    def set_on(self, level):
+        """Set what "awake" means — the user's SYSTEM > Brightness choice.
+
+        Edge-only like ``_set``: the Runtime hands this the current setting every
+        tick (the same shape as ``led_out``), so it has to be free when nothing
+        moved. Takes effect immediately only if the panel is actually at full;
+        dimmed or blanked, it lands on the next wake.
+        """
+        if level == self.on_level:
+            return
+        self.on_level = level
+        if self.state == "on":
+            self.device.contrast(level)
 
     def idle(self, elapsed):
         """Apply the state ``elapsed`` seconds without input implies."""

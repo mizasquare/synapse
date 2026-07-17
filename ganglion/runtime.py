@@ -17,10 +17,12 @@ Seams:
   source.poll(now) -> [events]         (KeyboardSource / hw.seesaw.SeesawInput)
   sink.show(frame)                     (TerminalSink / luma device)
   led_out((name0, name1)) -> None      (optional; device NeoPixels)
-  power.idle(elapsed) / .wake()        (optional; hw.oled.PanelPower)
+  power.idle(elapsed) / .wake() / .set_on(level)   (optional; hw.oled.PanelPower)
 """
 
 import time as _time
+
+from ganglion.config import BRIGHT_LEVELS, I2C_ADDR, ROTATE
 
 
 class Runtime:
@@ -74,6 +76,10 @@ class Runtime:
             if events and self.power.blanked:
                 self.power.wake()               # off a dark panel the first input
                 events = []                     # only wakes it: never edit what
+            # SYSTEM > Brightness. Same shape as led_out: a pure value out of the
+            # state, pushed to hardware by the loop, so the controller never
+            # learns what a contrast byte is. Both calls no-op when nothing moved.
+            self.power.set_on(BRIGHT_LEVELS[self.c.st.bright])
             self.power.idle(now - self._t_input)  # the user cannot see (cf. F)
         for ev in events:
             self.c.feed(ev)
@@ -172,12 +178,6 @@ LED_RGB = {"amber": (255, 120, 0), "green": (0, 200, 60), "blue": (0, 90, 255),
            "purple": (150, 0, 255), "red": (255, 0, 0), "grey": (60, 60, 60),
            "off": (0, 0, 0)}
 
-# Idle thresholds for the panel (hw.oled.PanelPower). Constants for now: there is
-# nowhere to persist a user's choice yet — no settings store exists, and these
-# move into it when it does (roadmap ③).
-IDLE_DIM_S = 30.0
-IDLE_OFF_S = 300.0
-
 
 def run_encoders_terminal(controller, view, leds=None, hud=None, mode="braille"):
     """Bring-up driver: real seesaw encoders in, **terminal** out (no OLED yet).
@@ -242,20 +242,15 @@ def run_device(controller, view, leds):
 
     i2c_bus = busio.I2C(board.SCL, board.SDA)
     source = SeesawInput(i2c=i2c_bus)
-    # rotate=0, confirmed on the panel (tools/oled_probe). design.md §2 reasoned
-    # from "mounts FFC-down, therefore 180deg" to rotate=2 and marked it 잠정 —
-    # the deduction was wrong: the panel reads upright with no rotation at all.
-    # Costs nothing either way (0 and 180 are both SH1107's slow axis), which is
-    # exactly why it went unnoticed until there was glass to look at.
-    #
-    # 0x3D, not the 0x3C every SH1107 example uses: Adafruit strap the 128x128
-    # module to 0x3D (i2cdetect -y 1 => 36 37 3d = both encoders + this panel).
+    # Address and rotation are config.py's (they were duplicated here and in
+    # tools/oled_probe, each with its own copy of why -- see that module).
     #
     # A full frame measures ~220ms here (184ms of it wire time at the 100kHz the
     # bus shipped at; the rest is luma's per-pixel Python packing loop). At the
     # 400kHz config.txt now asks for it is still ~80ms — nearly 3 ticks, and the
     # encoders poll on this bus. The diff sink below is not an optimization.
-    device = sh1107(i2c(port=1, address=0x3D), width=128, height=128, rotate=0)
+    device = sh1107(i2c(port=1, address=I2C_ADDR), width=128, height=128,
+                    rotate=ROTATE)
 
     # So we never send one. DiffSink pushes only the page-row spans that changed
     # (typically one 8px band, often nothing at all) and diffs in panel space,
@@ -265,10 +260,9 @@ def run_device(controller, view, leds):
     # when nothing moved).
     sink = DiffSink(LumaWriter(device), preprocess=device.preprocess)
 
-    # Idle burn-in defence. The UI is mostly static furniture and the device sits
-    # on a desk for hours, so quiet knobs have to reach the glass: dim at 30s,
-    # blank at 5min. OFF_S is provisional -- pick it by living with it.
-    power = PanelPower(device, dim_s=IDLE_DIM_S, off_s=IDLE_OFF_S)
+    # Idle burn-in defence: the UI is mostly static furniture and the device sits
+    # on a desk for hours, so quiet knobs have to reach the glass (config.py).
+    power = PanelPower(device)
 
     def led_out(colors):
         for idx, name in enumerate(colors):

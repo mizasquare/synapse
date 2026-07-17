@@ -52,6 +52,7 @@ Keyboard = encoders: `r`/`t` = ENC0 turn, `f`/`g` = ENC1 turn, `w`/`s` = click,
 
 | File | Role |
 |---|---|
+| `config.py` | **This rig's numbers** — panel address/rotation, brightness levels, idle timings. Measured, not deduced |
 | `app.py` | The 2a state machine — modes, controller, `render(st)`, the whole UI spine |
 | `render.py` | 1-bit drawing primitives + pixel-font tiers for the 128×128 OLED |
 | `input.py` | Input events + gesture recognition (rotate / press / combo), shared by every source |
@@ -73,7 +74,7 @@ Keyboard = encoders: `r`/`t` = ENC0 turn, `f`/`g` = ENC1 turn, `w`/`s` = click,
 
 | Doc | What's in it |
 |---|---|
-| [`docs/roadmap.md`](docs/roadmap.md) | **What's left** — the living roadmap (on-metal bring-up first) |
+| [`docs/roadmap.md`](docs/roadmap.md) | **What's left** — the living roadmap (on-metal bring-up is closed; features first now) |
 | [`docs/design.md`](docs/design.md) | The design — hardware spec, the 2a interaction model, screen-by-screen decisions |
 | [`docs/decisions.md`](docs/decisions.md) | Running implementation-decision log as the mockup was ported to `app.py` |
 | [`docs/plugin-whitelist.md`](docs/plugin-whitelist.md) | How the picker's plugin buckets are curated |
