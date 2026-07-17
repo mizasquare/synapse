@@ -44,12 +44,13 @@ costs **0.025ms, 0.9% of the 2.67ms period**, and triggers no GC at all (it free
 what it allocates, so gen0 never trips). ``tools/gil_probe`` puts the loop's GIL
 lateness at the idle-sleep floor.
 
-What remains is 22/10min, and only about two thirds of it has an address. Split by
-panel state: 0.065/s while the panel is lit (``draw`` running) against 0.019/s once
-it blanks, and that 0.046/s difference is the size ``gil_probe`` independently
-measures for ``draw``'s 80ms tail. The 0.019/s floor arrives with ``_draw`` and
-``observe`` both idle, so it is not yet ours to explain -- it sits about where the
-rig's own baseline sat (0.03/s) before any meter existed. Roadmap ④ has both.
+Nothing measurable remains. On an idle rig this meter's cost is indistinguishable
+from zero -- 47 minutes clean with it off, two 11-minute stretches clean with it on.
+Every xrun we did see clustered on **our own development load** (test suites, hours
+of journal scanning, the probe itself); the "22/10min residual" first written here
+was a startup transient measured a minute after the service came up, and its
+"unexplained floor" was us. See decisions X, methodology (9) — to measure the rig,
+only the rig may be running.
 """
 
 import math
