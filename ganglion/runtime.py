@@ -254,7 +254,7 @@ def run_device(controller, view, leds):
     import busio
     from luma.core.interface.serial import i2c
     from luma.oled.device import sh1107
-    from ganglion.hw.meter import Meter
+    from ganglion.hw.meter import Meter    # noqa: F401 — see the `meter = None` note
     from ganglion.hw.oled import DiffSink, LumaWriter, PanelPower
     from ganglion.hw.radio import Radio
     from ganglion.hw.seesaw import SeesawInput
@@ -295,10 +295,29 @@ def run_device(controller, view, leds):
     settings = Settings()
     settings.apply(controller.st)
 
-    # IN/OUT header (decision H). Its own JACK client, in this process: safe only
-    # because a frame costs 0.26ms of GIL (decision X) -- at the 8.7ms it cost
-    # before, this line alone was 40 xruns/s. Degrades to "--" if JACK is absent.
-    meter = Meter()
+    # IN/OUT header (decision H) — DISABLED, and the reason matters.
+    #
+    # A LevelMeter here is a Python RT callback that must take the GIL every
+    # 2.67ms. Decision X cut a frame from 8.7ms to 0.26ms and I concluded that
+    # bought us the in-process meter. It did not, and the rig said so:
+    #
+    #   xruns/10min, by client     before the meter        with it
+    #     GangMeter                       -                  688
+    #     mod-monitor / effect_*          3 each              11 each
+    #
+    # 97% of the rig's xruns became ours, and — because jackd waits for every
+    # client — being late made the rig's OWN plugins 3.7x later. That is the
+    # audio path, not a cosmetic report.
+    #
+    # The hole in the reasoning: I modelled `render`'s GIL and read it as "the
+    # loop's". It is not. `source.poll()` reads two seesaw encoders over I2C
+    # through blinka EVERY tick, outside the blank guard, and I never measured it
+    # — the rate was identical with the panel dark and nothing drawing at all.
+    #
+    # So the meter moves to its own process (roadmap ④), which is where the user
+    # said it belonged from the start. Until then the header reads "--": an
+    # honest blank beats a level that costs the guitar.
+    meter = None
 
     rt = Runtime(controller, source, sink, view, leds=leds, led_out=led_out,
                  power=power, settings=settings, radio=Radio(), meter=meter)
@@ -316,4 +335,5 @@ def run_device(controller, view, leds):
             led_out(("off", "off"))
         except OSError:
             pass                       # a dead bus must not mask the real error
-        meter.stop()                   # never raises (hw/meter.py)
+        if meter is not None:
+            meter.stop()               # never raises (hw/meter.py)
