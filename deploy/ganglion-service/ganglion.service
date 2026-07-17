@@ -7,14 +7,32 @@ Description=Ganglion (GECO1: 2 encoders + SH1107 OLED, headless pedal UI)
 # race, the same bargain synapse-ui.service takes ("fails loud, we retry").
 # Wants=, not Requires=: a mod-host restart shouldn't tear this down, the retry
 # loop already handles it.
-After=modep-mod-host.service local-fs.target sound.target
+After=modep-mod-host.service local-fs.target sound.target jack.service
 Wants=modep-mod-host.service
 
 [Service]
 # Runs as `miza`: in the `i2c` group, which is what /dev/i2c-1 (root:i2c 0660)
-# needs for both the seesaw encoders (0x36/0x37) and the OLED (0x3D).
+# needs for both the seesaw encoders (0x36/0x37) and the OLED (0x3D). Also in
+# `jack`, which is what the level meter's JACK client needs (decision H) --
+# jackd runs as user `jack` (uid 108) and its /dev/shm segments are jack:jack 0660.
 User=miza
 WorkingDirectory=/home/miza/synapse
+
+# The level meter (decision H) is a JACK client, and jackd here belongs to another
+# user, so a client needs JACK_PROMISCUOUS_SERVER to find its socket at all.
+# That value lives in /etc/environment, which **PAM** applies to login sessions --
+# a systemd system service never reads it. So the shell probe attached and the
+# service could not, failing with `server_failed` / "Cannot connect to server
+# socket" and leaving the header at "--". jack.service sets the same variable the
+# same way, for the same reason; this just stops relying on a login shell.
+#
+# NO_START_SERVER is the belt to that braces: levelmeter.py builds jack.Client()
+# without no_start_server, so on a miss it tries to EXEC A SECOND JACK SERVER
+# (seen in the journal: `exec of JACK server ... failed`). It failed harmlessly
+# here, but a rig that boots a rival jackd is a rig with no audio. The env var
+# forbids it without editing the synapse core.
+Environment=JACK_PROMISCUOUS_SERVER=jack
+Environment=JACK_NO_START_SERVER=1
 # The hardware bring-up venv (system-site; gitignored, see ganglion/README).
 # It carries luma.oled + adafruit-blinka + adafruit-circuitpython-seesaw, which
 # the system python cannot get (externally-managed). Adjust if the venv moves.
