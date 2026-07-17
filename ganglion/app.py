@@ -1642,6 +1642,63 @@ class _SpyGeco(FakeGeco):
         return super().save(which)
 
 
+def _settingstest():
+    """Persistence, including the ways it is allowed to fail (decisions.md V).
+
+    Everything interesting here happens on a boot *after* something went wrong —
+    a cut write, a hand-edited file, a value from a version that knew more. Those
+    are the states a pedal actually meets (it is unplugged, never shut down) and
+    none of them may stop it booting, so provoke each one on purpose.
+    """
+    import json
+    import tempfile
+    from ganglion.settings import Settings
+
+    d = tempfile.mkdtemp(prefix="ganglion-settingstest-")
+    path = os.path.join(d, "sub", "ganglion.json")      # dir does not exist yet
+    ok = True
+
+    def check(label, got, want):
+        nonlocal ok
+        ok &= got == want
+        print("%-34s %-22r %s" % (label, got, "OK" if got == want else
+                                  "FAIL want %r" % (want,)))
+
+    c = AppController()
+    s = Settings(path)
+    s.apply(c.st)                                       # first boot: no file
+    check("first boot -> default", c.st.bright, BRIGHT_DEFAULT)
+
+    c.st.bright = 0
+    check("observe(changed) wrote", s.observe(c.st), True)
+    check("observe(same) silent", s.observe(c.st), False)
+
+    c2 = AppController()
+    Settings(path).apply(c2.st)                         # reboot
+    check("survives reboot", c2.st.bright, 0)
+    check("no .tmp left behind", os.path.exists(path + ".tmp"), False)
+
+    for label, blob in (("truncated (power cut)", '{"bright"'),
+                        ("empty file", ""),
+                        ("not a dict", "[1, 2]"),
+                        ("wrong type", '{"bright": "high"}'),
+                        ("out of range", '{"bright": 99}'),
+                        ("bool is not an index", '{"bright": true}')):
+        with open(path, "w") as f:
+            f.write(blob)
+        c3 = AppController()
+        Settings(path).apply(c3.st)                     # must never raise
+        check(label + " -> default", c3.st.bright, BRIGHT_DEFAULT)
+
+    with open(path, "w") as f:                          # a newer version's file
+        json.dump({"bright": 2, "unknown_future_key": {"x": 1}}, f)
+    c4 = AppController()
+    Settings(path).apply(c4.st)
+    check("unknown key ignored, rest kept", c4.st.bright, 2)
+
+    print("SETTINGSTEST", "PASS" if ok else "FAIL")
+
+
 def _looptest():
     """Drive the Runtime under a fake clock (no TTY) — proves loop + splash (F)."""
     from ganglion.runtime import Runtime
@@ -1678,6 +1735,9 @@ def main(argv):
         return
     if "--sleeptest" in argv:
         _sleeptest()
+        return
+    if "--settingstest" in argv:
+        _settingstest()
         return
     from ganglion.runtime import run_terminal
     if "--live" in argv:                       # inject the live synapse backend

@@ -477,6 +477,40 @@ N의 seam에 라이브 구현체를 붙임. 이 Pi는 살아있는 MODEP/pisound
   양끝 clamp · SYS 렌더) + **온메탈**(실 Runtime·실 PanelPower로 high→mid→low→high, 사용자 육안:
   "실용적인 수준에서 밝기 조절이 된다"). `--sleeptest`/`--looptest`/`--walk`/`oled_bench` 전부 통과.
 
+## V. 설정 영속화 저장소 `[해결]` (2026-07-17)
+
+로드맵 ①의 **선결** 항목. 없는 동안 Brightness는 매 부팅 mid로 돌아갔다 — 설정이 아니라 장난감이다.
+
+- `[결정]` **`config.py`와 `settings.py`는 다른 물건이다.** 전자는 **코드가 아는 값**(패널 주소,
+  구분되는 contrast 바이트), 후자는 **사용자가 고른 값**. 상수는 설정이 될 수 없다.
+- `[결정]` **위치 = `configs.LOCAL_STORAGE + "ganglion.json"`** (`~/.modep/ganglion.json`).
+  synapse의 `LOCAL_STORAGE`에서 파생시킨 이유가 있다: **`SYNAPSE_STATE_DIR` 오버라이드를 공짜로
+  물려받는다** — qt_dev가 fake-backend 실행이 실기 상태를 덮어쓰는 걸 막으려고 만든 그 가드다.
+  `configs`는 **지연 import**(라이브러리 모듈이라 sys.path를 entry point만 세운다).
+- `[결정]` **온메탈 드라이버만 쓴다.** `run_device`만 `Settings`를 주입 — 터미널/fake 실행이 실기의
+  선택을 덮어쓰면 안 된다(위 가드와 같은 이유). `power`와 같은 모양의 seam이라 순수 컨트롤러는
+  디스크의 존재를 모른다: `apply(st)` 부팅 시, `observe(st)` 매 틱.
+- **이 기기는 종료되지 않고 뽑힌다.** 파워스트립에 물린 기타 페달이라 flush할 정상 종료가 없고 쓰기가
+  아무 바이트에서나 잘린다. [`../../docs/save-corruption-postmortem.md`](../../docs/save-corruption-postmortem.md)의
+  교훈이 여기 직접 걸린다 — **반쯤 쓰인 파일은 잃어버린 설정이 아니라, 다음 부팅이 읽고 행동하는
+  파일**이고, writer를 나중에 고쳐도 디스크는 안 낫는다. 그래서 세 규칙:
+  - `[결정]` **원자적**: 같은 디렉토리에 tmp → `fsync` → `os.replace`(파일시스템 내 rename은 원자적)
+    → **디렉토리도 `fsync`**(rename 자체를 durable하게). 파일은 옛것 아니면 새것, 반쪽이 없다.
+  - `[결정]` **관대함**: 없음·빈 파일·잘림·타입 틀림·모르는 키 — 전부 에러가 아니다. **필드별로 각각**
+    검증해 하나가 나빠도 나머지를 잃지 않는다(미래 버전이 쓴 파일도 이 버전이 아는 건 다 산다).
+    **설정 파일에 잡바이트 하나 있다고 안 켜지는 페달이 밝기를 잊은 페달보다 훨씬 나쁘다.**
+  - `[결정]` **즉시 쓰기**: 값이 바뀐 그 틱에. 타이머도 종료시점도 아니다(**종료가 없으므로**). 값이
+    적고 이산적이라 손이 카드를 괴롭힐 만큼 만들 수 없다 — 디바운스는 여기선 과설계다.
+- `[결정]` **쓰기 실패는 로그 1회 후 계속.** design.md §5는 fail-loud지만 화면이 사용자가 보고 있는
+  그것뿐이고 이건 취향 설정이다. **꽉 찼거나 read-only인 카드가 페달을 죽이면 안 된다.**
+- **스키마 = `FIELDS` 한 곳**(`attr -> (default, validator)`). 설정 추가 = 여기 한 줄 + `AppState` 필드.
+- **검증**: `--settingstest` 12케이스 — 첫 부팅·변경 시 쓰기·무변경 시 침묵·재부팅 생존·`.tmp` 잔재
+  없음 + **고의 파손 6종**(잘림/빈파일/비-dict/타입틀림/범위밖/bool은 인덱스 아님) 전부 defaults로
+  착지하고 **아무것도 raise 안 함** + 미래 키 무시하고 나머지 유지.
+  **온메탈**: 실 Runtime에 ENC1 이벤트를 넣어 `{"bright": 0}`이 디스크에 앉는 것 확인 → 서비스
+  재시작 후 **레일 실측으로 적용 확인**: `bright=0`(0x08) 패널 몫 **+16.1mA** vs `bright=2`(0xFF)
+  **+65.4mA** — **4배 차, 저장된 선택이 유리까지 간다**(눈 없이 증명됨).
+
 ## 해결됨 `[해결]`
 - **입력 어휘**: 우리 GestureRecognizer(Rotate/Press{click,long}/Combo)가 2a에 정확히 충분. 키보드
   에뮬(r/t/w/e · f/g/s/d · x)이 ENC0/ENC1 rot/click/hold + combo에 1:1 매핑 — 검증됨.

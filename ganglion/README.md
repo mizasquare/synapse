@@ -41,6 +41,7 @@ python3 ganglion/app.py --device   # run on the real hardware (OLED + seesaw enc
 python3 ganglion/app.py --encoders # real knobs in, terminal out (bring-up: no panel needed)
 python3 ganglion/app.py --looptest # loop + splash (F) under a fake clock
 python3 ganglion/app.py --sleeptest # idle dim/off (S) under a fake clock — no hardware, no waiting
+python3 ganglion/app.py --settingstest # persistence (V), including 6 kinds of corrupt file
 ```
 
 On the device it runs as a systemd unit — see [`../deploy/ganglion-service/`](../deploy/ganglion-service/).
@@ -53,10 +54,11 @@ Keyboard = encoders: `r`/`t` = ENC0 turn, `f`/`g` = ENC1 turn, `w`/`s` = click,
 | File | Role |
 |---|---|
 | `config.py` | **This rig's numbers** — panel address/rotation, brightness levels, idle timings. Measured, not deduced |
+| `settings.py` | **What the user chose**, across a boot — atomic + forgiving, because this thing gets unplugged |
 | `app.py` | The 2a state machine — modes, controller, `render(st)`, the whole UI spine |
 | `render.py` | 1-bit drawing primitives + pixel-font tiers for the 128×128 OLED |
 | `input.py` | Input events + gesture recognition (rotate / press / combo), shared by every source |
-| `runtime.py` | Headless main loop — ties input, view, splash, LEDs and idle panel power together |
+| `runtime.py` | Headless main loop — ties input, view, splash, LEDs, idle panel power and settings together |
 | `display.py` | Mono framebuffer + the terminal renderer |
 | `geco_backend.py` | The GECO **seam** — decouples the app from the board / catalog / persistence source (`FakeGeco` default) |
 | `geco_adapter.py` | Live backend over the real synapse stack — the swap-in for `FakeGeco` |

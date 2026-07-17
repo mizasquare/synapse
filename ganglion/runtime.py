@@ -18,6 +18,7 @@ Seams:
   sink.show(frame)                     (TerminalSink / luma device)
   led_out((name0, name1)) -> None      (optional; device NeoPixels)
   power.idle(elapsed) / .wake() / .set_on(level)   (optional; hw.oled.PanelPower)
+  settings.apply(st) / .observe(st)    (optional; settings.Settings)
 """
 
 import time as _time
@@ -43,8 +44,8 @@ class Runtime:
     """
 
     def __init__(self, controller, source, sink, view, *, leds=None, led_out=None,
-                 power=None, splash_s=0.5, tick_s=0.03, clock=_time.monotonic,
-                 sleep=_time.sleep):
+                 power=None, settings=None, splash_s=0.5, tick_s=0.03,
+                 clock=_time.monotonic, sleep=_time.sleep):
         self.c = controller
         self.source = source
         self.sink = sink
@@ -52,6 +53,7 @@ class Runtime:
         self.leds = leds
         self.led_out = led_out
         self.power = power
+        self.settings = settings
         self.splash_s = splash_s
         self.tick_s = tick_s
         self.clock = clock
@@ -83,6 +85,8 @@ class Runtime:
             self.power.idle(now - self._t_input)  # the user cannot see (cf. F)
         for ev in events:
             self.c.feed(ev)
+        if self.settings:
+            self.settings.observe(self.c.st)    # writes only when a choice moved
         if not (self.power and self.power.blanked):     # a blank panel keeps its
             self._draw()                                # GDDRAM; drawing into it
             if self.c.st.toast:                 # confirmation splash: hold, then clear
@@ -239,6 +243,7 @@ def run_device(controller, view, leds):
     from luma.oled.device import sh1107
     from ganglion.hw.oled import DiffSink, LumaWriter, PanelPower
     from ganglion.hw.seesaw import SeesawInput
+    from ganglion.settings import Settings
 
     i2c_bus = busio.I2C(board.SCL, board.SDA)
     source = SeesawInput(i2c=i2c_bus)
@@ -268,8 +273,15 @@ def run_device(controller, view, leds):
         for idx, name in enumerate(colors):
             source.set_rgb(idx, LED_RGB.get(name, (0, 0, 0)))
 
+    # Only the on-metal driver persists: a terminal/fake run must not write over
+    # the device's real choices (the reason synapse's configs.py grew
+    # SYNAPSE_STATE_DIR in the first place). Applied before the first draw so the
+    # panel never flashes the default brightness on the way to the stored one.
+    settings = Settings()
+    settings.apply(controller.st)
+
     rt = Runtime(controller, source, sink, view, leds=leds, led_out=led_out,
-                 power=power)
+                 power=power, settings=settings)
     try:
         rt.run()                       # Ctrl-C is the only way out: no quit gesture
     except KeyboardInterrupt:

@@ -1,7 +1,7 @@
 # Ganglion 로드맵 — 남은 일 (finalize 기준선)
 
 > 🛠 **살아있는 로드맵 (남은 일만).** 끝난 것은 여기 안 적는다 — 결정의 근거·검증 기록은
-> [`decisions.md`](decisions.md)(구현 결정 로그 A~U)에, 주제별 상세는
+> [`decisions.md`](decisions.md)(구현 결정 로그 A~V)에, 주제별 상세는
 > [`encoder-rail-todo.md`](encoder-rail-todo.md) · [`workflow-review-todo.md`](workflow-review-todo.md)에 남아 있고
 > 이 문서는 거기 흩어진 "남은 것"만 집계한다. 설계 정본 = [`design.md`](design.md).
 > 마지막 갱신: **2026-07-17 (전면 재작성 — 온메탈축 폐지(닫힘), 번인 방어 신설 후 같은 날 완료,
@@ -55,31 +55,38 @@ finalize다.
 
 ## ① 기능 (미구현 / 부분구현 본체)
 
-- [ ] **설정 영속화 저장소 `[선결]`** — ganglion은 **설정을 저장하지 않는다.** [`../config.py`](../config.py)가
-      생겼지만 그건 **상수**(코드가 아는 값)고, **사용자가 고른 값**(밝기 단계, WiFi/BT 상태, 번인
-      `off_s`)을 재부팅 너머로 나르는 물건이 없다 — 지금 Brightness는 매 부팅 mid로 돌아간다.
-      synapse의 `configs.py`는 공유 상수 모듈이라 writer가 없고 손대지 않는다(§1 재사용 경계).
-      `configs.LOCAL_STORAGE` 아래 JSON 하나면 충분. (중, **선결** — 아래 전부가 여기 걸려 있다)
+> ✅ **2026-07-17 완료: 설정 영속화 저장소** — [`../settings.py`](../settings.py), `~/.modep/ganglion.json`.
+> ①의 **선결**이 풀렸다. `config.py`(코드가 아는 값)와 다른 물건이다 — 이건 **사용자가 고른 값**.
+> **이 기기는 종료되지 않고 뽑히므로**(부검 참조) 원자적 쓰기(tmp→fsync→replace→dir fsync) + 필드별
+> 관대한 로드(파손 6종 전부 defaults로 착지, raise 0) + 즉시 쓰기(종료 시점이 없다). `run_device`만
+> 주입해 fake 실행이 실기 값을 못 덮는다(`SYNAPSE_STATE_DIR` 가드를 물려받음).
+> 설정 추가 = `FIELDS` 한 줄 + `AppState` 필드. → [`decisions.md`](decisions.md) V.
 - [ ] **SYSTEM `About`** — 마지막 남은 `TODO:` 토스트 스텁([`../app.py`](../app.py):471). 무엇을
       보일지 미결(버전? 보드수? I2C 주소?). (소, 결정 필요)
       > ✅ 2026-07-17: **`Brightness` 완료** — ENC1 제자리 편집(새 모드 0개, `AppState` 필드 1개),
       > 3단계 `(0x08, 0x2D, 0xFF)`. 만들기 전에 "지각되긴 하나"부터 쟀고, design.md의 "밝기 변화를
       > 못 느낀다"는 **전백에서만 참**이었다(실 UI는 6단계 구분). 수치는 신설 [`../config.py`](../config.py)로
       > — §7이 결정만 해두고 안 만든 자리이고, `0x3D`/`rotate=0`이 두 벌 있던 중복도 같이 없앴다.
-      > 영속화는 아직(재부팅 시 mid로). → [`decisions.md`](decisions.md) U.
+      > 영속화는 아래 ✅(저장소)가 닫았다 — 이제 재부팅을 넘는다. → [`decisions.md`](decisions.md) U.
       >
       > ✅ 2026-07-17: **`MIDI Ch` 제거**[사용자 동의] — 설계가 없는 라벨이었다(스펙 0,
       > design.md §7의 열린 질문 한 줄이 전부). GECO는 **보낼 게 없고**(synapse의 MIDI = 페달
       > 배선인데 이 기기엔 페달이 없다), 인바운드는 **MODEP가 이미 처리한다**(PC ch1 → 스냅샷,
       > 지금 켜져 있음). 검증할 장비도 없어 만들면 영원히 미검증으로 남았을 것. → design.md §9-9 닫음.
-- [ ] **WiFi / BT on/off** — 리포지토리에 **선례 0**(첫 라디오 제어). (중)
-  - **`rfkill`을 쓰면 sudo도 polkit도 필요 없다** — `/dev/rfkill`이 `root:netdev`이고 `miza`가
-    `netdev` 소속. **그룹 권한은 세션 독립**이라 로그인 세션 없는 systemd 서비스에서도 산다.
-  - **`nmcli radio wifi off`는 거부된다** — polkit `enable-disable-wifi`가 `allow_active=yes`,
-    `allow_inactive=no`. 서비스는 세션이 없어 inactive(`nmcli general permissions`가 이미 "아니요").
-    **synapse 전원 메뉴가 겪은 것과 같은 실패**이고 그때 해법이
-    `deploy/ui-service/49-synapse-power.rules`다. → **rfkill 경로 채택**(새 polkit 규칙 불필요).
-  - `[열림]` SYSTEM 하위 항목 vs 별도 화면.
+- [ ] **WiFi 3상태 / BT 2상태** — 리포지토리에 **선례 0**(첫 라디오 제어). 저장소가 생겼으니
+      착수 가능. (중)
+  - **사양[사용자]**: WiFi = `on` / `hotspot` / `off`, 기본 **on**. BT = `on` / `off`, 기본 **off**.
+    둘 다 SYSTEM의 **값 항목**(ENC1 제자리, 결정 U의 문법 — on/off도 2단계짜리 값이다).
+  - ⚠️ **`hotspot`이 계획을 바꾼다.** rfkill은 라디오 on/off밖에 못 해 **AP 모드를 못 만든다.**
+    → NetworkManager가 필요하고, 그럼 **polkit 규칙이 다시 들어온다**(`nmcli radio wifi off`가
+    `enable-disable-wifi`=`allow_active=yes`라 세션 없는 서비스에선 거부됨 — synapse 전원 메뉴가
+    겪은 그 실패). 해법 선례 = `deploy/ui-service/49-synapse-power.rules`.
+    이전 로드맵의 "rfkill 경로 채택(polkit 불필요)" 결론은 **hotspot 때문에 무효**.
+  - `[열림]` hotspot 연결 프로파일을 **설치 시 1회 생성**(그러면 앱은 `con up`만) vs 런타임 생성
+    (`nmcli device wifi hotspot`, 매번 임시 연결). 전자가 권장 — 앱 권한이 좁아진다.
+  - ⚠️ **이 박스는 wlan0로 붙어 있다** — WiFi off 테스트 순간 SSH가 끊긴다(노브로 복구는 되지만).
+    **맨 마지막에 붙일 것.**
+  - `[열림]` SYSTEM 하위 항목 vs 별도 화면 → 결정 U로 **닫힘**(SYSTEM 값 항목).
 - [ ] **monitorfeed 배선 (결정 H)** — IN/OUT 헤더 레벨(−14.2/−4.3)이 **하드코딩**. synapse
       `monitorfeed.py`를 `Runtime.step()`에 틱으로 얹는다. 코스트 모델상 좁은 밴드 갱신은 저렴. (중)
 - [ ] **튜너 실동작** — 지금은 **껍데기**다. `tcents=6` / `tnote="A"`가 `AppState` 기본값
@@ -150,7 +157,7 @@ finalize다.
 ## 참조
 
 - [`design.md`](design.md) — **설계 정본.** 하드웨어 스펙(실측) · 2a 인터랙션 모델 · 화면별 결정 · §9 열린결정.
-- [`decisions.md`](decisions.md) — **구현 결정 로그(A~U).** 왜 그렇게 정했나 + 라이브 검증 기록.
+- [`decisions.md`](decisions.md) — **구현 결정 로그(A~V).** 왜 그렇게 정했나 + 라이브 검증 기록.
 - [`encoder-rail-todo.md`](encoder-rail-todo.md) — 좌측 3px 인코더 레일 (구현 완료, 상세·비용표 보존).
 - [`workflow-review-todo.md`](workflow-review-todo.md) — 워크플로우 검토 Q1–Q7 (전부 착지, 대응 근거 보존).
 - [`plugin-whitelist.md`](plugin-whitelist.md) — 피커 버킷 큐레이션 (→ `geco_whitelist.json`). **스테일**:
