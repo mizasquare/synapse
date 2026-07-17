@@ -254,7 +254,7 @@ def run_device(controller, view, leds):
     import busio
     from luma.core.interface.serial import i2c
     from luma.oled.device import sh1107
-    from ganglion.hw.meter import Meter    # noqa: F401 — see the `meter = None` note
+    from ganglion.hw.meter import Meter
     from ganglion.hw.oled import DiffSink, LumaWriter, PanelPower
     from ganglion.hw.radio import Radio
     from ganglion.hw.seesaw import SeesawInput
@@ -295,29 +295,24 @@ def run_device(controller, view, leds):
     settings = Settings()
     settings.apply(controller.st)
 
-    # IN/OUT header (decision H) — DISABLED, and the reason matters.
+    # IN/OUT header (decision H) — re-attached, now that the service can actually
+    # take RT scheduling. The why lives in the unit (deploy/ganglion-service/).
     #
-    # A LevelMeter here is a Python RT callback that must take the GIL every
-    # 2.67ms. Decision X cut a frame from 8.7ms to 0.26ms and I concluded that
-    # bought us the in-process meter. It did not, and the rig said so:
+    # The 688 xruns/10min that pulled this were never about the GIL, and both
+    # earlier explanations were wrong. Measured since:
     #
-    #   xruns/10min, by client     before the meter        with it
-    #     GangMeter                       -                  688
-    #     mod-monitor / effect_*          3 each              11 each
+    #   * the callback costs 0.025ms — 0.9% of the 2.67ms period, tail max 0.51ms,
+    #     and it triggers no GC at all (alloc/free balance, so gen0 never trips);
+    #   * `tools/gil_probe` puts the loop's GIL lateness at the *sleep floor*
+    #     (0.058ms p50, identical to an idle tick). `source.poll()`, which the
+    #     first correction blamed by elimination, is 34ms of `time.sleep(0.008)`
+    #     inside adafruit_seesaw's `read()` — wall time that holds no GIL at all.
     #
-    # 97% of the rig's xruns became ours, and — because jackd waits for every
-    # client — being late made the rig's OWN plugins 3.7x later. That is the
-    # audio path, not a cosmetic report.
-    #
-    # The hole in the reasoning: I modelled `render`'s GIL and read it as "the
-    # loop's". It is not. `source.poll()` reads two seesaw encoders over I2C
-    # through blinka EVERY tick, outside the blank guard, and I never measured it
-    # — the rate was identical with the panel dark and nothing drawing at all.
-    #
-    # So the meter moves to its own process (roadmap ④), which is where the user
-    # said it belonged from the start. Until then the header reads "--": an
-    # honest blank beats a level that costs the guitar.
-    meter = None
+    # The client just never got scheduled: `AcquireSelfRealTime` failed, so it ran
+    # SCHED_OTHER as the one non-FIFO client in a sync (-S) graph, and jackd waits
+    # for everybody. `LimitRTPRIO` is a unit setting; limits.conf only ever reaches
+    # PAM sessions, which a system service is not.
+    meter = Meter()
 
     rt = Runtime(controller, source, sink, view, leds=leds, led_out=led_out,
                  power=power, settings=settings, radio=Radio(), meter=meter)

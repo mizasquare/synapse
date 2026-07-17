@@ -24,11 +24,32 @@ text*, and this is text. The live value wobbles every tick (measured at silence:
 time and flicker the last digit; the peak sits still. Matching synapse is also the
 cheap choice.
 
-**Why this may live in-process.** A cffi JACK callback has to take the GIL, so it
-only runs when the draw loop lets go. That cost 40 xruns/s until decision X pulled
-a frame from 8.7ms to 0.26ms of GIL — measured 0/s at <=1ms, indistinguishable
-from not drawing at all. If ``render`` ever gets heavy again this comes back: see
-roadmap ④ (move JACK to its own process), which is the standing answer if it does.
+**Why this lives in-process** — and why the answer took three wrong turns.
+
+Attaching it cost the rig 688 xruns/10min, 97% of its total, and made the rig's
+own plugins 3.7x later (jackd waits for every client). Two explanations were
+written into this file and both were wrong: first "``render`` holds 8.7ms of GIL"
+(decision X fixed that, and the meter still broke), then "``source.poll()`` holds
+the GIL every tick" — named by elimination, never measured.
+
+It was neither. The client **could not get real-time scheduling**, because
+``LimitRTPRIO`` is a systemd unit setting and ``limits.conf`` only ever reaches PAM
+sessions. It ran SCHED_OTHER, the one non-FIFO client in a sync (``-S``) graph. The
+journal said so at startup and was read eight hours late. Two lines in the unit
+took it to 22/10min — the rig's own baseline — and the callback thread is now
+``SCHED_FIFO 90``. See ``deploy/ganglion-service/ganglion.service`` and decisions X.
+
+So the GIL was never the constraint here, and the numbers say why: this callback
+costs **0.025ms, 0.9% of the 2.67ms period**, and triggers no GC at all (it frees
+what it allocates, so gen0 never trips). ``tools/gil_probe`` puts the loop's GIL
+lateness at the idle-sleep floor.
+
+What remains is 22/10min, and only about two thirds of it has an address. Split by
+panel state: 0.065/s while the panel is lit (``draw`` running) against 0.019/s once
+it blanks, and that 0.046/s difference is the size ``gil_probe`` independently
+measures for ``draw``'s 80ms tail. The 0.019/s floor arrives with ``_draw`` and
+``observe`` both idle, so it is not yet ours to explain -- it sits about where the
+rig's own baseline sat (0.03/s) before any meter existed. Roadmap ④ has both.
 """
 
 import math

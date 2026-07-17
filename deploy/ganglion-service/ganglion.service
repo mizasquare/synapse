@@ -33,6 +33,28 @@ WorkingDirectory=/home/miza/synapse
 # forbids it without editing the synapse core.
 Environment=JACK_PROMISCUOUS_SERVER=jack
 Environment=JACK_NO_START_SERVER=1
+
+# Shell != service, the THIRD time -- and the second one is the paragraph above.
+# /etc/security/limits.d/audio.conf grants `@audio rtprio 95 / memlock unlimited`,
+# but **pam_limits** is what applies it, and a system service has no PAM session.
+# So `ulimit -r` says 95 in a login shell and the service got RTPRIO=0. Measured:
+#
+#   python[381794]: Cannot lock down 107350048 byte memory area (Cannot allocate memory)
+#   python[381794]: Cannot use real-time scheduling (RR/90) (1: Operation not permitted)
+#   python[381794]: JackClient::AcquireSelfRealTime error
+#   python[381794]: INFO:levelmeter:LevelMeter: active @ 48000 Hz    <- and then it said fine
+#
+# That is the whole of decision H's 688 xruns/10min. The callback was never the
+# problem: it costs 0.025ms, 0.9% of the 2.67ms period, and the loop does not
+# hold the GIL against it (`tools/gil_probe`: poll's GIL lateness == the sleep
+# floor, 0.058ms). It simply **was not scheduled** -- the only SCHED_OTHER client
+# in a sync (-S) graph where every other client is FIFO. jackd waits for all of
+# them, which is why the rig's OWN plugins got 3.7x worse.
+#
+# MEMLOCK matters for the same reason: an RT callback that page-faults is late,
+# and jack asks to lock ~107MB (jackd's shm), so the 8MB default cannot cover it.
+LimitRTPRIO=95
+LimitMEMLOCK=infinity
 # The hardware bring-up venv (system-site; gitignored, see ganglion/README).
 # It carries luma.oled + adafruit-blinka + adafruit-circuitpython-seesaw, which
 # the system python cannot get (externally-managed). Adjust if the venv moves.
