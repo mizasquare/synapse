@@ -61,8 +61,9 @@ finalize다.
 > 관대한 로드(파손 6종 전부 defaults로 착지, raise 0) + 즉시 쓰기(종료 시점이 없다). `run_device`만
 > 주입해 fake 실행이 실기 값을 못 덮는다(`SYNAPSE_STATE_DIR` 가드를 물려받음).
 > 설정 추가 = `FIELDS` 한 줄 + `AppState` 필드. → [`decisions.md`](decisions.md) V.
-- [ ] **SYSTEM `About`** — 마지막 남은 `TODO:` 토스트 스텁([`../app.py`](../app.py):471). 무엇을
-      보일지 미결(버전? 보드수? I2C 주소?). (소, 결정 필요)
+- [ ] **SYSTEM `About`** — 마지막 남은 `TODO:` 토스트 스텁이자 **유일한 미구현 액션**. 무엇을
+      보일지 미결(버전? 보드수? I2C 주소? hotspot SSID/IP?). 위 ✅의 "hotspot을 어디 보여줄지"와
+      겹치는 주제라 같이 정하는 게 자연스럽다. (소, 결정 필요)
       > ✅ 2026-07-17: **`Brightness` 완료** — ENC1 제자리 편집(새 모드 0개, `AppState` 필드 1개),
       > 3단계 `(0x08, 0x2D, 0xFF)`. 만들기 전에 "지각되긴 하나"부터 쟀고, design.md의 "밝기 변화를
       > 못 느낀다"는 **전백에서만 참**이었다(실 UI는 6단계 구분). 수치는 신설 [`../config.py`](../config.py)로
@@ -73,16 +74,15 @@ finalize다.
       > design.md §7의 열린 질문 한 줄이 전부). GECO는 **보낼 게 없고**(synapse의 MIDI = 페달
       > 배선인데 이 기기엔 페달이 없다), 인바운드는 **MODEP가 이미 처리한다**(PC ch1 → 스냅샷,
       > 지금 켜져 있음). 검증할 장비도 없어 만들면 영원히 미검증으로 남았을 것. → design.md §9-9 닫음.
-> ✅ **2026-07-17 완료(일부 미검증): WiFi 3상태 / BT 2상태** — SYSTEM 값 항목(결정 U 문법),
+> ✅ **2026-07-17 완료: WiFi 3상태 / BT 2상태** — SYSTEM 값 항목(결정 U 문법),
 > 부팅 시 적용[사용자]. `hotspot`이 계획을 뒤집었다(rfkill은 AP를 못 만든다) → WiFi는 nmcli +
 > polkit 3액션(`deploy/ganglion-service/50-ganglion-radio.rules`), BT는 rfkill(`netdev` 그룹이라
 > 규칙 불필요). **`pb-hotspot` 프로파일은 이미 있어서**[사용자 지적] 앱은 up/down만 하고, 덕분에
 > polkit에서 `settings.modify.*`를 뺐다. 클라이언트 SSID는 코드에 없다 — NM autoconnect에 맡겨야
 > 리그가 다른 방으로 따라간다. → [`decisions.md`](decisions.md) W.
+> 온메탈 **전 상태 확인됨**[사용자] — `hotspot`/`off` 포함(Claude는 확인 불가한 자리였다:
+> 실행하면 이 박스가 관리 네트워크에서 떨어진다).
 >
-> - [ ] **⚠️ `hotspot` / `off` 온메탈 미검증** — 실행하면 이 박스가 관리 네트워크에서 떨어져
->       Claude가 확인할 수 없다. **노브로 직접 확인 필요.** (BT와 WiFi `on`은 실기 확인됨:
->       재시작 시 BT `Soft blocked: no → yes`, Florsheim 유지.)
 > - [ ] `[열림]` **hotspot일 때 화면에 뭘 보여줄지** — 지금은 SYSTEM 행에 `AP`뿐. 붙을 SSID
 >       (`starry`)나 IP(172.24.1.1)를 어디 보여줄지 미결. `About`과 겹치는 주제.
 

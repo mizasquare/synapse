@@ -496,14 +496,21 @@ class AppController:
         st.confirm, st.sub = "", ""
 
     def _sys_act(self):
+        """ENC0 click — only **actions** answer it (decision U).
+
+        A value item has nothing to click: it is edited in place with ENC1, and
+        its ENC1 rail and LED already say so. This used to toast "TODO: WiFi" at
+        a WiFi setting that works fine — the action/value split landed in the
+        rotate handler and never reached this one.
+        """
         it = SYSITEMS[self.st.sys_idx]
         if it == "Tuner":
             self.st.sys = False
             self.enter("tuner")
         elif it == "< Back":
             self.st.sys = False
-        else:
-            self._toast("TODO: " + it)
+        elif it not in SYSVALUES:              # only an unimplemented *action*
+            self._toast("TODO: " + it)         # is a TODO — i.e. About, alone
 
     def combo(self):
         """ENC0+ENC1 — the global snapshot save (2a).
