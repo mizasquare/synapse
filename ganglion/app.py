@@ -1833,7 +1833,67 @@ def _looptest():
     print("t (nav)   pb=%d  frames=%d" % (c.st.pb, rt.sink.frames))
 
 
+def _fonttest():
+    """The text cache draws exactly what ImageDraw.text does — or this fails.
+
+    ``render.py`` skips Pillow's re-rasterisation by caching the glyph run and
+    blitting it through ``_getink`` / ``draw.draw_bitmap``. Those are private:
+    they are precisely what ``ImageDraw.text`` calls today, but nothing promises
+    they will stay. So the slow path stays in the tree as the **oracle** and this
+    compares them pixel for pixel, over every screen and at three clock values
+    (t sweeps the marquee: head dwell, mid-scroll, tail).
+
+    A wrong-but-fast renderer is worth nothing, and the failure mode here is
+    silent — glyphs a pixel off, or an ink that inverts. This is the alarm.
+    """
+    import copy
+    from ganglion import render as R
+
+    states = []
+    c = AppController()
+    states.append(("chain", copy.deepcopy(c.st)))
+    for _ in range(3):
+        c.feed(Rotate(0, 1))
+    states.append(("chain-scrolled", copy.deepcopy(c.st)))
+    c.feed(Rotate(1, 1)); c.feed(Press(1, "click"))
+    states.append(("knob-locked", copy.deepcopy(c.st)))
+    for name, mut in (("glance", lambda s: setattr(s, "depth", s.depth)),
+                      ("sys", lambda s: setattr(s, "sys", True)),
+                      ("tuner", lambda s: setattr(s, "tuner", True))):
+        c2 = AppController()
+        mut(c2.st)
+        states.append((name, copy.deepcopy(c2.st)))
+    c3 = AppController(); c3.feed(Press(0, "long"))
+    states.append(("glance-real", copy.deepcopy(c3.st)))
+    # A long name is the marquee's whole reason to exist (decision Q) — pin it.
+    c4 = AppController()
+    c4.backend.board()[0]["name"] = "Neural Amp Modeler XL"
+    states.append(("long-name", copy.deepcopy(c4.st)))
+
+    ok = True
+    for name, st in states:
+        for t in (0.0, 1.7, 3.0):
+            st.t = t
+            fast = render(st).tobytes()
+            R._Face.draw, slow_fn = R._Face.draw_slow, R._Face.draw
+            for f in R._Face._cache.values():        # the oracle must not read the
+                f._mask.clear()                      # cache it is checking
+            try:
+                slow = render(st).tobytes()
+            finally:
+                R._Face.draw = slow_fn
+            same = fast == slow
+            ok &= same
+            print("%-22s t=%.1f  %s" % (name, t, "OK" if same else "FAIL (pixels differ)"))
+    print("\nFONT-CACHE-%s" % ("OK" if ok else "MISMATCH"))
+    if not ok:
+        raise SystemExit(1)
+
+
 def main(argv):
+    if "--fonttest" in argv:
+        _fonttest()
+        return
     if "--walk" in argv:
         _walk()
         return
