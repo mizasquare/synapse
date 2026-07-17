@@ -33,7 +33,8 @@ import json
 import logging
 import os
 
-from ganglion.config import BRIGHT_DEFAULT, BRIGHT_LEVELS
+from ganglion.config import (BRIGHT_DEFAULT, BRIGHT_LEVELS, BT_DEFAULT, BT_STATES,
+                             WIFI_DEFAULT, WIFI_STATES)
 
 
 def _bright_ok(v):
@@ -47,6 +48,8 @@ def _bright_ok(v):
 # written by a newer version still yields everything this version understands.
 FIELDS = {
     "bright": (BRIGHT_DEFAULT, _bright_ok),
+    "wifi": (WIFI_DEFAULT, lambda v: v in WIFI_STATES),
+    "bt": (BT_DEFAULT, lambda v: v in BT_STATES),
 }
 
 

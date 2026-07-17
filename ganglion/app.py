@@ -36,7 +36,8 @@ from dataclasses import dataclass, field
 from PIL import ImageDraw
 
 from ganglion import WIDTH, HEIGHT
-from ganglion.config import BRIGHT_DEFAULT, BRIGHT_LEVELS, CONTRAST_DIM
+from ganglion.config import (BRIGHT_DEFAULT, BRIGHT_LEVELS, BT_DEFAULT, BT_STATES,
+                             CONTRAST_DIM, WIFI_DEFAULT, WIFI_STATES)
 from ganglion.render import Screen, fs
 from ganglion.input import Rotate, Press, Combo
 from ganglion.geco_backend import FakeGeco
@@ -75,7 +76,31 @@ def fmt(kb):
 # label came along with the port, not with a use. Inbound already works without
 # us: MODEP changes snapshots on PC ch1 today, with zero app code. See design.md
 # §9-9, closed.
-SYSITEMS = ["Tuner", "Brightness", "About", "< Back"]
+SYSITEMS = ["Tuner", "Brightness", "WiFi", "Bluetooth", "About", "< Back"]
+
+# SYSTEM items come in two kinds (decision U): **actions**, which ENC0-click, and
+# **values**, which ENC1 edits in place. This table is what makes an item a value
+# -- which AppState field it is, and what it may be.
+#
+# Brightness stores an *index* because its choices are contrast bytes, which are
+# meaningless as a saved label; the radios store their state *name*, because those
+# do have to survive in a settings file where someone may later re-order the
+# tuple. Indexing the choices tuple makes both walk identically anyway.
+SYSVALUES = {
+    "Brightness": ("bright", tuple(range(len(BRIGHT_LEVELS)))),
+    "WiFi": ("wifi", WIFI_STATES),
+    "Bluetooth": ("bt", BT_STATES),
+}
+SYSVLABEL = {"on": "ON", "hotspot": "AP", "off": "OFF"}
+
+
+def _sys_pos(st, item):
+    """``(cursor, total)`` for ``item``'s value, or ``None`` if it is an action."""
+    v = SYSVALUES.get(item)
+    if v is None:
+        return None
+    attr, choices = v
+    return choices.index(getattr(st, attr)), len(choices)
 
 # ---- SAVE AS naming (reuses synapse's word bank; 0 core edits) --------------
 # Reuses synapse's SAVE AS word pool (qtview/editor_bridge), the SAME shared
@@ -153,6 +178,8 @@ class AppState:
     sys_idx: int = 0
     bright: int = BRIGHT_DEFAULT      # index into config.BRIGHT_LEVELS; the
                                       # Runtime maps it to a contrast byte
+    wifi: str = WIFI_DEFAULT          # config.WIFI_STATES; the Runtime hands
+    bt: str = BT_DEFAULT              # these to hw.radio, which owns nmcli
     pick: str = ""            # ""=off, "cat"=category list, "fx"=plugin list
     pick_cat: int = 0
     pick_fx: int = 0
@@ -702,8 +729,12 @@ class SysMode(NavMode):
         st = c.st
         if enc == 0:
             st.sys_idx = (st.sys_idx + d) % len(SYSITEMS)
-        elif SYSITEMS[st.sys_idx] == "Brightness":     # clamp, don't wrap: a value
-            st.bright = max(0, min(len(BRIGHT_LEVELS) - 1, st.bright + d))
+            return
+        v = SYSVALUES.get(SYSITEMS[st.sys_idx])
+        if v:                              # clamp, don't wrap: a value that jumps
+            attr, choices = v              # from max to min is not a value
+            i = choices.index(getattr(st, attr))
+            setattr(st, attr, choices[max(0, min(len(choices) - 1, i + d))])
     def on_click(self, c, enc):
         st = c.st
         if enc == 0:
@@ -885,9 +916,8 @@ def rails(st):
             else (st.pick_fx, len(st.wl[st.pick_cat]["plugins"]))
         return ("off", z)                    # E0 dead (hold=back), E1 operates
     if m == "sys":
-        val = (st.bright, len(BRIGHT_LEVELS)) \
-            if SYSITEMS[st.sys_idx] == "Brightness" else "off"   # E1 dead on actions
-        return ((st.sys_idx, len(SYSITEMS)), val)
+        return ((st.sys_idx, len(SYSITEMS)),
+                _sys_pos(st, SYSITEMS[st.sys_idx]) or "off")     # E1 dead on actions
     if m == "menu":
         return ((st.menu, len(menu_items(st))), "idle")
     if m == "glance":                        # E0 boards; E1 snapshots — but the snap list
@@ -1351,13 +1381,19 @@ def _sys(st):
     s.T("SYSTEM", 6, 4, 8, ls=1)
     s.hline(0, 16, 128)
     for i, it in enumerate(SYSITEMS):
-        y = 24 + i * 18
-        on = i == st.sys_idx
+        y = 22 + i * 16                      # 16, not 18: six items have to clear
+        on = i == st.sys_idx                 # the footer at 120
         if on:
-            s.box(4, y - 2, 120, 16, fill=True)
+            s.box(4, y - 2, 120, 14, fill=True)
         s.T(it, 9, y, 12, fill=0 if on else 1)
-        if it == "Brightness":               # a value item shows its value, always:
-            s.dots(len(BRIGHT_LEVELS), st.bright, 98, y + 4, fill=0 if on else 1)
+        v = SYSVALUES.get(it)
+        if v:                                # a value item always shows its value
+            attr, choices = v
+            cur, f = getattr(st, attr), (0 if on else 1)
+            if it == "Brightness":           # a level -> where it sits in the range
+                s.dots(len(choices), cur, 98, y + 3, fill=f)
+            else:                            # a named state -> its name
+                s.T(SYSVLABEL[cur], 120 - int(s.Tw(8, SYSVLABEL[cur])), y + 2, 8, fill=f)
     s.T("e0 move.click  e1 set  HOLD back", 5, 120, 6)
     _toast_over(s, st)
     return s.img
@@ -1405,7 +1441,7 @@ def leds(st):
     if m == "sysfocus":                       # parked at SYS entry (edge detent)
         return ("grey", OFF)
     if m == "sys":                             # green=edit (I), only over a value
-        return ("grey", "green" if SYSITEMS[st.sys_idx] == "Brightness" else OFF)
+        return ("grey", "green" if SYSITEMS[st.sys_idx] in SYSVALUES else OFF)
     if m == "glance":
         return ("blue", "green")
     if m == "adding":                          # [+] cell: E0 commits (amber = the add action)
@@ -1667,15 +1703,18 @@ def _settingstest():
     c = AppController()
     s = Settings(path)
     s.apply(c.st)                                       # first boot: no file
-    check("first boot -> default", c.st.bright, BRIGHT_DEFAULT)
+    check("first boot -> defaults", (c.st.bright, c.st.wifi, c.st.bt),
+          (BRIGHT_DEFAULT, WIFI_DEFAULT, BT_DEFAULT))
 
     c.st.bright = 0
     check("observe(changed) wrote", s.observe(c.st), True)
     check("observe(same) silent", s.observe(c.st), False)
+    c.st.wifi, c.st.bt = "hotspot", "on"
+    check("radios persist too", s.observe(c.st), True)
 
     c2 = AppController()
     Settings(path).apply(c2.st)                         # reboot
-    check("survives reboot", c2.st.bright, 0)
+    check("survives reboot", (c2.st.bright, c2.st.wifi, c2.st.bt), (0, "hotspot", "on"))
     check("no .tmp left behind", os.path.exists(path + ".tmp"), False)
 
     for label, blob in (("truncated (power cut)", '{"bright"'),
@@ -1683,20 +1722,81 @@ def _settingstest():
                         ("not a dict", "[1, 2]"),
                         ("wrong type", '{"bright": "high"}'),
                         ("out of range", '{"bright": 99}'),
-                        ("bool is not an index", '{"bright": true}')):
+                        ("bool is not an index", '{"bright": true}'),
+                        ("unknown radio state", '{"wifi": "mesh", "bt": 1}')):
         with open(path, "w") as f:
             f.write(blob)
         c3 = AppController()
         Settings(path).apply(c3.st)                     # must never raise
-        check(label + " -> default", c3.st.bright, BRIGHT_DEFAULT)
+        check(label + " -> defaults", (c3.st.bright, c3.st.wifi, c3.st.bt),
+              (BRIGHT_DEFAULT, WIFI_DEFAULT, BT_DEFAULT))
+
+    with open(path, "w") as f:                          # one bad field, one good
+        json.dump({"bright": 99, "wifi": "hotspot"}, f)
+    c4 = AppController()
+    Settings(path).apply(c4.st)
+    check("bad field costs only itself", (c4.st.bright, c4.st.wifi),
+          (BRIGHT_DEFAULT, "hotspot"))
 
     with open(path, "w") as f:                          # a newer version's file
         json.dump({"bright": 2, "unknown_future_key": {"x": 1}}, f)
-    c4 = AppController()
-    Settings(path).apply(c4.st)
-    check("unknown key ignored, rest kept", c4.st.bright, 2)
+    c5 = AppController()
+    Settings(path).apply(c5.st)
+    check("unknown key ignored, rest kept", c5.st.bright, 2)
 
     print("SETTINGSTEST", "PASS" if ok else "FAIL")
+
+
+def _radiotest():
+    """The radio command sequences, without touching a radio (decisions.md W).
+
+    Two of the three WiFi states drop this box off the network it is administered
+    over, so "just try it" is not a test strategy here — the argv is the part
+    that is easy to get wrong and cheap to pin down. The runner is injected; no
+    subprocess is ever spawned.
+    """
+    from ganglion.hw.radio import Radio
+    from ganglion.config import HOTSPOT_CON
+
+    log = []
+    r = Radio(run=lambda steps, what: log.append((what, steps)))
+    ok = True
+
+    def check(label, got, want):
+        nonlocal ok
+        ok &= got == want
+        print("%-30s %s" % (label, "OK" if got == want else
+                            "FAIL\n    got  %r\n    want %r" % (got, want)))
+
+    def fire(fn, state):
+        log.clear()
+        fn(state)
+        return [argv for argv, _ in log[0][1]] if log else []
+
+    NM = ["nmcli"]
+    check("wifi=off", fire(r.set_wifi, "off"), [NM + ["radio", "wifi", "off"]])
+    check("wifi=hotspot", fire(r.set_wifi, "hotspot"),
+          [NM + ["radio", "wifi", "on"], NM + ["con", "up", HOTSPOT_CON]])
+    check("wifi=on downs the hotspot", fire(r.set_wifi, "on"),
+          [NM + ["radio", "wifi", "on"], NM + ["con", "down", HOTSPOT_CON]])
+    check("bt=on", fire(r.set_bt, "on"), [["rfkill", "unblock", "bluetooth"]])
+    check("bt=off", fire(r.set_bt, "off"), [["rfkill", "block", "bluetooth"]])
+
+    # `con down` on a hotspot that was never up is rc=10, and off->on is exactly
+    # that path. Verified against the real nmcli: it must not be logged as a fault.
+    log.clear()
+    r.set_wifi("hotspot")
+    r.set_wifi("on")
+    check("...tolerantly (must=False)", [must for _, must in log[-1][1]], [True, False])
+
+    # Edge-only, like PanelPower: the loop calls these at 33Hz.
+    log.clear()
+    check("repeat is silent", (r.set_wifi("on"), r.set_bt("off"), len(log)),
+          (False, False, 0))
+    check("first call always fires", Radio(run=lambda s, w: log.append(w))
+          .set_wifi("on"), True)           # fresh Radio == boot: applies the stored
+
+    print("RADIOTEST", "PASS" if ok else "FAIL")
 
 
 def _looptest():
@@ -1738,6 +1838,9 @@ def main(argv):
         return
     if "--settingstest" in argv:
         _settingstest()
+        return
+    if "--radiotest" in argv:
+        _radiotest()
         return
     from ganglion.runtime import run_terminal
     if "--live" in argv:                       # inject the live synapse backend

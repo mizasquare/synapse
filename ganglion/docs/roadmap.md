@@ -1,7 +1,7 @@
 # Ganglion 로드맵 — 남은 일 (finalize 기준선)
 
 > 🛠 **살아있는 로드맵 (남은 일만).** 끝난 것은 여기 안 적는다 — 결정의 근거·검증 기록은
-> [`decisions.md`](decisions.md)(구현 결정 로그 A~V)에, 주제별 상세는
+> [`decisions.md`](decisions.md)(구현 결정 로그 A~W)에, 주제별 상세는
 > [`encoder-rail-todo.md`](encoder-rail-todo.md) · [`workflow-review-todo.md`](workflow-review-todo.md)에 남아 있고
 > 이 문서는 거기 흩어진 "남은 것"만 집계한다. 설계 정본 = [`design.md`](design.md).
 > 마지막 갱신: **2026-07-17 (전면 재작성 — 온메탈축 폐지(닫힘), 번인 방어 신설 후 같은 날 완료,
@@ -73,20 +73,19 @@ finalize다.
       > design.md §7의 열린 질문 한 줄이 전부). GECO는 **보낼 게 없고**(synapse의 MIDI = 페달
       > 배선인데 이 기기엔 페달이 없다), 인바운드는 **MODEP가 이미 처리한다**(PC ch1 → 스냅샷,
       > 지금 켜져 있음). 검증할 장비도 없어 만들면 영원히 미검증으로 남았을 것. → design.md §9-9 닫음.
-- [ ] **WiFi 3상태 / BT 2상태** — 리포지토리에 **선례 0**(첫 라디오 제어). 저장소가 생겼으니
-      착수 가능. (중)
-  - **사양[사용자]**: WiFi = `on` / `hotspot` / `off`, 기본 **on**. BT = `on` / `off`, 기본 **off**.
-    둘 다 SYSTEM의 **값 항목**(ENC1 제자리, 결정 U의 문법 — on/off도 2단계짜리 값이다).
-  - ⚠️ **`hotspot`이 계획을 바꾼다.** rfkill은 라디오 on/off밖에 못 해 **AP 모드를 못 만든다.**
-    → NetworkManager가 필요하고, 그럼 **polkit 규칙이 다시 들어온다**(`nmcli radio wifi off`가
-    `enable-disable-wifi`=`allow_active=yes`라 세션 없는 서비스에선 거부됨 — synapse 전원 메뉴가
-    겪은 그 실패). 해법 선례 = `deploy/ui-service/49-synapse-power.rules`.
-    이전 로드맵의 "rfkill 경로 채택(polkit 불필요)" 결론은 **hotspot 때문에 무효**.
-  - `[열림]` hotspot 연결 프로파일을 **설치 시 1회 생성**(그러면 앱은 `con up`만) vs 런타임 생성
-    (`nmcli device wifi hotspot`, 매번 임시 연결). 전자가 권장 — 앱 권한이 좁아진다.
-  - ⚠️ **이 박스는 wlan0로 붙어 있다** — WiFi off 테스트 순간 SSH가 끊긴다(노브로 복구는 되지만).
-    **맨 마지막에 붙일 것.**
-  - `[열림]` SYSTEM 하위 항목 vs 별도 화면 → 결정 U로 **닫힘**(SYSTEM 값 항목).
+> ✅ **2026-07-17 완료(일부 미검증): WiFi 3상태 / BT 2상태** — SYSTEM 값 항목(결정 U 문법),
+> 부팅 시 적용[사용자]. `hotspot`이 계획을 뒤집었다(rfkill은 AP를 못 만든다) → WiFi는 nmcli +
+> polkit 3액션(`deploy/ganglion-service/50-ganglion-radio.rules`), BT는 rfkill(`netdev` 그룹이라
+> 규칙 불필요). **`pb-hotspot` 프로파일은 이미 있어서**[사용자 지적] 앱은 up/down만 하고, 덕분에
+> polkit에서 `settings.modify.*`를 뺐다. 클라이언트 SSID는 코드에 없다 — NM autoconnect에 맡겨야
+> 리그가 다른 방으로 따라간다. → [`decisions.md`](decisions.md) W.
+>
+> - [ ] **⚠️ `hotspot` / `off` 온메탈 미검증** — 실행하면 이 박스가 관리 네트워크에서 떨어져
+>       Claude가 확인할 수 없다. **노브로 직접 확인 필요.** (BT와 WiFi `on`은 실기 확인됨:
+>       재시작 시 BT `Soft blocked: no → yes`, Florsheim 유지.)
+> - [ ] `[열림]` **hotspot일 때 화면에 뭘 보여줄지** — 지금은 SYSTEM 행에 `AP`뿐. 붙을 SSID
+>       (`starry`)나 IP(172.24.1.1)를 어디 보여줄지 미결. `About`과 겹치는 주제.
+
 - [ ] **monitorfeed 배선 (결정 H)** — IN/OUT 헤더 레벨(−14.2/−4.3)이 **하드코딩**. synapse
       `monitorfeed.py`를 `Runtime.step()`에 틱으로 얹는다. 코스트 모델상 좁은 밴드 갱신은 저렴. (중)
 - [ ] **튜너 실동작** — 지금은 **껍데기**다. `tcents=6` / `tnote="A"`가 `AppState` 기본값
@@ -157,7 +156,7 @@ finalize다.
 ## 참조
 
 - [`design.md`](design.md) — **설계 정본.** 하드웨어 스펙(실측) · 2a 인터랙션 모델 · 화면별 결정 · §9 열린결정.
-- [`decisions.md`](decisions.md) — **구현 결정 로그(A~V).** 왜 그렇게 정했나 + 라이브 검증 기록.
+- [`decisions.md`](decisions.md) — **구현 결정 로그(A~W).** 왜 그렇게 정했나 + 라이브 검증 기록.
 - [`encoder-rail-todo.md`](encoder-rail-todo.md) — 좌측 3px 인코더 레일 (구현 완료, 상세·비용표 보존).
 - [`workflow-review-todo.md`](workflow-review-todo.md) — 워크플로우 검토 Q1–Q7 (전부 착지, 대응 근거 보존).
 - [`plugin-whitelist.md`](plugin-whitelist.md) — 피커 버킷 큐레이션 (→ `geco_whitelist.json`). **스테일**:

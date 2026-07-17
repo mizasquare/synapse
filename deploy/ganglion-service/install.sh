@@ -18,6 +18,12 @@ fi
 
 install -m 0644 "$HERE/ganglion.service" /etc/systemd/system/ganglion.service
 
+# SYSTEM > WiFi needs three NetworkManager actions that default to allow_active,
+# which a sessionless system service can never satisfy (see the rule's comment,
+# and 49-synapse-power.rules for the identical problem in the other app). polkitd
+# reads rules.d live, so no reload.
+install -m 0644 "$HERE/50-ganglion-radio.rules" /etc/polkit-1/rules.d/50-ganglion-radio.rules
+
 systemctl daemon-reload
 systemctl enable --now ganglion.service
 

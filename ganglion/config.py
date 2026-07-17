@@ -49,6 +49,31 @@ BRIGHT_DEFAULT = 1
 """Index into BRIGHT_LEVELS — mid. (Not persisted yet: no settings store exists,
 so this is also the value every boot starts at. roadmap ①.)"""
 
+# -- radios (SYSTEM > WiFi / Bluetooth) ---------------------------------------
+WIFI_STATES = ("on", "hotspot", "off")
+WIFI_DEFAULT = "on"
+"""``hotspot`` is why WiFi goes through NetworkManager and not rfkill: rfkill can
+only kill a radio, it cannot make an access point.
+
+Stored as names, not indices — a settings file has to keep meaning when someone
+re-orders this tuple."""
+
+HOTSPOT_CON = "pb-hotspot"
+"""A NetworkManager connection profile that **already existed** on this box: AP
+mode, SSID ``starry``, wpa-psk, ``ipv4.method=shared`` (172.24.1.1/24 with NM's
+own DHCP), ``autoconnect=no``. We only ever bring it up and down — never edit or
+create it, which is why the polkit rule can withhold ``settings.modify.*``.
+
+Nothing here names a *client* SSID on purpose. There are several saved
+(Florsheim, KBRI_WiFi6, KT_...); leaving ``on`` to NetworkManager's autoconnect
+means the rig follows the user to another room, and another house, by itself."""
+
+BT_STATES = ("on", "off")
+BT_DEFAULT = "off"
+"""on/off only, so rfkill does it — and `miza`'s `netdev` membership is a *group*
+grant, which survives the sessionless service context that defeats polkit's
+allow_active. No rule needed for this one."""
+
 # -- idle panel power (burn-in — decisions.md S) -------------------------------
 CONTRAST_DIM = 0x01
 """Below the perceptible floor (0x08), so dimming costs nothing to look at while

@@ -1,0 +1,30 @@
+// Ganglion runs as a systemd *system* service (User=miza, no login session), so
+// NetworkManager's default policy denies it the radio actions behind SYSTEM >
+// WiFi: those are allow_active=yes, and a service has no active session to be.
+// Verified on this box, not assumed -- `loginctl list-sessions` is empty and
+// `nmcli general permissions` as miza already reports:
+//     enable-disable-wifi     아니요   (needed by: WiFi off)
+//     wifi.share.protected    아니요   (needed by: the pb-hotspot AP, wpa-psk +
+//                                       ipv4.method=shared)
+//     network-control         인증     (needed by: con up/down -- and with no
+//                                       session there is nobody to ask)
+//
+// Same shape and same reason as 49-synapse-power.rules, which exists because the
+// ⚙MENU power actions hit this identical wall. Grant the miza service user
+// exactly these three actions and nothing else -- notably NOT settings.modify.*,
+// because the hotspot profile (pb-hotspot) is pre-provisioned and the app only
+// ever brings connections up and down. It never edits or creates one.
+//
+// Bluetooth deliberately does not appear here: it is on/off only, which rfkill
+// does, and miza is in `netdev` -- a group grant, so it survives the sessionless
+// service context that defeats polkit's allow_active.
+//
+// polkitd picks up rules.d changes live -- no reload required.
+polkit.addRule(function(action, subject) {
+    if (subject.user == "miza" &&
+        (action.id == "org.freedesktop.NetworkManager.enable-disable-wifi" ||
+         action.id == "org.freedesktop.NetworkManager.network-control" ||
+         action.id == "org.freedesktop.NetworkManager.wifi.share.protected")) {
+        return polkit.Result.YES;
+    }
+});

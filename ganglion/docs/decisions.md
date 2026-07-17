@@ -511,6 +511,48 @@ N의 seam에 라이브 구현체를 붙임. 이 Pi는 살아있는 MODEP/pisound
   재시작 후 **레일 실측으로 적용 확인**: `bright=0`(0x08) 패널 몫 **+16.1mA** vs `bright=2`(0xFF)
   **+65.4mA** — **4배 차, 저장된 선택이 유리까지 간다**(눈 없이 증명됨).
 
+## W. 라디오 — WiFi 3상태 / BT 2상태 `[해결·일부 미검증]` (2026-07-17)
+
+앱 최초의 라디오 제어(리포지토리에 선례 0). 사양[사용자]: WiFi `on`/`hotspot`/`off` 기본 **on**,
+BT `on`/`off` 기본 **off**. 둘 다 SYSTEM의 **값 항목**(결정 U 문법 — on/off도 2단계짜리 값이다).
+
+- `[결정]` **hotspot이 계획을 뒤집었다.** 이전 로드맵은 "rfkill이면 sudo도 polkit도 불필요"로
+  결론냈는데 **무효다**: rfkill은 라디오를 끌 뿐 **AP를 만들 수 없다.** → WiFi는 NetworkManager,
+  그럼 polkit. **BT만 rfkill로 남는다**(on/off뿐이고, `miza`의 `netdev`는 *그룹* 권한이라 polkit의
+  `allow_active`를 무력화하는 세션 없는 서비스 컨텍스트에서도 산다 — 규칙 불필요).
+- `[결정]` **`pb-hotspot`은 이미 있었다** [사용자 지적] — AP/SSID `starry`/wpa-psk/`ipv4.method=shared`
+  (172.24.1.1/24 + NM 내장 DHCP)/`autoconnect=no`. **프로파일 생성이 계획에서 빠졌고**, 앱은 up/down만
+  하면 된다 → polkit에서 `settings.modify.*`를 **뺄 수 있었다**(권한이 좁아짐).
+- `[결정]` **polkit 규칙 3액션** — `deploy/ganglion-service/50-ganglion-radio.rules`,
+  `49-synapse-power.rules`와 같은 모양·같은 이유. **추측이 아니라 실측**: 이 박스는
+  `loginctl list-sessions`가 **비어 있어** 내 셸이 서비스와 같은 컨텍스트였고, 거기서
+  `enable-disable-wifi`=아니요 / `wifi.share.protected`=아니요 / `network-control`=인증(물어볼 세션이
+  없으니 사실상 거부)였다. 규칙 설치 후 **셋 다 예**로 뒤집히는 것을 **라디오를 건드리지 않고** 확인.
+- `[결정]` **클라이언트 SSID를 코드에 안 적는다.** `on`은 `radio wifi on` 후 **NM의 autoconnect에
+  맡긴다**(저장된 클라이언트 프로파일이 여럿 — Florsheim/KBRI_WiFi6/KT_…). 그래야 리그가 다른 방,
+  다른 집으로 따라간다. 하드코딩했으면 이사할 때 깨진다.
+- `[결정]` **`con down`은 관용(`must=False`)** — `off → on` 경로에선 hotspot이 애초에 안 떠 있고
+  nmcli는 그걸 **에러(rc=10)로 취급**한다(실 nmcli로 확인). 관용 안 하면 전환마다 헛 경고가 뜬다.
+- `[결정]` **루프를 절대 막지 않는다.** `nmcli con up`은 수 초가 걸리는데 이 루프는 33Hz로 인코더를
+  폴하고 패널과 버스를 공유한다 — 거기서 멈추면 UI도 노브도 그 시간 내내 죽는다. → **워커 스레드
+  fire-and-forget.** 결과를 기다리지도, 라디오를 되읽지도 않는다: UI는 **고른 값**을 보여준다
+  (밝기와 같은 계약 — contrast도 되읽지 않는다). 실패는 로그로.
+- `[결정]` **부팅 시 적용**[사용자 선택] — `Radio`가 엣지 온리라 **첫 호출이 곧 부팅 적용**이 된다
+  (별도 코드 없음). 위험은 알고 고른 것: 저장값이 `off`면 부팅 후 SSH로 못 들어온다(노브로만 복구).
+  기본이 `on`이라 새 박스는 안전하고, 앱이 안 뜨면 NM 자신의 기억이 남으므로 위험은 유계다.
+- `[결정]` **SYSTEM 항목 6개 → 레이아웃 재작업.** 18px 간격이면 6번째가 y=114에서 시작해 푸터(120)를
+  뚫는다 → **16px**. 값 표시는 종류를 따른다: 밝기는 **점**(레벨 = 범위 내 위치), 라디오는
+  **이름**(`ON`/`AP`/`OFF`) — 익명의 점 3개보다 정직하다. 반전 행에서도 `fill=0`으로 읽힌다(실 렌더 확인).
+- `[결정]` **`SYSVALUES` 테이블** — Brightness 특수분기를 대체. 밝기는 **인덱스**를 저장하고(선택지가
+  contrast 바이트라 라벨로선 무의미) 라디오는 **이름**을 저장한다(설정 파일에서 튜플 순서가 바뀌어도
+  의미가 유지돼야 한다). 선택지 튜플을 인덱싱하면 둘이 같은 방식으로 걷는다.
+- **⚠️ 미검증**: **`hotspot`과 `off`는 온메탈 검증 못 했다** — 실행하는 순간 이 박스가 관리 통로인
+  네트워크에서 떨어진다. **노브로 확인 필요.** 검증된 것: BT는 실기에서 **재시작 전 `Soft blocked: no`
+  → 후 `yes`**(저장된 기본값 off가 부팅 시 적용됨), WiFi `on`은 no-op이라 Florsheim 유지.
+- **검증**: `--radiotest` 8케이스(상태별 argv 3+2 · `con down` 관용 플래그 · 엣지 온리 · 첫 호출은
+  발화) — 러너 주입이라 서브프로세스 0. `--settingstest` 15케이스(라디오 필드 포함, **"bad field
+  costs only itself"**: `bright=99` 거부하면서 `wifi=hotspot`은 유지). 온메탈은 위.
+
 ## 해결됨 `[해결]`
 - **입력 어휘**: 우리 GestureRecognizer(Rotate/Press{click,long}/Combo)가 2a에 정확히 충분. 키보드
   에뮬(r/t/w/e · f/g/s/d · x)이 ENC0/ENC1 rot/click/hold + combo에 1:1 매핑 — 검증됨.

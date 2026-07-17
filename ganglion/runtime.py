@@ -19,6 +19,7 @@ Seams:
   led_out((name0, name1)) -> None      (optional; device NeoPixels)
   power.idle(elapsed) / .wake() / .set_on(level)   (optional; hw.oled.PanelPower)
   settings.apply(st) / .observe(st)    (optional; settings.Settings)
+  radio.set_wifi(state) / .set_bt(state)   (optional; hw.radio.Radio)
 """
 
 import time as _time
@@ -44,7 +45,7 @@ class Runtime:
     """
 
     def __init__(self, controller, source, sink, view, *, leds=None, led_out=None,
-                 power=None, settings=None, splash_s=0.5, tick_s=0.03,
+                 power=None, settings=None, radio=None, splash_s=0.5, tick_s=0.03,
                  clock=_time.monotonic, sleep=_time.sleep):
         self.c = controller
         self.source = source
@@ -54,6 +55,7 @@ class Runtime:
         self.led_out = led_out
         self.power = power
         self.settings = settings
+        self.radio = radio
         self.splash_s = splash_s
         self.tick_s = tick_s
         self.clock = clock
@@ -83,6 +85,9 @@ class Runtime:
             # learns what a contrast byte is. Both calls no-op when nothing moved.
             self.power.set_on(BRIGHT_LEVELS[self.c.st.bright])
             self.power.idle(now - self._t_input)  # the user cannot see (cf. F)
+        if self.radio:                      # same shape again; both are edge-only,
+            self.radio.set_wifi(self.c.st.wifi)     # and the first call is the
+            self.radio.set_bt(self.c.st.bt)         # boot-time apply
         for ev in events:
             self.c.feed(ev)
         if self.settings:
@@ -242,6 +247,7 @@ def run_device(controller, view, leds):
     from luma.core.interface.serial import i2c
     from luma.oled.device import sh1107
     from ganglion.hw.oled import DiffSink, LumaWriter, PanelPower
+    from ganglion.hw.radio import Radio
     from ganglion.hw.seesaw import SeesawInput
     from ganglion.settings import Settings
 
@@ -281,7 +287,7 @@ def run_device(controller, view, leds):
     settings.apply(controller.st)
 
     rt = Runtime(controller, source, sink, view, leds=leds, led_out=led_out,
-                 power=power, settings=settings)
+                 power=power, settings=settings, radio=Radio())
     try:
         rt.run()                       # Ctrl-C is the only way out: no quit gesture
     except KeyboardInterrupt:

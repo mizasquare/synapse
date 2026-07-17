@@ -61,3 +61,25 @@ journalctl -u ganglion.service -b      # 이번 부팅 전체 (재시작 루프 
 
 재시작 루프가 돌면 대개 둘 중 하나다: mod-host가 아직 안 떴거나(정상, 곧 붙는다),
 i2c에 아무것도 없거나(`i2cdetect -y 1` → `36 37 3d`가 보여야 한다).
+
+## polkit — SYSTEM > WiFi
+
+`install.sh` also drops `50-ganglion-radio.rules` into `/etc/polkit-1/rules.d/`.
+Without it SYSTEM > WiFi silently does nothing: NetworkManager's radio actions
+are `allow_active=yes`, and this unit has no login session to be active in — the
+same wall `49-synapse-power.rules` exists for in the other app. It grants user
+`miza` exactly three actions (`enable-disable-wifi`, `network-control`,
+`wifi.share.protected`) and nothing else; notably **not** `settings.modify.*`,
+because the hotspot profile (`pb-hotspot`) is pre-provisioned on the box and the
+app only ever brings connections up and down.
+
+Check it took, without touching the radio:
+
+```sh
+nmcli general permissions | grep -E 'enable-disable-wifi|network-control|share.protected'
+# all three should say yes / 예
+```
+
+Bluetooth needs no rule — it is on/off only, so it goes through `rfkill`, and
+`miza`'s `netdev` group membership is a group grant that survives the
+sessionless service context.
