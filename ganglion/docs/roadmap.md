@@ -4,8 +4,8 @@
 > [`decisions.md`](decisions.md)(구현 결정 로그 A~W)에, 주제별 상세는
 > [`encoder-rail-todo.md`](encoder-rail-todo.md) · [`workflow-review-todo.md`](workflow-review-todo.md)에 남아 있고
 > 이 문서는 거기 흩어진 "남은 것"만 집계한다. 설계 정본 = [`design.md`](design.md).
-> 마지막 갱신: **2026-07-17 (전면 재작성 — 온메탈축 폐지(닫힘), 번인 방어 신설 후 같은 날 완료,
-> 버그 2건 발견, 유틸 노드 항목 정정.)**
+> 마지막 갱신: **2026-07-17** — 전면 재작성(온메탈축 폐지) 후 같은 날: 번인 방어(S) · 버그 2건(T) ·
+> MIDI Ch 제거 · Brightness(U) · 설정 저장소(V) · 라디오(W)까지 닫힘. **①에 About·monitorfeed·튜너만 남았다.**
 >
 > **정렬 원칙 — 우선순위 축:** ① 기능(미구현 본체) → ② 뷰 폴리시 → ③ 온메탈 잔여 →
 > ④ 아키텍처·성능 → ⑤ 백로그. (번인 방어·버그 축은 열린 날 닫혔다 — 위 ✅ 둘.)
@@ -55,37 +55,37 @@ finalize다.
 
 ## ① 기능 (미구현 / 부분구현 본체)
 
-> ✅ **2026-07-17 완료: 설정 영속화 저장소** — [`../settings.py`](../settings.py), `~/.modep/ganglion.json`.
-> ①의 **선결**이 풀렸다. `config.py`(코드가 아는 값)와 다른 물건이다 — 이건 **사용자가 고른 값**.
-> **이 기기는 종료되지 않고 뽑히므로**(부검 참조) 원자적 쓰기(tmp→fsync→replace→dir fsync) + 필드별
-> 관대한 로드(파손 6종 전부 defaults로 착지, raise 0) + 즉시 쓰기(종료 시점이 없다). `run_device`만
-> 주입해 fake 실행이 실기 값을 못 덮는다(`SYNAPSE_STATE_DIR` 가드를 물려받음).
-> 설정 추가 = `FIELDS` 한 줄 + `AppState` 필드. → [`decisions.md`](decisions.md) V.
-- [ ] **SYSTEM `About`** — 마지막 남은 `TODO:` 토스트 스텁이자 **유일한 미구현 액션**. 무엇을
-      보일지 미결(버전? 보드수? I2C 주소? hotspot SSID/IP?). 위 ✅의 "hotspot을 어디 보여줄지"와
-      겹치는 주제라 같이 정하는 게 자연스럽다. (소, 결정 필요)
-      > ✅ 2026-07-17: **`Brightness` 완료** — ENC1 제자리 편집(새 모드 0개, `AppState` 필드 1개),
-      > 3단계 `(0x08, 0x2D, 0xFF)`. 만들기 전에 "지각되긴 하나"부터 쟀고, design.md의 "밝기 변화를
-      > 못 느낀다"는 **전백에서만 참**이었다(실 UI는 6단계 구분). 수치는 신설 [`../config.py`](../config.py)로
-      > — §7이 결정만 해두고 안 만든 자리이고, `0x3D`/`rotate=0`이 두 벌 있던 중복도 같이 없앴다.
-      > 영속화는 아래 ✅(저장소)가 닫았다 — 이제 재부팅을 넘는다. → [`decisions.md`](decisions.md) U.
-      >
-      > ✅ 2026-07-17: **`MIDI Ch` 제거**[사용자 동의] — 설계가 없는 라벨이었다(스펙 0,
-      > design.md §7의 열린 질문 한 줄이 전부). GECO는 **보낼 게 없고**(synapse의 MIDI = 페달
-      > 배선인데 이 기기엔 페달이 없다), 인바운드는 **MODEP가 이미 처리한다**(PC ch1 → 스냅샷,
-      > 지금 켜져 있음). 검증할 장비도 없어 만들면 영원히 미검증으로 남았을 것. → design.md §9-9 닫음.
-> ✅ **2026-07-17 완료: WiFi 3상태 / BT 2상태** — SYSTEM 값 항목(결정 U 문법),
-> 부팅 시 적용[사용자]. `hotspot`이 계획을 뒤집었다(rfkill은 AP를 못 만든다) → WiFi는 nmcli +
-> polkit 3액션(`deploy/ganglion-service/50-ganglion-radio.rules`), BT는 rfkill(`netdev` 그룹이라
-> 규칙 불필요). **`pb-hotspot` 프로파일은 이미 있어서**[사용자 지적] 앱은 up/down만 하고, 덕분에
-> polkit에서 `settings.modify.*`를 뺐다. 클라이언트 SSID는 코드에 없다 — NM autoconnect에 맡겨야
-> 리그가 다른 방으로 따라간다. → [`decisions.md`](decisions.md) W.
-> 온메탈 **전 상태 확인됨**[사용자] — `hotspot`/`off` 포함(Claude는 확인 불가한 자리였다:
-> 실행하면 이 박스가 관리 네트워크에서 떨어진다).
+> ✅ **2026-07-17 완료: SYSTEM 메뉴 본체 + 설정 저장소.** 하루에 축이 거의 비었다. 근거·검증은
+> [`decisions.md`](decisions.md) **U**(Brightness) · **V**(저장소) · **W**(라디오).
 >
-> - [ ] `[열림]` **hotspot일 때 화면에 뭘 보여줄지** — 지금은 SYSTEM 행에 `AP`뿐. 붙을 SSID
->       (`starry`)나 IP(172.24.1.1)를 어디 보여줄지 미결. `About`과 겹치는 주제.
+> - **설정 영속화 저장소** — [`../settings.py`](../settings.py), `~/.modep/ganglion.json`. ①의
+>   **선결**이었다. [`../config.py`](../config.py)(코드가 아는 값)와 **다른 물건**이다: 이건
+>   *사용자가 고른 값*이고, 상수는 설정이 될 수 없다. **이 기기는 종료되지 않고 뽑히므로**
+>   ([부검](../../docs/save-corruption-postmortem.md)) 원자적 쓰기(tmp→fsync→replace→dir fsync) +
+>   **필드별** 관대한 로드(파손 7종 전부 defaults 착지, raise 0) + 즉시 쓰기(종료 시점이 없다).
+>   `run_device`만 주입해 fake 실행이 실기 값을 못 덮는다(`SYNAPSE_STATE_DIR` 가드 상속).
+>   설정 추가 = `FIELDS` 한 줄 + `AppState` 필드.
+> - **Brightness** — ENC1 **제자리 편집**(새 모드 0개, `AppState` 필드 1개), 3단계
+>   `(0x08, 0x2D, 0xFF)`. **만들기 전에 "지각되긴 하나"부터 쟀다** — design.md의 "밝기 변화를 못
+>   느낀다"는 **전백에서만 참**이었고 실 UI는 6단계가 구분된다. 수치는 신설 `config.py`로:
+>   §7이 결정만 해두고 안 만든 자리였고, `0x3D`/`rotate=0`이 두 벌(runtime + oled_probe) 있던
+>   중복도 같이 없앴다.
+> - **WiFi 3상태 / BT 2상태** — SYSTEM **값 항목**, 부팅 시 적용[사용자]. `hotspot`이 계획을
+>   뒤집었다(rfkill은 AP를 못 만든다) → WiFi = nmcli + polkit 3액션
+>   ([`50-ganglion-radio.rules`](../../deploy/ganglion-service/50-ganglion-radio.rules)),
+>   BT = rfkill(`netdev` 그룹이라 규칙 불필요). **`pb-hotspot`이 이미 있어서**[사용자 지적] 앱은
+>   up/down만 하고, 덕분에 polkit에서 `settings.modify.*`를 뺐다. 클라이언트 SSID는 코드에 없다 —
+>   NM autoconnect에 맡겨야 리그가 다른 방으로 따라간다. 온메탈 **전 상태 확인됨**[사용자].
+> - **`MIDI Ch` 제거**[사용자 동의] — 설계가 없는 라벨이었다(스펙 0). GECO는 **보낼 게 없고**
+>   (synapse의 MIDI = 페달 배선인데 이 기기엔 페달이 없다), 인바운드는 **MODEP가 이미 처리한다**
+>   (PC ch1 → 스냅샷, 지금 켜져 있음). → design.md §9-9 닫음.
+>
+> **남은 것:** `[열림]` **hotspot일 때 화면에 뭘 보여줄지** — 지금 SYSTEM 행엔 `AP`뿐이다. 붙을
+> SSID(`starry`)·IP(172.24.1.1)를 어디 보여줄지 미결. 아래 `About`과 같은 주제.
 
+- [ ] **SYSTEM `About`** — 마지막 남은 `TODO:` 토스트 스텁이자 **유일한 미구현 액션**(값 항목은
+      클릭에 반응하지 않는다 — 결정 W 후속). 무엇을 보일지 미결: 버전? 보드수? I2C 주소?
+      **hotspot SSID/IP?** 위 `[열림]`과 같은 주제라 같이 정하는 게 자연스럽다. (소, 결정 필요)
 - [ ] **monitorfeed 배선 (결정 H)** — IN/OUT 헤더 레벨(−14.2/−4.3)이 **하드코딩**. synapse
       `monitorfeed.py`를 `Runtime.step()`에 틱으로 얹는다. 코스트 모델상 좁은 밴드 갱신은 저렴. (중)
 - [ ] **튜너 실동작** — 지금은 **껍데기**다. `tcents=6` / `tnote="A"`가 `AppState` 기본값
