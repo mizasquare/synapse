@@ -4,9 +4,9 @@
 > [`decisions.md`](decisions.md)(구현 결정 로그 A~W)에, 주제별 상세는
 > [`encoder-rail-todo.md`](encoder-rail-todo.md) · [`workflow-review-todo.md`](workflow-review-todo.md)에 남아 있고
 > 이 문서는 거기 흩어진 "남은 것"만 집계한다. 설계 정본 = [`design.md`](design.md).
-> 마지막 갱신: **2026-07-17** — 전면 재작성(온메탈축 폐지) 후 같은 날: 번인 방어(S) · 버그 2건(T) ·
-> MIDI Ch 제거 · Brightness(U) · 설정 저장소(V) · 라디오(W) · **텍스트 래스터 캐시(X)** ·
-> **레벨미터(H, 실기 검증)**까지 닫힘. **①에 About·튜너만 남았다.**
+> 마지막 갱신: **2026-07-20** — 번인 방어(S) · 버그 2건(T) · MIDI Ch 제거 · Brightness(U) ·
+> 설정 저장소(V) · 라디오(W) · **텍스트 래스터 캐시(X)** · **레벨미터(H, 실기 검증)** ·
+> **튜너 실동작**(온디맨드 cochlea 심, **온메탈 실음 검증까지 완료**)까지 닫힘. **①에 About만 남았다.**
 >
 > ⚠️ **④의 "RT 경로에서 파이썬 빼기"는 폐기됐다 — 문제가 존재하지 않았다.** 미터의 xrun 688은
 > 파이썬도 GIL도 아니고 유닛에 `LimitRTPRIO`가 없어 콜백이 SCHED_OTHER로 돌던 것이었다. 유닛
@@ -15,9 +15,10 @@
 > 64 에이전트 리서치는 **틀린 질문에 정교하게 답한** 것이 됐다. 전말은 [`decisions.md`](decisions.md)
 > X의 "정정의 정정" — **저널 네 줄을 아무도 먼저 읽지 않은 게 그날의 전부다.**
 >
-> ⚠️ **이 문서가 "튜너는 monitorfeed 배선이 전제"라고 적었던 것은 오류였다**(결정 H에서 물려받음).
-> 튜너는 monitorfeed를 안 쓴다 — `cochlea`가 자기 JACK 클라이언트로 `capture_1`을 직접 뜬다.
-> 없는 의존을 만들어 순서를 거꾸로 잡고 있었다. 자세한 건 [`decisions.md`](decisions.md) H의 폐기 블록.
+> 📝 **튜너 착지(2026-07-18, 온메탈 검증 2026-07-20).** "monitorfeed 배선이 전제"였다던 것은
+> 오류였고(결정 H에서 물려받음), 실제로는 `cochlea`가 자기 JACK 클라이언트로 `capture_1`을 직접
+> 떠서 **안 막혀 있었다** — [`../hw/tuner.py`](../hw/tuner.py) 온디맨드 심으로 구현.
+> **실기(기타 → JACK → 바늘)까지 검증 완료 — 이 축은 닫혔다**(① 참조).
 >
 > **정렬 원칙 — 우선순위 축:** ① 기능(미구현 본체) → ② 뷰 폴리시 → ③ 온메탈 잔여 →
 > ④ 아키텍처·성능 → ⑤ 백로그. (번인 방어·버그 축은 열린 날 닫혔다 — 위 ✅ 둘.)
@@ -107,19 +108,36 @@ finalize다.
       0**(남의 클라이언트 0). 숫자는 live amp가 아니라 **5초 윈도 peak**(synapse `pack()`과
       동일 — live는 매 틱 떨려 헤더 밴드를 매번 민다). `st.inlvl`/`st.outlvl` 기본값은 `None`(→ `"--"`):
       JACK 없는 dev/터미널에서 가짜 −14.2를 보이면 거짓말이다. → README 스크린샷은 ⑤에 남아 있다.
-- [ ] **튜너 실동작** — 지금은 **껍데기**다. `tcents=6` / `tnote="A"`가 `AppState` 기본값
-      ([`../app.py`](../app.py):156-157)이고 **쓰는 코드가 없다** — 라이브 튜너는 영구히 "A / +6 cents",
-      바늘은 x≈70에 얼어 있다. `TunerMode`는 플래그만 세운다. ~~monitorfeed 배선이 전제~~ —
-      **틀렸다**(H 폐기 블록). 튜너는 `cochlea.TunerEngine`(NSDF+HPS, 자체 `capture_1` 클라이언트,
-      `get_reading()` 풀 API)이고 **안 막혀 있었다**. 오히려 **온디맨드라 안전한 쪽**이다 —
-      튜닝 중엔 연주 중이 아니다. 심 모양은 미터와 같고, 모드 진입/이탈 엣지에서 engine을
-      start/stop(synapse `presenter.enter_tuner`와 동형). 무음/저신뢰 = `get_reading()→None`이라
-      "listening" 표시가 필요하다(지금 상태엔 그 자리가 없다). (중)
+- [x] **튜너 실동작** `[해결]`(2026-07-18, 온메탈 검증 2026-07-20) — 껍데기(영구 "A / +6")를 실동작으로. 미터와
+      **대칭인 온디맨드 INBOUND 심** [`../hw/tuner.py`](../hw/tuner.py): `st.tuner` 엣지에서
+      `cochlea.TunerEngine`(NSDF+HPS, 자체 `capture_1` JACK 클라이언트, One-Euro+노트락)를
+      start/stop하고 `get_reading()`을 `st.tnote`/`st.tcents`로 쓴다(synapse `presenter.enter_tuner`와
+      동형). 엔진은 **튜닝 중에만** 산다 — 리그가 연주 중이 아님이 보장되는 유일한 순간. ~~monitorfeed
+      전제~~는 틀렸었고(H 폐기 블록) 튜너는 capture를 직접 뜬다. 무음/저신뢰 = `get_reading()→None`은
+      새 필드 `st.tlisten`으로 "listening / play a note" 화면(마지막 노트를 얼리는 대신 정직하게
+      표시 — `inlvl=None → "--"`와 같은 idiom). LED는 **인튠(|cents|<5)에서만 green/green**, 그 외
+      purple. 지연 부착+재시도(부팅 레이스, 미터와 동일). `--tunertest` 17검(엣지: 진입/이탈 lifecycle,
+      None→listening, 라운딩, 죽은 엔진, 부팅 레이스 재시도, LED, stop 멱등) + `--walk` 골든 불변
+      (tlisten 기본 False라 골든 튜너 프레임 유지). **온메탈 검증 완료**(2026-07-20): 리그에서
+      ENC1-hold 후 실제 기타 → JACK → 바늘 동작 확인 — 셀프테스트가 안 타던 DSP 경로까지 닫혔다.
 - [ ] **effect 채널 (toast/persist emit)** — 콤보 저장 버그(위 ✅)는 닫혔지만 채널 자체는
       남아 있다. → [`decisions.md`](decisions.md) N "남은 것"(2). (소)
 
 ## ② 뷰 폴리시 (상태를 올바로 드러냄)
 
+- [ ] **롱프레스는 릴리즈가 아니라 임계 시점에 발동해야 한다** [사용자, 2026-07-18] — 지금
+      [`../input.py`](../input.py) `GestureRecognizer._switch`는 click/long을 **릴리즈 엣지에서만**
+      판정한다(`dur >= long_press_s`). 그래서 홀드하는 동안 사용자는 자기가 지금 어느 상태인지
+      **볼 수가 없다** — "충분히 눌렀나? 지금 떼면 click으로 먹나?" 하고 멈칫하게 된다. 이건
+      본질적으로 **상태 은폐**라 ②에 든다. 고칠 방향: 버튼이 눌린 채 `now - since >= long_press_s`가
+      되는 **그 틱에** `Press(enc, "long")`을 바로 내보내고(엣지가 아니라 매 틱 검사 필요 — `update()`가
+      지금은 엣지에서만 `_switch`를 돌린다), 이후 릴리즈는 억제(콤보의 `_consumed`와 같은 플래그).
+      임계 도달 순간 **햅틱 대용 피드백**(LED 깜빡/색전환 한 번)이 있으면 "됐다"가 손끝에 전해진다.
+      ⚠️ **파급:** (1) 키보드 에뮬레이터는 릴리즈가 없어 이미 `Press("long")`을 즉시 낸다 — 하드웨어만
+      바뀌면 되고 에뮬레이터와 동작이 **더** 일치한다. (2) `ENC0-hold=zoom-out`이 홀드 중 발동하면,
+      튜너 진입(`ENC1-hold`)·무빙 취소 등 hold 액션이 **손 떼기 전에** 일어난다 — 대체로 바라던 바지만
+      long 후 그 버튼의 회전/클릭이 오면 안 되므로 억제 플래그가 확실해야 한다. (3) `LONG_PRESS_S=0.6`이
+      체감 임계가 되니 실기에서 재조정 여지. 결정 D(제스처)·Q1(튜너 이탈)과 같은 계열. (중)
 - [ ] **유틸 노드가 이펙트처럼 보인다** — ⚠️ **정정: 라우팅 예외처리는 이미 되어 있다.**
       [`../geco_routing.py`](../geco_routing.py):53 `desired_wiring()`이 포트 **개수를 가정하지 않고**
       실 LV2 포트 심볼을 보고 셋으로 분류한다 — 트렁크 fx(`ain`&`aout`, :62) / **소스**(`ain==[]`:

@@ -21,6 +21,7 @@ Seams:
   settings.apply(st) / .observe(st)    (optional; settings.Settings)
   radio.set_wifi(state) / .set_bt(state)   (optional; hw.radio.Radio)
   meter.observe(st)                    (optional; hw.meter.Meter — INBOUND)
+  tuner.observe(st)                    (optional; hw.tuner.Tuner — INBOUND, on-demand)
 """
 
 import time as _time
@@ -46,8 +47,8 @@ class Runtime:
     """
 
     def __init__(self, controller, source, sink, view, *, leds=None, led_out=None,
-                 power=None, settings=None, radio=None, meter=None, splash_s=0.5,
-                 tick_s=0.03, clock=_time.monotonic, sleep=_time.sleep):
+                 power=None, settings=None, radio=None, meter=None, tuner=None,
+                 splash_s=0.5, tick_s=0.03, clock=_time.monotonic, sleep=_time.sleep):
         self.c = controller
         self.source = source
         self.sink = sink
@@ -58,6 +59,7 @@ class Runtime:
         self.settings = settings
         self.radio = radio
         self.meter = meter
+        self.tuner = tuner
         self.splash_s = splash_s
         self.tick_s = tick_s
         self.clock = clock
@@ -94,6 +96,11 @@ class Runtime:
             self.c.feed(ev)
         if self.settings:
             self.settings.observe(self.c.st)    # writes only when a choice moved
+        # Not under the blank guard below: unlike the meter, this seam owns a JACK
+        # client's whole lifetime and must start/stop it on the st.tuner edge even
+        # if the panel is dark. It self-gates (does nothing unless tuning) cheaply.
+        if self.tuner:
+            self.tuner.observe(self.c.st)
         # A blank panel keeps its GDDRAM, so drawing into it is pure bus waste --
         # and a level nobody can read is not worth a JACK snapshot either, which is
         # why the meter sits inside the guard and not with the three seams above.
@@ -258,6 +265,7 @@ def run_device(controller, view, leds):
     from ganglion.hw.oled import DiffSink, LumaWriter, PanelPower
     from ganglion.hw.radio import Radio
     from ganglion.hw.seesaw import SeesawInput
+    from ganglion.hw.tuner import Tuner
     from ganglion.settings import Settings
 
     i2c_bus = busio.I2C(board.SCL, board.SDA)
@@ -314,8 +322,15 @@ def run_device(controller, view, leds):
     # PAM sessions, which a system service is not.
     meter = Meter()
 
+    # Guitar tuner (① 기능) — an on-demand cochlea engine, live only while the
+    # ENC1-hold tuner screen is up (hw/tuner.py). Its own JACK client on
+    # capture_1, spun up and torn down on the mode edge, so it costs nothing the
+    # rest of the time.
+    tuner = Tuner()
+
     rt = Runtime(controller, source, sink, view, leds=leds, led_out=led_out,
-                 power=power, settings=settings, radio=Radio(), meter=meter)
+                 power=power, settings=settings, radio=Radio(), meter=meter,
+                 tuner=tuner)
     try:
         rt.run()                       # Ctrl-C is the only way out: no quit gesture
     except KeyboardInterrupt:
@@ -332,3 +347,5 @@ def run_device(controller, view, leds):
             pass                       # a dead bus must not mask the real error
         if meter is not None:
             meter.stop()               # never raises (hw/meter.py)
+        if tuner is not None:
+            tuner.stop()               # drops the engine's JACK client + DSP thread

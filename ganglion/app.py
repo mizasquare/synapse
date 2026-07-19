@@ -190,6 +190,11 @@ class AppState:
     tuner: bool = False
     tcents: int = 6
     tnote: str = "A"
+    # No pitch to show yet — silence, low confidence, or a stale frame. Written by
+    # the Runtime's Tuner seam (like inlvl below, world -> state); the view draws
+    # "listening" rather than freeze on the last note. False default so the golden
+    # tuner frame (--walk) still shows a locked reading.
+    tlisten: bool = False
     pb: int = 0               # highlighted board (glance cursor)
     pb_cur: int = 0           # board actually loaded on the host (glance "loaded" marker)
     snap: int = 1
@@ -1428,6 +1433,10 @@ def _tuner(st):
     s = Screen()
     s.T("TUNER", 6, 4, 8, ls=1)
     s.T("press exit", 84, 4, 6)               # Q1: any press exits (rotate ignored)
+    if st.tlisten:                            # no reading: don't fake a note/needle
+        s.T("listening", int((128 - s.Tw(16, "listening")) / 2), 40, 16)
+        s.T("play a note", int((128 - s.Tw(8, "play a note")) / 2), 74, 8)
+        return s.img
     s.T(st.tnote, int((128 - s.Tw(46, st.tnote)) / 2), 18, 46)
     s.hline(10, 88, 108)
     for i in range(-2, 3):
@@ -1451,7 +1460,9 @@ OFF = "off"
 def leds(st):
     m = mode_of(st)
     n = st.board[st.node] if st.board else None   # no node under the cursor on an empty chain
-    if m == "tuner":
+    if m == "tuner":                          # green = in tune (both LEDs, like a
+        if not st.tlisten and abs(st.tcents) < 5:   # hardware tuner's lock light);
+            return ("green", "green")               # purple while listening/adjusting
         return ("purple", "purple")
     if m == "confirm":                        # delete danger on the operating encoder
         return ("red", OFF) if _op(st.confirm.split(":")[1]) == 0 else (OFF, "red")
@@ -2026,12 +2037,140 @@ def _metertest():
         raise SystemExit(1)
 
 
+def _tunertest():
+    """Guitar tuner seam (① 기능) — injected engine, no JACK, no cochlea import.
+
+    The DSP is synapse's and unit-tested there (cochlea_selftest); what ganglion
+    owns is the seam around it — on-demand start/stop on the st.tuner edge, the
+    None -> "listening" contract, the boot-race retry, and that a dead engine
+    can't take the UI down. Those are the edges the rig actually hits.
+    """
+    from ganglion.hw.tuner import Tuner
+
+    ok = True
+
+    def check(label, got, want):
+        nonlocal ok
+        ok &= got == want
+        print("%-46s %s" % (label, "OK" if got == want else
+                            "FAIL  got %r want %r" % (got, want)))
+
+    class Reading:
+        def __init__(self, note, cents):
+            self.note, self.cents = note, cents
+
+    class Engine:
+        def __init__(self, reading=None):
+            self.reading = reading          # a Reading, None, or an Exception
+            self.started = self.stopped = False
+
+        def start(self):
+            self.started = True
+
+        def stop(self):
+            self.stopped = True
+
+        def get_reading(self):
+            if isinstance(self.reading, Exception):
+                raise self.reading
+            return self.reading
+
+    # -- lifecycle: engine exists only while tuning --------------------------
+    eng = Engine(None)
+    t = Tuner(make=lambda: eng)
+    st = AppState()
+    t.observe(st)                           # st.tuner False (default) -> nothing
+    check("idle when not tuning (no engine built)", (t.ok, eng.started), (False, False))
+
+    st.tuner = True
+    t.observe(st)                           # enter -> build + start; None reading
+    check("entering tuner starts the engine", (t.ok, eng.started), (True, True))
+    check("no pitch yet -> listening", st.tlisten, True)
+    check("...and the note is left frozen (hidden)", (st.tnote, st.tcents), ("A", 6))
+
+    eng.reading = Reading("E2", 3.4)        # a locked reading arrives
+    t.observe(st)
+    check("a reading lands as note + rounded cents",
+          (st.tlisten, st.tnote, st.tcents), (False, "E2", 3))
+
+    eng.reading = Reading("A2", -12.6)      # rounds away from zero
+    t.observe(st)
+    check("cents rounds (-12.6 -> -13)", st.tcents, -13)
+
+    eng.reading = None                      # player stops -> back to listening
+    t.observe(st)
+    check("silence -> listening, last note frozen",
+          (st.tlisten, st.tnote), (True, "A2"))
+
+    eng.reading = RuntimeError("engine died")   # a crashing engine must not throw
+    t.observe(st)                                # (and reads as nothing)
+    check("dead engine -> listening, no crash", st.tlisten, True)
+
+    st.tuner = False                        # leave -> stop + drop
+    t.observe(st)
+    check("leaving tuner stops + drops the engine", (eng.stopped, t.ok), (True, False))
+
+    # -- boot race: TunerEngine.start() raises until jackd is up -------------
+    tries = []
+
+    def flaky():
+        tries.append(1)
+        e = Engine(None)
+        if len(tries) < 2:
+            def boom():
+                raise RuntimeError("no JACK yet")
+            e.start = boom                  # first attempt: jackd not up
+        return e
+
+    t2, st2 = Tuner(make=flaky), AppState()
+    st2.tuner = True
+    t2.observe(st2)
+    check("no JACK at entry -> listening, no engine", (t2.ok, st2.tlisten), (False, True))
+    st2.t = 0.5                             # same retry window: must not hammer
+    t2.observe(st2)
+    check("attach is rate-limited (1 try per 3s)", len(tries), 1)
+    st2.t = Tuner.RETRY_S + 0.1             # window passed: try again, jackd up now
+    t2.observe(st2)
+    check("retries once the window passes, then attaches", (t2.ok, len(tries)), (True, 2))
+
+    # -- the view: listening vs a locked reading are different frames --------
+    st3 = AppState(tuner=True, tlisten=True)
+    listening = render(st3).tobytes()
+    st3.tlisten, st3.tnote, st3.tcents = False, "E2", 3
+    check("listening and a reading render differently",
+          render(st3).tobytes() != listening, True)
+
+    # -- LEDs: green only on a real in-tune reading, never while listening ---
+    check("in-tune reading -> green/green",
+          leds(AppState(tuner=True, tlisten=False, tcents=2)), ("green", "green"))
+    check("off-pitch -> purple/purple",
+          leds(AppState(tuner=True, tlisten=False, tcents=20)), ("purple", "purple"))
+    check("listening -> purple (not a false green)",
+          leds(AppState(tuner=True, tlisten=True, tcents=0)), ("purple", "purple"))
+
+    # stop() is idempotent and always reaches the engine
+    eng2 = Engine(None)
+    t3 = Tuner(make=lambda: eng2)
+    st4 = AppState(tuner=True)
+    t3.observe(st4)
+    t3.stop()
+    t3.stop()
+    check("stop() reaches the engine and is idempotent", (eng2.stopped, t3.ok), (True, False))
+
+    print("\nTUNER-%s" % ("OK" if ok else "FAIL"))
+    if not ok:
+        raise SystemExit(1)
+
+
 def main(argv):
     if "--fonttest" in argv:
         _fonttest()
         return
     if "--metertest" in argv:
         _metertest()
+        return
+    if "--tunertest" in argv:
+        _tunertest()
         return
     if "--walk" in argv:
         _walk()
