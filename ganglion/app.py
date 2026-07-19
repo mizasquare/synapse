@@ -37,7 +37,8 @@ from PIL import ImageDraw
 
 from ganglion import WIDTH, HEIGHT
 from ganglion.config import (BRIGHT_DEFAULT, BRIGHT_LEVELS, BT_DEFAULT, BT_STATES,
-                             CONTRAST_DIM, WIFI_DEFAULT, WIFI_STATES)
+                             CONTRAST_DIM, HOTSPOT_IP, HOTSPOT_SSID, WIFI_DEFAULT,
+                             WIFI_STATES)
 from ganglion.render import Screen, fs
 from ganglion.input import Rotate, Press, Combo
 from ganglion.geco_backend import FakeGeco
@@ -180,6 +181,14 @@ class AppState:
                                       # Runtime maps it to a contrast byte
     wifi: str = WIFI_DEFAULT          # config.WIFI_STATES; the Runtime hands
     bt: str = BT_DEFAULT              # these to hw.radio, which owns nmcli
+    about: bool = False               # SYSTEM > About: an overlay ABOVE sys (mode_of
+                                      # ranks it first), so leaving it reveals the
+                                      # SYSTEM menu underneath -- no re-entry needed
+    net_ssid: str = None              # client SSID / IP, read live by hw.radio.status
+    net_ip: str = None                # on the About edge (None -> "--"; hotspot uses
+                                      # config constants, not these). world -> state.
+    build: str = None                 # git describe, seeded once by run_device (None
+                                      # off-device -> "unknown"; a fact, not a choice)
     pick: str = ""            # ""=off, "cat"=category list, "fx"=plugin list
     pick_cat: int = 0
     pick_fx: int = 0
@@ -237,6 +246,7 @@ class AppState:
 # one place and can't drift between them. Flags stay the source of truth (the
 # confirm-over-sub overlay is preserved for free); this only reads them.
 def mode_of(st):
+    if st.about:       return "about"    # overlay above sys: exit reveals SYSTEM
     if st.tuner:       return "tuner"
     if st.confirm:     return "confirm"
     if st.naming:      return "naming"
@@ -519,10 +529,12 @@ class AppController:
         if it == "Tuner":
             self.st.sys = False
             self.enter("tuner")
+        elif it == "About":                    # leave st.sys set: About overlays it,
+            self.enter("about")                # so exiting reveals the menu again
         elif it == "< Back":
             self.st.sys = False
-        elif it not in SYSVALUES:              # only an unimplemented *action*
-            self._toast("TODO: " + it)         # is a TODO — i.e. About, alone
+        elif it not in SYSVALUES:              # (no unimplemented actions remain)
+            self._toast("TODO: " + it)
 
     def combo(self):
         """ENC0+ENC1 — the global snapshot save (2a).
@@ -593,6 +605,15 @@ class TunerMode(Mode):
         c.st.tuner = False
     def on_hold(self, c, enc):
         c.st.tuner = False
+
+
+class AboutMode(Mode):
+    def enter(self, c):                    # overlay ABOVE sys: leave st.sys set so
+        c.st.about = True                  # exiting drops back into the SYSTEM menu
+    def on_click(self, c, enc):            # any press exits (informational leaf)
+        c.st.about = False
+    def on_hold(self, c, enc):
+        c.st.about = False
 
 
 class ConfirmMode(Mode):
@@ -858,6 +879,7 @@ class AddMode(NavMode):
 
 
 MODES = {
+    "about": AboutMode(),
     "tuner": TunerMode(), "confirm": ConfirmMode(), "naming": NamingMode(),
     "sub": SubMode(), "pick": PickMode(), "sys": SysMode(), "menu": MenuMode(),
     "glance": GlanceMode(), "sysfocus": SysFocusMode(), "moving": MovingMode(),
@@ -886,7 +908,7 @@ def _rail_split(st):
     zone sits beside the content its encoder drives. Chain maps ENC0->node strip
     (top) / ENC1->knobs (bottom) at ~3:7; glance splits at its own rule; modals
     don't map encoders to top/bottom regions so they stay ~1:1."""
-    if mode_of(st) in ("tuner", "confirm", "naming", "sub", "pick", "sys",
+    if mode_of(st) in ("about", "tuner", "confirm", "naming", "sub", "pick", "sys",
                        "menu", "sysfocus"):
         return 64                            # ~1:1: no top/bottom encoder mapping
     if st.depth == -1:
@@ -919,6 +941,8 @@ def rails(st):
     'solid'=dedicated engagement · tuple=scrollable list (thumb) · 'idle'=usable
     but secondary · 'off'=dead hand. Danger(red) stays the LED's job, not the rail."""
     m = mode_of(st)
+    if m == "about":
+        return ("solid", "off")              # info leaf: any press exits (like tuner)
     if m == "tuner":
         return ("solid", "off")              # E0 live = E0-hold exits (back rule, Q1)
     if m == "confirm":
@@ -961,6 +985,8 @@ def rails(st):
 
 def _frame(st):
     m = mode_of(st)
+    if m == "about":
+        return _about(st)
     if m == "tuner":
         return _tuner(st)
     if m == "confirm":
@@ -1426,6 +1452,34 @@ def _sys(st):
                 s.T(SYSVLABEL[cur], 120 - int(s.Tw(8, SYSVLABEL[cur])), y + 2, 8, fill=f)
     s.T("e0 move.click  e1 set  HOLD back", 5, 120, 6)
     _toast_over(s, st)
+    return s.img
+
+
+def _about(st):
+    s = Screen()
+    s.T("ABOUT", 6, 4, 8, ls=1)
+    s.T("press exit", 84, 4, 6)               # any-press-exit leaf, like the tuner
+    s.hline(0, 16, 128)
+    # Network, mode-conditional and honest. hotspot names the pb-hotspot profile's
+    # own constants; client shows the LIVE ssid/ip (radio.status), "--" until it
+    # lands or while unassociated; off has nothing. Never a stale guess (cf. meter).
+    if st.wifi == "off":
+        s.T("WiFi: off", 6, 26, 8)
+    elif st.wifi == "hotspot":
+        s.T("AP: " + HOTSPOT_SSID, 6, 24, 8)
+        s.T(HOTSPOT_IP, 6, 38, 8)
+    elif st.net_ssid:
+        s.Tclip(st.net_ssid, 6, 24, 8, 116)   # a room's SSID can overrun 128px
+        s.T(st.net_ip or "--", 6, 38, 8)
+    else:
+        s.T("WiFi: --", 6, 26, 8)             # on, but not read yet / not associated
+    s.hline(0, 56, 128)
+    s.T("written by", 6, 64, 6)
+    s.T("miza and claude", 6, 74, 12)         # '&' renders as '$' in this pixel font
+    b = (st.build or "unknown").split(" ", 1)   # "<date> <hash>" -> two lines, so a
+    s.T("build " + b[0], 6, 100, 6)             # long dirty hash never clips the date
+    if len(b) > 1:
+        s.T(b[1], 6, 110, 8)
     return s.img
 
 
@@ -2162,6 +2216,115 @@ def _tunertest():
         raise SystemExit(1)
 
 
+def _abouttest():
+    """SYSTEM > About (① 기능) — the overlay, the live-read seam, the frames.
+
+    Three seams meet here and each has a way to lie: the mode (must reveal the
+    SYSTEM menu on exit, not drop to the chain), the network read (must read the
+    world, and only in client mode, and say "--" when it can't), and the frame
+    (each wifi state is a different truth and must look different). No nmcli, no
+    git, no threads — every impure edge is injected.
+    """
+    from ganglion.hw.radio import Radio
+    from ganglion.runtime import _build_stamp
+
+    ok = True
+
+    def check(label, got, want):
+        nonlocal ok
+        ok &= got == want
+        print("%-48s %s" % (label, "OK" if got == want else
+                            "FAIL  got %r want %r" % (got, want)))
+
+    # -- the mode: an overlay above SYSTEM, entered by ENC0 click on "About" ---
+    c = AppController()
+    c.enter("sys")
+    for _ in range(SYSITEMS.index("About")):
+        c.feed(Rotate(0, 1))                 # ENC0 walks the list to About
+    check("cursor lands on About", SYSITEMS[c.st.sys_idx], "About")
+    c.feed(Press(0, "click"))                # ENC0 click -> _sys_act -> enter("about")
+    check("About opens, SYSTEM stays under it", (c.st.about, c.st.sys), (True, True))
+    check("...and it is the active mode", mode_of(c.st), "about")
+    c.feed(Press(0, "click"))                # any press exits (info leaf)
+    check("exit reveals the SYSTEM menu (not chain)",
+          (c.st.about, c.st.sys, mode_of(c.st)), (False, True, "sys"))
+    c.feed(Press(0, "click"))                # re-enter
+    c.feed(Press(1, "long"))                 # ENC1-hold also exits
+    check("hold exits too", (c.st.about, mode_of(c.st)), (False, "sys"))
+
+    # -- the read seam: live client SSID/IP, client mode only -----------------
+    sync = lambda fn: fn()                   # noqa: E731 — run the worker inline
+    st = AppState(wifi="on")
+    Radio(read_net=lambda: ("MyNet", "10.0.0.5"), spawn=sync).status(st)
+    check("client mode reads ssid + ip", (st.net_ssid, st.net_ip), ("MyNet", "10.0.0.5"))
+
+    st = AppState(wifi="on")                 # unassociated / no lease -> None, not stale
+    Radio(read_net=lambda: (None, None), spawn=sync).status(st)
+    check("unassociated -> None (view shows '--')", (st.net_ssid, st.net_ip), (None, None))
+
+    for w in ("hotspot", "off"):             # these never pay for a read
+        reads = []
+        st = AppState(wifi=w)
+        Radio(read_net=lambda: reads.append(1) or ("x", "y"), spawn=sync).status(st)
+        check("%s does not read the radio" % w,
+              (st.net_ssid, st.net_ip, reads), (None, None, []))
+
+    # -- the Runtime edge: status fires once per About open, off-thread --------
+    class _NoInput:
+        def poll(self, now):
+            return []
+
+    class _NullSink:
+        def show(self, frame):
+            pass
+
+    class _FakeRadio:
+        def __init__(self):
+            self.calls = 0
+        def set_wifi(self, s):
+            pass
+        def set_bt(self, s):
+            pass
+        def status(self, st):
+            self.calls += 1
+
+    from ganglion.runtime import Runtime
+    fr = _FakeRadio()
+    c = AppController()
+    rt = Runtime(c, _NoInput(), _NullSink(), render, radio=fr,
+                 clock=lambda: 0.0, sleep=lambda dt: None)
+    c.st.about = True
+    rt.step(); rt.step()                     # held open across two ticks
+    check("status fires once on the About edge, not per tick", fr.calls, 1)
+    c.st.about = False; rt.step()
+    c.st.about = True; rt.step()             # a fresh open reads again
+    check("re-opening About reads again", fr.calls, 2)
+
+    # -- the frames: each wifi state is a distinct, honest truth ---------------
+    frame = lambda **kw: render(AppState(about=True, **kw)).tobytes()
+    off = frame(wifi="off")
+    hotspot = frame(wifi="hotspot")
+    client = frame(wifi="on", net_ssid="Net", net_ip="1.2.3.4")
+    pending = frame(wifi="on")               # client, read not landed -> "WiFi: --"
+    check("off / hotspot / client / pending are 4 different frames",
+          len({off, hotspot, client, pending}), 4)
+
+    unknown = frame(wifi="off", build=None)          # -> "unknown"
+    stamped = frame(wifi="off", build="2026-07-20 abc1234")
+    check("build line renders (None -> 'unknown', differs from a stamp)",
+          unknown != stamped, True)
+
+    # -- the stamp itself: date + hash off this repo, else "unknown" ----------
+    stamp = _build_stamp()
+    check("build stamp is '<YYYY-MM-DD> <hash>' (or 'unknown' off a checkout)",
+          stamp == "unknown" or (len(stamp.split()) == 2 and len(stamp.split()[0]) == 10),
+          True)
+
+    print("\nABOUT-%s" % ("OK" if ok else "FAIL"))
+    if not ok:
+        raise SystemExit(1)
+
+
 def main(argv):
     if "--fonttest" in argv:
         _fonttest()
@@ -2171,6 +2334,9 @@ def main(argv):
         return
     if "--tunertest" in argv:
         _tunertest()
+        return
+    if "--abouttest" in argv:
+        _abouttest()
         return
     if "--walk" in argv:
         _walk()

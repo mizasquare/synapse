@@ -68,6 +68,15 @@ Nothing here names a *client* SSID on purpose. There are several saved
 (Florsheim, KBRI_WiFi6, KT_...); leaving ``on`` to NetworkManager's autoconnect
 means the rig follows the user to another room, and another house, by itself."""
 
+HOTSPOT_SSID = "starry"
+HOTSPOT_IP = "172.24.1.1"
+"""The pb-hotspot profile's own identity, lifted out of the prose above so the
+About screen can name it. Not read from the system: in ``hotspot`` these are
+fixed by the profile (``ipv4.method=shared`` pins 172.24.1.1/24), so showing them
+is naming a constant, not inventing a reading. The *client* SSID/IP are the
+opposite — they drift with the room, so About reads those live (hw/radio.py
+``status``); these two never do."""
+
 BT_STATES = ("on", "off")
 BT_DEFAULT = "off"
 """on/off only, so rfkill does it — and `miza`'s `netdev` membership is a *group*

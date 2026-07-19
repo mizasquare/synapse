@@ -20,6 +20,7 @@ Seams:
   power.idle(elapsed) / .wake() / .set_on(level)   (optional; hw.oled.PanelPower)
   settings.apply(st) / .observe(st)    (optional; settings.Settings)
   radio.set_wifi(state) / .set_bt(state)   (optional; hw.radio.Radio)
+  radio.status(st)                     (optional; live SSID/IP on the About edge)
   meter.observe(st)                    (optional; hw.meter.Meter — INBOUND)
   tuner.observe(st)                    (optional; hw.tuner.Tuner — INBOUND, on-demand)
 """
@@ -27,6 +28,33 @@ Seams:
 import time as _time
 
 from ganglion.config import BRIGHT_LEVELS, I2C_ADDR, ROTATE
+
+
+def _build_stamp():
+    """"<date> <shorthash>[*]" for the About screen, or "unknown" off a checkout.
+
+    Not ``git describe``: this repo carries internal milestone tags (gap-d-...),
+    so describe yields a long tag-relative form ("gap-d-complete-297-g380a85e")
+    that reads as a version we don't keep. There is no release numbering here, so
+    the honest identity of the running code is just the commit — date + short
+    hash. The trailing ``*`` marks a dirty tree (``-uno``: tracked edits only, the
+    on-metal-poke signal, not stray files), which is the one thing that moves
+    without a commit. This file's repo, never the cwd; non-zero rc -> "unknown"."""
+    import os
+    import subprocess
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    def _git(*args):
+        return subprocess.run(("git",) + args, cwd=root, capture_output=True,
+                              text=True, timeout=5).stdout.strip()
+
+    try:
+        h = _git("rev-parse", "--short", "HEAD")
+        d = _git("log", "-1", "--format=%cd", "--date=short")
+        dirty = "*" if _git("status", "--porcelain", "-uno") else ""
+    except (OSError, subprocess.TimeoutExpired):
+        return "unknown"
+    return ("%s %s%s" % (d, h, dirty)).strip() if h else "unknown"
 
 
 class Runtime:
@@ -66,6 +94,8 @@ class Runtime:
         self.sleep = sleep
         self._t0 = None
         self._t_input = None
+        self._about_was = False             # edge tracker: fire radio.status once
+        #                                     when About opens, not every tick
 
     def _draw(self):
         self.sink.show(self.view(self.c.st))
@@ -92,6 +122,9 @@ class Runtime:
         if self.radio:                      # same shape again; both are edge-only,
             self.radio.set_wifi(self.c.st.wifi)     # and the first call is the
             self.radio.set_bt(self.c.st.bt)         # boot-time apply
+            if self.c.st.about and not self._about_was:   # About just opened: one
+                self.radio.status(self.c.st)              # live read of client SSID/IP
+            self._about_was = self.c.st.about             # (off-thread; no-op unless on)
         for ev in events:
             self.c.feed(ev)
         if self.settings:
@@ -327,6 +360,8 @@ def run_device(controller, view, leds):
     # capture_1, spun up and torn down on the mode edge, so it costs nothing the
     # rest of the time.
     tuner = Tuner()
+
+    controller.st.build = _build_stamp()   # About's version line, read once here
 
     rt = Runtime(controller, source, sink, view, leds=leds, led_out=led_out,
                  power=power, settings=settings, radio=Radio(), meter=meter,

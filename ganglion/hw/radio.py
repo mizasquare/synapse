@@ -51,6 +51,36 @@ def _bt_cmds(state):
     return [(["rfkill", "unblock" if state == "on" else "block", "bluetooth"], True)]
 
 
+def _read_net(dev="wlan0"):
+    """``(ssid, ip)`` for the client radio *right now*, via nmcli, or None each.
+
+    Two reads: the active SSID (``active,ssid`` — the one row nmcli marks ``yes``)
+    and the interface's IPv4 (stripped of its ``/24``). Either can be None — not
+    associated yet, no lease, or nmcli absent on a dev box — and None is honest:
+    About shows "--", the same as a meter with no JACK, never a stale guess."""
+    ssid = ip = None
+    try:
+        r = subprocess.run(["nmcli", "-t", "-f", "active,ssid", "dev", "wifi"],
+                           capture_output=True, text=True, timeout=8)
+        for line in r.stdout.splitlines():
+            if line.startswith("yes:"):          # the associated network's row
+                ssid = line[4:].strip() or None
+                break
+    except (OSError, subprocess.TimeoutExpired) as e:
+        logging.warning("ganglion radio: ssid read: %s", e)
+    try:
+        r = subprocess.run(["nmcli", "-t", "-f", "IP4.ADDRESS", "dev", "show", dev],
+                           capture_output=True, text=True, timeout=8)
+        for line in r.stdout.splitlines():
+            if ":" in line:                      # IP4.ADDRESS[1]:192.168.0.64/24
+                ip = line.split(":", 1)[1].split("/")[0].strip() or None
+                if ip:
+                    break
+    except (OSError, subprocess.TimeoutExpired) as e:
+        logging.warning("ganglion radio: ip read: %s", e)
+    return ssid, ip
+
+
 def _spawn(steps, what):
     """Run the steps on a worker thread; never make the caller wait."""
 
@@ -70,10 +100,26 @@ def _spawn(steps, what):
 
 
 class Radio:
-    """Apply the chosen radio states. Edge-only; the runner is injectable."""
+    """Apply the chosen radio states. Edge-only; the runner is injectable.
 
-    def __init__(self, run=_spawn):
+    ``status`` is a **deliberate read**, and the one exception to the write-only
+    contract in this module's header. That contract is about the *control* path:
+    the tri-state on/hotspot/off never reads back, because the UI shows what you
+    chose. ``status`` is a different path with a different reason to exist — About
+    wants the client's actual SSID and lease, which no ``set_wifi`` knows: the
+    ``on`` case never runs ``con up`` (autoconnect associates *after* the worker
+    exits), and the rig roams rooms and renews leases with **no radio edge at
+    all** (config.py's autoconnect note). So a cache off the last write would be
+    stale exactly where it matters; ``status`` reads the world when About opens."""
+
+    def __init__(self, run=_spawn, read_net=_read_net, spawn=None):
         self.run = run
+        self._read_net = read_net
+        # How the status read runs off-thread. Default: a daemon like _spawn's, so
+        # a slow nmcli never stalls the 33Hz encoder poll. Tests inject a
+        # synchronous runner to read the result without joining a thread.
+        self._spawn = spawn or (lambda fn: threading.Thread(
+            target=fn, name="ganglion-netstat", daemon=True).start())
         self._last = {}
 
     def set_wifi(self, state):
@@ -90,3 +136,17 @@ class Radio:
         self._last[key] = state
         self.run(cmds(state), "%s=%s" % (key, state))
         return True
+
+    def status(self, st):
+        """Client SSID/IP -> st.net_ssid / st.net_ip, once, off-thread.
+
+        Only in ``on``: ``hotspot`` shows the profile's constants (config) and
+        ``off`` has nothing, so neither pays for an nmcli read. The Runtime fires
+        this on the About-open edge, not per tick."""
+        if st.wifi != "on":
+            return
+        self._spawn(lambda: self._write_net(st))
+
+    def _write_net(self, st):
+        st.net_ssid, st.net_ip = self._read_net()   # atomic attr writes (GIL); the
+        #                                             render thread reads them next tick

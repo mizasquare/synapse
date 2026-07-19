@@ -6,7 +6,8 @@
 > 이 문서는 거기 흩어진 "남은 것"만 집계한다. 설계 정본 = [`design.md`](design.md).
 > 마지막 갱신: **2026-07-20** — 번인 방어(S) · 버그 2건(T) · MIDI Ch 제거 · Brightness(U) ·
 > 설정 저장소(V) · 라디오(W) · **텍스트 래스터 캐시(X)** · **레벨미터(H, 실기 검증)** ·
-> **튜너 실동작**(온디맨드 cochlea 심, **온메탈 실음 검증까지 완료**)까지 닫힘. **①에 About만 남았다.**
+> **튜너 실동작**(온메탈 실음 검증까지 완료) · **SYSTEM About**(네트워크·크레딧·build)까지 닫힘.
+> **① 기능축이 사실상 비었다** — 남은 건 `effect 채널`(소) 하나뿐. 다음 축은 ② 뷰 폴리시.
 >
 > ⚠️ **④의 "RT 경로에서 파이썬 빼기"는 폐기됐다 — 문제가 존재하지 않았다.** 미터의 xrun 688은
 > 파이썬도 GIL도 아니고 유닛에 `LimitRTPRIO`가 없어 콜백이 SCHED_OTHER로 돌던 것이었다. 유닛
@@ -93,12 +94,23 @@ finalize다.
 >   (synapse의 MIDI = 페달 배선인데 이 기기엔 페달이 없다), 인바운드는 **MODEP가 이미 처리한다**
 >   (PC ch1 → 스냅샷, 지금 켜져 있음). → design.md §9-9 닫음.
 >
-> **남은 것:** `[열림]` **hotspot일 때 화면에 뭘 보여줄지** — 지금 SYSTEM 행엔 `AP`뿐이다. 붙을
-> SSID(`starry`)·IP(172.24.1.1)를 어디 보여줄지 미결. 아래 `About`과 같은 주제.
+> **~~남은 것~~ [닫힘, About에서 함께]:** hotspot일 때 뭘 보여줄지는 About의 네트워크 줄이
+> 흡수했다 — `AP: starry` / `172.24.1.1`(config 상수). 클라이언트일 땐 `<SSID>: <IP>`를 라이브로.
 
-- [ ] **SYSTEM `About`** — 마지막 남은 `TODO:` 토스트 스텁이자 **유일한 미구현 액션**(값 항목은
-      클릭에 반응하지 않는다 — 결정 W 후속). 무엇을 보일지 미결: 버전? 보드수? I2C 주소?
-      **hotspot SSID/IP?** 위 `[열림]`과 같은 주제라 같이 정하는 게 자연스럽다. (소, 결정 필요)
+- [x] **SYSTEM `About`** `[해결]`(2026-07-20) — 마지막 `TODO:` 토스트 스텁이자 유일한 미구현
+      액션이었다. `tuner`처럼 실제 화면 모드로 올리되 **SYSTEM 위에 얹는 오버레이**(mode_of 최상위)라
+      **이탈이 공짜로 SYSTEM 메뉴 복귀**가 된다(confirm-over-sub와 같은 패턴). 세 줄:
+      **네트워크**(모드 조건부·정직) — `hotspot`→`AP: starry`/`172.24.1.1`(config 상수),
+      `on`→라이브 `<SSID>: <IP>`(못 받았으면 `WiFi: --`), `off`→`WiFi: off`. 라이브 값은
+      **`hw/radio.py`에 분리한 `status()` 읽기 경로**로 얻는다 — radio의 write-only 독트린은
+      *컨트롤 경로*(3상태)에만 걸리고, About의 읽기는 별개다. **`set_wifi` 콜백에 안 붙인 이유**:
+      클라이언트는 autoconnect가 워커 종료 *후* 붙어 IP가 없고, 로밍·DHCP가 radio 엣지 없이 세상을
+      바꿔 캐시가 썩는다 → About 열 때 라이브로 읽는다(워커 스레드 1회, Runtime이 엣지 구동).
+      **크레딧** `written by / miza and claude`(`&`가 이 폰트에서 `$`로 읽혀 `and`). **build**
+      `<날짜> <short-hash>[*]`(runtime `_build_stamp`, `git describe`는 내부 마일스톤 태그 때문에
+      장황해 `rev-parse --short`+dirty로; 릴리즈 넘버링을 안 하므로 커밋이 곧 신원). `--abouttest`
+      14검(오버레이 진입/이탈, 라이브 읽기 client-only·None, Runtime 엣지 1회, 4프레임 구분, 스탬프)
+      + `--walk` 골든 불변(about 기본 False). **남은 것:** 온메탈 실 네트워크 확인(SSID/IP 실측).
 - [x] **레벨미터 배선 (결정 H)** `[해결]`(2026-07-17) — synapse `levelmeter.py`(자체 `jack.Client`,
       IN=`capture_1/2` 탭 · OUT=playback 피더 미러링)를 `Runtime`의 심으로 얹었다 — `power`/`settings`/
       `radio`와 같은 자리지만 **방향이 반대**(하드웨어→상태, `st.t`와 같은 부류). **인프로세스로 산다.**
